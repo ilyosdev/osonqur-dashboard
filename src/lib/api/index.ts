@@ -14,3 +14,4 @@ export * from './warehouses';
 export * from './workers';
 export * from './finance';
 export * from './telegram-groups';
+export * from './analytics';

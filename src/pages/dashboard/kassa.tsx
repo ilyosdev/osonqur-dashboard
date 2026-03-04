@@ -1,4 +1,4 @@
-import { useState, useCallback } from "react";
+import { useState } from "react";
 import {
   Wallet,
   TrendingUp,
@@ -12,6 +12,8 @@ import {
   XCircle,
   Clock,
   User,
+  DollarSign,
+  ArrowDownCircle,
 } from "lucide-react";
 import { StatsCard } from "@/components/dashboard/stats-card";
 import {
@@ -48,6 +50,7 @@ import {
   cashRequestsApi,
   CashTransaction,
   CashRegisterDetailed,
+  incomesApi,
 } from "@/lib/api/finance";
 import { projectsApi } from "@/lib/api/projects";
 import { PaginatedResponse } from "@/lib/api/client";
@@ -58,17 +61,20 @@ function formatMoney(num: number): string {
   return num.toLocaleString("uz-UZ");
 }
 
-type ActiveView = "balance" | "history" | "expenses" | "requests";
+type ActiveView = "balance" | "history" | "expenses" | "requests" | "incomes";
 
 export default function KassaPage() {
   const { user } = useAuth();
   const role = user?.role;
-  const canRequestMoney = role !== "BUGALTERIYA";
-  const isBugalteriya = hasRole(role, ["BUGALTERIYA", "DIREKTOR", "BOSS"]);
+  const isReadOnly = role === "BOSS";
+  const canRequestMoney = role !== "BUGALTERIYA" && !isReadOnly;
+  const isBugalteriya = hasRole(role, ["BUGALTERIYA", "DIREKTOR"]);
 
   const [activeView, setActiveView] = useState<ActiveView>("balance");
   const [requestDialogOpen, setRequestDialogOpen] = useState(false);
   const [expenseDialogOpen, setExpenseDialogOpen] = useState(false);
+  const [incomeDialogOpen, setIncomeDialogOpen] = useState(false);
+  const [fillBalanceDialogOpen, setFillBalanceDialogOpen] = useState(false);
   const [rejectDialogOpen, setRejectDialogOpen] = useState<string | null>(null);
   const [rejectReason, setRejectReason] = useState("");
 
@@ -122,6 +128,17 @@ export default function KassaPage() {
     { enabled: activeView === "expenses" && !!koshelok }
   );
 
+  // Incomes list (for BUGALTERIYA)
+  const {
+    data: incomesData,
+    loading: incomesLoading,
+    refetch: refetchIncomes,
+  } = useApi(
+    () => incomesApi.getAll({ limit: 50 }),
+    [],
+    { enabled: isBugalteriya && activeView === "incomes" }
+  );
+
   // Cash requests (for BUGALTERIYA)
   const {
     data: cashRequestsData,
@@ -144,6 +161,7 @@ export default function KassaPage() {
   );
 
   const pendingCashRequests = cashRequestsData?.data || [];
+  const incomesList = incomesData?.data || [];
 
   const handleApprove = async (id: string) => {
     try {
@@ -216,7 +234,7 @@ export default function KassaPage() {
       )}
 
       {/* Action buttons */}
-      <div className="grid gap-3 grid-cols-2 sm:grid-cols-3 lg:grid-cols-6">
+      <div className="grid gap-3 grid-cols-2 sm:grid-cols-3 lg:grid-cols-8">
         <ActionButton
           icon={Wallet}
           label="Balans"
@@ -248,18 +266,30 @@ export default function KassaPage() {
           onClick={() => setExpenseDialogOpen(true)}
         />
         {isBugalteriya && (
-          <ActionButton
-            icon={Users}
-            label="Pul so'rovlari"
-            active={activeView === "requests"}
-            onClick={() => setActiveView("requests")}
-            badge={pendingCashRequests.length > 0 ? pendingCashRequests.length : undefined}
-          />
+          <>
+            <ActionButton
+              icon={ArrowDownCircle}
+              label="Kirim qo'shish"
+              onClick={() => setIncomeDialogOpen(true)}
+            />
+            <ActionButton
+              icon={DollarSign}
+              label="Balans to'ldirish"
+              onClick={() => setFillBalanceDialogOpen(true)}
+            />
+            <ActionButton
+              icon={Users}
+              label="Pul so'rovlari"
+              active={activeView === "requests"}
+              onClick={() => setActiveView("requests")}
+              badge={pendingCashRequests.length > 0 ? pendingCashRequests.length : undefined}
+            />
+          </>
         )}
       </div>
 
       {/* Date filters for history/expenses */}
-      {(activeView === "history" || activeView === "expenses") && (
+      {(activeView === "history" || activeView === "expenses" || activeView === "incomes") && (
         <Card>
           <CardContent className="pt-4 pb-3">
             <div className="flex flex-wrap items-end gap-3">
@@ -317,6 +347,48 @@ export default function KassaPage() {
           loading={expensesLoading}
           type="OUT"
         />
+      )}
+      {activeView === "incomes" && isBugalteriya && (
+        <Card className="animate-slide-up">
+          <CardHeader>
+            <CardTitle className="text-base font-semibold flex items-center gap-2">
+              <TrendingUp className="h-4 w-4 text-success" />
+              Kirimlar
+            </CardTitle>
+            <CardDescription>Barcha kirim yozuvlari</CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            {incomesLoading ? (
+              <div className="space-y-3">
+                {[1, 2, 3].map((i) => (
+                  <div key={i} className="h-16 bg-muted/50 rounded-lg animate-pulse" />
+                ))}
+              </div>
+            ) : incomesList.length === 0 ? (
+              <div className="text-center py-8 text-muted-foreground">
+                <TrendingUp className="h-12 w-12 mx-auto mb-4 opacity-50" />
+                <p>Hozircha kirim yo'q</p>
+              </div>
+            ) : (
+              incomesList.map((income) => (
+                <div
+                  key={income.id}
+                  className="flex items-center justify-between p-3 rounded-lg border bg-success/5 border-success/10"
+                >
+                  <div>
+                    <p className="font-medium text-sm">{income.category || "Kirim"}</p>
+                    <p className="text-xs text-muted-foreground">
+                      {income.description} • {new Date(income.date).toLocaleDateString("uz-UZ")}
+                    </p>
+                  </div>
+                  <p className="font-semibold text-success">
+                    +{formatMoney(income.amount)} so'm
+                  </p>
+                </div>
+              ))
+            )}
+          </CardContent>
+        </Card>
       )}
       {activeView === "requests" && isBugalteriya && (
         <Card className="animate-slide-up">
@@ -459,6 +531,32 @@ export default function KassaPage() {
           if (activeView === "expenses") refetchExpenses();
         }}
       />
+
+      {/* Add income dialog (for BUGALTERIYA) */}
+      {isBugalteriya && (
+        <AddIncomeDialog
+          open={incomeDialogOpen}
+          onOpenChange={setIncomeDialogOpen}
+          onSuccess={() => {
+            setIncomeDialogOpen(false);
+            if (activeView === "incomes") refetchIncomes();
+          }}
+        />
+      )}
+
+      {/* Fill balance dialog (for BUGALTERIYA) */}
+      {isBugalteriya && (
+        <FillBalanceDialog
+          open={fillBalanceDialogOpen}
+          onOpenChange={setFillBalanceDialogOpen}
+          koshelokId={koshelok?.id}
+          onSuccess={() => {
+            setFillBalanceDialogOpen(false);
+            refetchKoshelok();
+            if (activeView === "history") refetchHistory();
+          }}
+        />
+      )}
     </div>
   );
 }
@@ -788,6 +886,214 @@ function AddExpenseDialog({
             disabled={loading || !amount || !koshelokId}
           >
             {loading ? "Saqlanmoqda..." : "Saqlash"}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+function AddIncomeDialog({
+  open,
+  onOpenChange,
+  onSuccess,
+}: {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  onSuccess: () => void;
+}) {
+  const [amount, setAmount] = useState("");
+  const [category, setCategory] = useState("");
+  const [description, setDescription] = useState("");
+  const [accountId, setAccountId] = useState("");
+
+  const { data: accountsData } = useApi(
+    () => import("@/lib/api/finance").then(m => m.accountsApi.getAll({ limit: 100 })),
+    [],
+    { enabled: open }
+  );
+
+  const { mutate, loading } = useMutation(
+    (data: { accountId: string; amount: number; date: string; category: string; description?: string }) =>
+      incomesApi.create(data)
+  );
+
+  const handleSubmit = async () => {
+    if (!amount || !accountId || !category) return;
+    try {
+      await mutate({
+        accountId,
+        amount: Number(amount),
+        date: new Date().toISOString().split("T")[0],
+        category,
+        description: description || undefined,
+      });
+      setAmount("");
+      setCategory("");
+      setDescription("");
+      setAccountId("");
+      onSuccess();
+    } catch {
+      // error handled by useMutation
+    }
+  };
+
+  const incomeCategories = [
+    "Loyiha to'lovi",
+    "Avans",
+    "Qarz qaytarish",
+    "Boshqa",
+  ];
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle>Kirim qo'shish</DialogTitle>
+          <DialogDescription>
+            Yangi kirim operatsiyasini kiriting
+          </DialogDescription>
+        </DialogHeader>
+        <div className="space-y-4 py-2">
+          <div className="space-y-2">
+            <Label>Hisob</Label>
+            <Select value={accountId} onValueChange={setAccountId}>
+              <SelectTrigger>
+                <SelectValue placeholder="Hisobni tanlang" />
+              </SelectTrigger>
+              <SelectContent>
+                {(accountsData?.data ?? []).map((a) => (
+                  <SelectItem key={a.id} value={a.id}>
+                    {a.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="space-y-2">
+            <Label>Kategoriya</Label>
+            <Select value={category} onValueChange={setCategory}>
+              <SelectTrigger>
+                <SelectValue placeholder="Kategoriyani tanlang" />
+              </SelectTrigger>
+              <SelectContent>
+                {incomeCategories.map((c) => (
+                  <SelectItem key={c} value={c}>
+                    {c}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="space-y-2">
+            <Label>Summa (so'm)</Label>
+            <Input
+              type="number"
+              min={1}
+              placeholder="Summani kiriting"
+              value={amount}
+              onChange={(e) => setAmount(e.target.value)}
+            />
+          </div>
+          <div className="space-y-2">
+            <Label>Izoh</Label>
+            <Textarea
+              placeholder="Izoh (ixtiyoriy)"
+              value={description}
+              onChange={(e) => setDescription(e.target.value)}
+            />
+          </div>
+        </div>
+        <DialogFooter>
+          <Button variant="outline" onClick={() => onOpenChange(false)}>
+            Bekor qilish
+          </Button>
+          <Button
+            onClick={handleSubmit}
+            disabled={loading || !amount || !accountId || !category}
+          >
+            {loading ? "Saqlanmoqda..." : "Saqlash"}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+function FillBalanceDialog({
+  open,
+  onOpenChange,
+  koshelokId,
+  onSuccess,
+}: {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  koshelokId?: string;
+  onSuccess: () => void;
+}) {
+  const [amount, setAmount] = useState("");
+  const [note, setNote] = useState("");
+
+  const { mutate, loading } = useMutation(
+    (data: { cashRegisterId: string; type: "IN"; amount: number; note?: string }) =>
+      cashRegistersApi.createTransaction(data)
+  );
+
+  const handleSubmit = async () => {
+    if (!koshelokId || !amount) return;
+    try {
+      await mutate({
+        cashRegisterId: koshelokId,
+        type: "IN",
+        amount: Number(amount),
+        note: note || "Balans to'ldirish",
+      });
+      setAmount("");
+      setNote("");
+      onSuccess();
+    } catch {
+      // error handled by useMutation
+    }
+  };
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle>Balans to'ldirish</DialogTitle>
+          <DialogDescription>
+            Koshelok balansini to'ldiring
+          </DialogDescription>
+        </DialogHeader>
+        <div className="space-y-4 py-2">
+          <div className="space-y-2">
+            <Label>Summa (so'm)</Label>
+            <Input
+              type="number"
+              min={1}
+              placeholder="Summani kiriting"
+              value={amount}
+              onChange={(e) => setAmount(e.target.value)}
+            />
+          </div>
+          <div className="space-y-2">
+            <Label>Izoh</Label>
+            <Textarea
+              placeholder="Izoh (ixtiyoriy)"
+              value={note}
+              onChange={(e) => setNote(e.target.value)}
+            />
+          </div>
+        </div>
+        <DialogFooter>
+          <Button variant="outline" onClick={() => onOpenChange(false)}>
+            Bekor qilish
+          </Button>
+          <Button
+            onClick={handleSubmit}
+            disabled={loading || !amount || !koshelokId}
+          >
+            {loading ? "Saqlanmoqda..." : "To'ldirish"}
           </Button>
         </DialogFooter>
       </DialogContent>

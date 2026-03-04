@@ -14,7 +14,7 @@ test.describe('BOSS/OWNER Flow - Organization Setup', () => {
       await page.goto('/register');
 
       // Check all form fields are present
-      await expect(page.getByText('SMETAKON')).toBeVisible();
+      await expect(page.getByText('Osonqur')).toBeVisible();
       await expect(page.locator('[data-slot="card-title"]')).toContainText("Ro'yxatdan o'tish");
       await expect(page.getByLabel('Tashkilot nomi')).toBeVisible();
       await expect(page.getByLabel("To'liq ismingiz")).toBeVisible();

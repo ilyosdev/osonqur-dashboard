@@ -1,7 +1,7 @@
 import { apiClient } from './client';
 
 export interface LoginRequest {
-  phone: string;
+  login: string;
   password: string;
 }
 

@@ -1,9 +1,10 @@
 import { useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from './auth-context';
+import { canAccessRoute } from './role-guard';
 
 export function AuthGuard({ children }: { children: React.ReactNode }) {
-  const { isAuthenticated, isLoading, isAdmin } = useAuth();
+  const { user, isAuthenticated, isLoading, isAdmin } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
 
@@ -15,7 +16,13 @@ export function AuthGuard({ children }: { children: React.ReactNode }) {
     if (!isLoading && isAuthenticated && isAdmin && !location.pathname.startsWith('/admin')) {
       navigate('/admin', { replace: true });
     }
-  }, [isLoading, isAuthenticated, isAdmin, navigate, location]);
+    // Check role-based route access and redirect unauthorized users to home
+    if (!isLoading && isAuthenticated && user && !isAdmin) {
+      if (!canAccessRoute(user.role, location.pathname)) {
+        navigate('/', { replace: true });
+      }
+    }
+  }, [isLoading, isAuthenticated, isAdmin, user, navigate, location]);
 
   if (isLoading) {
     return (
@@ -29,6 +36,11 @@ export function AuthGuard({ children }: { children: React.ReactNode }) {
   }
 
   if (!isAuthenticated) {
+    return null;
+  }
+
+  // Block access to unauthorized routes
+  if (user && !isAdmin && !canAccessRoute(user.role, location.pathname)) {
     return null;
   }
 

@@ -9,6 +9,8 @@ import {
   DollarSign,
   Calculator,
   MessageSquare,
+  BarChart3,
+  TrendingUp,
 } from "lucide-react";
 import { StatsCard } from "@/components/dashboard/stats-card";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -17,6 +19,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   Dialog,
   DialogContent,
@@ -31,9 +34,19 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
 import { useApi, useMutation } from "@/hooks/use-api";
+import { useAuth } from "@/lib/auth";
 import { workersApi, WorkLog } from "@/lib/api/workers";
 import { smetaItemsApi, SmetaItem } from "@/lib/api/smeta-items";
+import { analyticsApi, SmetaMonitoringSummary } from "@/lib/api/analytics";
 import { StatsSkeleton } from "@/components/ui/table-skeleton";
 import { ErrorMessage } from "@/components/ui/error-message";
 
@@ -70,6 +83,10 @@ interface PriceAdjustmentData {
 }
 
 export default function ValidationPage() {
+  const { user } = useAuth();
+  const isReadOnly = user?.role === "BOSS";
+
+  const [activeTab, setActiveTab] = useState("validation");
   const [priceDialog, setPriceDialog] = useState<WorkLog | null>(null);
   const [rejectDialog, setRejectDialog] = useState<WorkLog | null>(null);
   const [priceData, setPriceData] = useState<PriceAdjustmentData>({
@@ -100,6 +117,12 @@ export default function ValidationPage() {
     error: smetaItemsError,
     refetch: refetchSmetaItems,
   } = useApi(() => smetaItemsApi.getAll({ limit: 500 }), []);
+
+  // Fetch smeta monitoring for project progress tab
+  const {
+    data: smetaMonitoringData,
+    loading: smetaMonitoringLoading,
+  } = useApi(() => analyticsApi.getSmetaMonitoring(), [], { enabled: activeTab === "progress" });
 
   // Mutation for validating work logs
   const { mutate: validateWorkLog, loading: validatingId } = useMutation(
@@ -267,6 +290,24 @@ export default function ValidationPage() {
           </div>
         )}
 
+        <Tabs value={activeTab} onValueChange={setActiveTab}>
+          <TabsList className="grid w-full grid-cols-2">
+            <TabsTrigger value="validation" className="flex items-center gap-2">
+              <CheckSquare className="h-4 w-4" />
+              Tekshirish
+              {pendingWorkLogs.length > 0 && (
+                <Badge variant="secondary" className="ml-1 bg-warning/10 text-warning text-xs">
+                  {pendingWorkLogs.length}
+                </Badge>
+              )}
+            </TabsTrigger>
+            <TabsTrigger value="progress" className="flex items-center gap-2">
+              <BarChart3 className="h-4 w-4" />
+              Loyiha bajarilishi
+            </TabsTrigger>
+          </TabsList>
+
+          <TabsContent value="validation" className="mt-4">
         <div className="grid gap-6 lg:grid-cols-3">
           <Card className="lg:col-span-2 animate-slide-up" style={{ animationDelay: "0.2s" }}>
             <CardHeader>
@@ -371,35 +412,37 @@ export default function ValidationPage() {
                               </span>
                             )}
                           </div>
-                          <div className="flex items-center gap-2">
-                            <Button
-                              size="sm"
-                              variant="outline"
-                              className="text-destructive hover:text-destructive"
-                              onClick={() => setRejectDialog(log)}
-                              disabled={!!validatingId}
-                            >
-                              <XCircle className="h-4 w-4 mr-1" />
-                              Rad etish
-                            </Button>
-                            <Button
-                              size="sm"
-                              variant="outline"
-                              onClick={() => openPriceDialog(log)}
-                              disabled={!!validatingId}
-                            >
-                              <DollarSign className="h-4 w-4 mr-1" />
-                              Narx bilan
-                            </Button>
-                            <Button
-                              size="sm"
-                              onClick={() => handleValidate(log, true)}
-                              disabled={!!validatingId}
-                            >
-                              <CheckCircle className="h-4 w-4 mr-1" />
-                              Tasdiqlash
-                            </Button>
-                          </div>
+                          {!isReadOnly && (
+                            <div className="flex items-center gap-2">
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                className="text-destructive hover:text-destructive"
+                                onClick={() => setRejectDialog(log)}
+                                disabled={!!validatingId}
+                              >
+                                <XCircle className="h-4 w-4 mr-1" />
+                                Rad etish
+                              </Button>
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                onClick={() => openPriceDialog(log)}
+                                disabled={!!validatingId}
+                              >
+                                <DollarSign className="h-4 w-4 mr-1" />
+                                Narx bilan
+                              </Button>
+                              <Button
+                                size="sm"
+                                onClick={() => handleValidate(log, true)}
+                                disabled={!!validatingId}
+                              >
+                                <CheckCircle className="h-4 w-4 mr-1" />
+                                Tasdiqlash
+                              </Button>
+                            </div>
+                          )}
                         </div>
                       </div>
                     );
@@ -540,6 +583,15 @@ export default function ValidationPage() {
             </Card>
           </div>
         </div>
+          </TabsContent>
+
+          <TabsContent value="progress" className="mt-4">
+            <ProjectProgressSection
+              data={smetaMonitoringData || []}
+              loading={smetaMonitoringLoading}
+            />
+          </TabsContent>
+        </Tabs>
 
         {/* Price Adjustment Dialog */}
         <Dialog open={!!priceDialog} onOpenChange={() => setPriceDialog(null)}>
@@ -687,5 +739,180 @@ export default function ValidationPage() {
         </Dialog>
       </div>
     </TooltipProvider>
+  );
+}
+
+// --- Project Progress Section ---
+
+function ProjectProgressSection({
+  data,
+  loading,
+}: {
+  data: SmetaMonitoringSummary[];
+  loading: boolean;
+}) {
+  const getProgressColor = (percentage: number) => {
+    if (percentage >= 100) return "bg-destructive";
+    if (percentage >= 80) return "bg-warning";
+    return "bg-success";
+  };
+
+  const getProgressTextColor = (percentage: number) => {
+    if (percentage >= 100) return "text-destructive";
+    if (percentage >= 80) return "text-warning";
+    return "text-success";
+  };
+
+  if (loading) {
+    return (
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-base font-semibold flex items-center gap-2">
+            <TrendingUp className="h-4 w-4 text-primary" />
+            Loyiha bajarilishi
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="space-y-4">
+            {[1, 2, 3].map((i) => (
+              <div key={i} className="h-24 bg-muted/50 rounded-lg animate-pulse" />
+            ))}
+          </div>
+        </CardContent>
+      </Card>
+    );
+  }
+
+  if (!data || data.length === 0) {
+    return (
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-base font-semibold flex items-center gap-2">
+            <TrendingUp className="h-4 w-4 text-primary" />
+            Loyiha bajarilishi
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="text-center py-8 text-muted-foreground">
+            <BarChart3 className="h-12 w-12 mx-auto mb-4 opacity-50" />
+            <p>Loyiha ma'lumotlari topilmadi</p>
+          </div>
+        </CardContent>
+      </Card>
+    );
+  }
+
+  return (
+    <div className="space-y-6">
+      {data.map((project) => (
+        <Card key={project.projectId} className="animate-slide-up">
+          <CardHeader>
+            <div className="flex items-center justify-between">
+              <div>
+                <CardTitle className="text-base font-semibold flex items-center gap-2">
+                  <TrendingUp className="h-4 w-4 text-primary" />
+                  {project.projectName}
+                </CardTitle>
+                <CardDescription>
+                  Umumiy: {formatMoney(project.totalUsedAmount)} / {formatMoney(project.totalSmetaAmount)}
+                </CardDescription>
+              </div>
+              <div className="text-right">
+                <Badge
+                  variant="secondary"
+                  className={`text-lg px-3 py-1 ${getProgressTextColor(project.overallUsagePercentage)}`}
+                >
+                  {project.overallUsagePercentage.toFixed(1)}%
+                </Badge>
+                {project.itemsOverrun > 0 && (
+                  <p className="text-xs text-destructive mt-1">
+                    <AlertTriangle className="h-3 w-3 inline mr-1" />
+                    {project.itemsOverrun} ta oshgan
+                  </p>
+                )}
+              </div>
+            </div>
+            {/* Overall progress bar */}
+            <div className="mt-3">
+              <div className="w-full bg-muted rounded-full h-3">
+                <div
+                  className={`h-3 rounded-full transition-all ${getProgressColor(project.overallUsagePercentage)}`}
+                  style={{ width: `${Math.min(project.overallUsagePercentage, 100)}%` }}
+                />
+              </div>
+            </div>
+          </CardHeader>
+          <CardContent>
+            <div className="rounded-md border overflow-hidden">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Nomi</TableHead>
+                    <TableHead className="text-center">Smeta</TableHead>
+                    <TableHead className="text-center">Ishlatilgan</TableHead>
+                    <TableHead className="text-center">Qoldiq</TableHead>
+                    <TableHead className="text-right">Bajarilish</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {project.items.slice(0, 20).map((item) => (
+                    <TableRow
+                      key={item.smetaItemId}
+                      className={item.isOverrun ? "bg-destructive/5" : ""}
+                    >
+                      <TableCell className="font-medium">
+                        <div className="flex items-center gap-2">
+                          {item.name}
+                          {item.isOverrun && (
+                            <Badge variant="destructive" className="text-[10px]">
+                              <AlertTriangle className="h-3 w-3 mr-0.5" />
+                              +{item.overrunQuantity.toFixed(1)}
+                            </Badge>
+                          )}
+                        </div>
+                        <p className="text-xs text-muted-foreground">{item.category}</p>
+                      </TableCell>
+                      <TableCell className="text-center">
+                        <span className="text-sm">
+                          {formatNumber(item.smetaQuantity)} {item.unit}
+                        </span>
+                      </TableCell>
+                      <TableCell className="text-center">
+                        <span className={`text-sm font-medium ${item.isOverrun ? "text-destructive" : ""}`}>
+                          {formatNumber(item.usedQuantity)} {item.unit}
+                        </span>
+                      </TableCell>
+                      <TableCell className="text-center">
+                        <span className={`text-sm ${item.remainingQuantity < 0 ? "text-destructive" : "text-muted-foreground"}`}>
+                          {formatNumber(item.remainingQuantity)} {item.unit}
+                        </span>
+                      </TableCell>
+                      <TableCell className="text-right">
+                        <div className="flex items-center justify-end gap-2">
+                          <div className="w-24 bg-muted rounded-full h-2">
+                            <div
+                              className={`h-2 rounded-full ${getProgressColor(item.usagePercentage)}`}
+                              style={{ width: `${Math.min(item.usagePercentage, 100)}%` }}
+                            />
+                          </div>
+                          <span className={`text-sm font-medium w-12 text-right ${getProgressTextColor(item.usagePercentage)}`}>
+                            {item.usagePercentage.toFixed(0)}%
+                          </span>
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </div>
+            {project.items.length > 20 && (
+              <p className="text-xs text-muted-foreground text-center mt-3">
+                +{project.items.length - 20} ta boshqa element
+              </p>
+            )}
+          </CardContent>
+        </Card>
+      ))}
+    </div>
   );
 }

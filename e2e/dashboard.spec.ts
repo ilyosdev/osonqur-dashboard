@@ -10,7 +10,7 @@ test.describe('Dashboard E2E Tests', () => {
     test('should show login page', async ({ page }) => {
       await page.goto('/login');
       
-      await expect(page.getByText('SMETAKON')).toBeVisible();
+      await expect(page.getByText('Osonqur')).toBeVisible();
       await expect(page.getByText('Tizimga kirish', { exact: true })).toBeVisible();
       await expect(page.getByLabel('Telefon raqam')).toBeVisible();
       await expect(page.getByPlaceholder('Parolingizni kiriting')).toBeVisible();

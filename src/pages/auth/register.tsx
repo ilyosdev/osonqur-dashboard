@@ -143,8 +143,8 @@ export default function RegisterPage() {
               <HardHat className="h-7 w-7" />
             </div>
             <div>
-              <h1 className="text-2xl font-bold tracking-tight">SMETAKON</h1>
-              <p className="text-xs text-muted-foreground">Qurilish byudjetini boshqarish</p>
+              <h1 className="text-2xl font-bold tracking-tight">Osonqur</h1>
+              <p className="text-xs text-muted-foreground">qurilish boshqaruv tizimi</p>
             </div>
           </div>
         </div>

@@ -19,6 +19,8 @@ import {
   Briefcase,
   Store,
   BarChart3,
+  Crown,
+  ShoppingCart,
 } from "lucide-react";
 import {
   Sidebar,
@@ -55,93 +57,127 @@ const mainNavItems: NavItem[] = [
     title: "Loyihalar",
     url: "/projects",
     icon: Building2,
+    roles: ["DIREKTOR", "BOSS", "BUGALTERIYA", "PTO", "SNABJENIYA", "SKLAD", "PRORAB"],
   },
   {
     title: "So'rovlar",
     url: "/requests",
     icon: ClipboardList,
     badge: 8,
-    roles: ["DIREKTOR", "BOSS", "BUGALTERIYA", "SNABJENIYA"],
+    roles: ["DIREKTOR"],
   },
   {
     title: "Hisobotlar",
     url: "/reports",
     icon: ChartBar,
-    roles: ["DIREKTOR", "BOSS", "BUGALTERIYA", "PTO"],
+    roles: ["BOSS"],
   },
   {
     title: "Xodimlar",
     url: "/users",
     icon: Users,
-    roles: ["DIREKTOR", "BOSS"],
+    roles: ["DIREKTOR"],
   },
 ];
 
 const roleNavItems: NavItem[] = [
+  // DIREKTOR only
+  {
+    title: "Direktor",
+    url: "/direktor",
+    icon: Crown,
+    roles: ["DIREKTOR"],
+  },
+  // SNABJENIYA only
+  {
+    title: "Ta'minot",
+    url: "/supply",
+    icon: ShoppingCart,
+    roles: ["SNABJENIYA"],
+  },
+  // PRORAB only
+  {
+    title: "Prorab",
+    url: "/foreman",
+    icon: HardHat,
+    roles: ["PRORAB"],
+  },
+  // Kassa - all operational roles (not BOSS)
   {
     title: "Kassa",
     url: "/kassa",
     icon: Banknote,
+    roles: ["DIREKTOR", "BUGALTERIYA", "SNABJENIYA", "SKLAD", "PRORAB", "PTO", "HAYDOVCHI", "MODERATOR"],
   },
+  // BUGALTERIYA only
   {
     title: "Moliya",
     url: "/finance",
     icon: Wallet,
-    roles: ["DIREKTOR", "BOSS", "BUGALTERIYA"],
+    roles: ["BUGALTERIYA"],
   },
+  // SKLAD only
   {
     title: "Ombor",
     url: "/warehouse",
     icon: Package,
-    roles: ["DIREKTOR", "BOSS", "SKLAD"],
+    roles: ["SKLAD"],
   },
+  // SNABJENIYA only
   {
     title: "Yetkazuvchilar",
     url: "/suppliers",
     icon: Truck,
-    roles: ["DIREKTOR", "BOSS", "SNABJENIYA"],
+    roles: ["SNABJENIYA"],
   },
+  // BUGALTERIYA only
   {
     title: "Ustalar",
     url: "/workers",
     icon: UserCircle,
-    roles: ["DIREKTOR", "BOSS", "PRORAB", "BUGALTERIYA"],
+    roles: ["BUGALTERIYA"],
   },
+  // DIREKTOR + PTO
   {
     title: "Tekshirish",
     url: "/validation",
     icon: CheckSquare,
-    roles: ["DIREKTOR", "BOSS", "PTO"],
+    roles: ["DIREKTOR", "PTO"],
   },
+  // HAYDOVCHI only
   {
     title: "Yetkazish",
     url: "/driver",
     icon: Car,
     roles: ["HAYDOVCHI"],
   },
+  // MODERATOR only
   {
     title: "Moderatsiya",
     url: "/moderator",
     icon: Shield,
     roles: ["MODERATOR"],
   },
+  // WORKER only
   {
     title: "Mening ishlarim",
     url: "/worker-portal",
     icon: Briefcase,
     roles: ["WORKER"],
   },
+  // POSTAVSHIK only
   {
     title: "Ta'minotchi",
     url: "/supplier-portal",
     icon: Store,
     roles: ["POSTAVSHIK"],
   },
+  // PTO only
   {
     title: "Smeta taqqoslash",
     url: "/smeta-comparison",
     icon: BarChart3,
-    roles: ["DIREKTOR", "BOSS", "PTO", "BUGALTERIYA"],
+    roles: ["PTO"],
   },
 ];
 
@@ -150,7 +186,7 @@ const settingsNavItems: NavItem[] = [
     title: "Sozlamalar",
     url: "/settings",
     icon: Settings,
-    roles: ["DIREKTOR", "BOSS"],
+    roles: ["DIREKTOR"],
   },
 ];
 
@@ -182,7 +218,7 @@ export function AppSidebar() {
           </div>
           <div className="flex flex-col group-data-[collapsible=icon]:hidden">
             <span className="text-base font-bold tracking-tight text-foreground">
-              SMETAKON
+              OSONQUR
             </span>
             <span className="text-[10px] text-muted-foreground -mt-0.5">
               Byudjet nazorati

@@ -2,17 +2,22 @@ import { useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from './auth-context';
 
-// Role hierarchy
+// Role hierarchy - SUPER_ADMIN has full access, others are isolated
 const ROLE_HIERARCHY: Record<string, string[]> = {
-  SUPER_ADMIN: ['SUPER_ADMIN', 'OPERATOR', 'DIREKTOR', 'BOSS', 'BUGALTERIYA', 'PTO', 'SNABJENIYA', 'SKLAD', 'PRORAB'],
+  SUPER_ADMIN: ['SUPER_ADMIN', 'OPERATOR', 'DIREKTOR', 'BOSS', 'BUGALTERIYA', 'PTO', 'SNABJENIYA', 'SKLAD', 'PRORAB', 'HAYDOVCHI', 'MODERATOR', 'WORKER', 'POSTAVSHIK'],
   OPERATOR: ['OPERATOR'],
-  DIREKTOR: ['DIREKTOR', 'PRORAB', 'SNABJENIYA', 'SKLAD', 'BUGALTERIYA', 'PTO', 'BOSS'],
-  BOSS: ['DIREKTOR', 'PRORAB', 'SNABJENIYA', 'SKLAD', 'BUGALTERIYA', 'PTO', 'BOSS'],
+  // All other roles are isolated - no inheritance
+  DIREKTOR: ['DIREKTOR'],
+  BOSS: ['BOSS'],
   PRORAB: ['PRORAB'],
   SNABJENIYA: ['SNABJENIYA'],
   SKLAD: ['SKLAD'],
   BUGALTERIYA: ['BUGALTERIYA'],
   PTO: ['PTO'],
+  HAYDOVCHI: ['HAYDOVCHI'],
+  MODERATOR: ['MODERATOR'],
+  WORKER: ['WORKER'],
+  POSTAVSHIK: ['POSTAVSHIK'],
 };
 
 export function hasRole(userRole: string | undefined, allowedRoles: string[]): boolean {
@@ -21,7 +26,7 @@ export function hasRole(userRole: string | undefined, allowedRoles: string[]): b
   // Check if user's role is in allowed roles
   if (allowedRoles.includes(userRole)) return true;
 
-  // Check role hierarchy - DIREKTOR and BOSS can access everything
+  // Check role hierarchy - only SUPER_ADMIN inherits all roles now
   const inheritedRoles = ROLE_HIERARCHY[userRole] || [];
   return allowedRoles.some(role => inheritedRoles.includes(role));
 }
@@ -29,29 +34,62 @@ export function hasRole(userRole: string | undefined, allowedRoles: string[]): b
 export function canAccessRoute(userRole: string | undefined, pathname: string): boolean {
   if (!userRole) return false;
 
-  // Routes with role restrictions
+  // Role-specific routes (matching bot structure - each role isolated)
   const routeRoles: Record<string, string[]> = {
+    // Admin routes
     '/admin/operators': ['SUPER_ADMIN'],
     '/admin': ['SUPER_ADMIN', 'OPERATOR'],
-    '/users': ['DIREKTOR', 'BOSS'],
-    '/kassa': ['DIREKTOR', 'BOSS', 'BUGALTERIYA', 'PTO', 'SNABJENIYA', 'SKLAD', 'PRORAB'],
-    '/finance': ['DIREKTOR', 'BOSS', 'BUGALTERIYA'],
-    '/warehouse': ['DIREKTOR', 'BOSS', 'SKLAD'],
-    '/suppliers': ['DIREKTOR', 'BOSS', 'SNABJENIYA'],
-    '/workers': ['DIREKTOR', 'BOSS', 'PRORAB', 'BUGALTERIYA'],
-    '/validation': ['DIREKTOR', 'BOSS', 'PTO'],
-    '/reports': ['DIREKTOR', 'BOSS', 'BUGALTERIYA', 'PTO'],
-    '/settings': ['DIREKTOR', 'BOSS'],
+
+    // DIREKTOR only pages
+    '/direktor': ['DIREKTOR'],
+    '/requests': ['DIREKTOR'],
+    '/users': ['DIREKTOR'],
+    '/settings': ['DIREKTOR'],
+
+    // Shared validation (DIREKTOR + PTO)
+    '/validation': ['DIREKTOR', 'PTO'],
+
+    // BOSS - minimal (view-only home + reports)
+    '/reports': ['BOSS'],
+
+    // BUGALTERIYA pages
+    '/finance': ['BUGALTERIYA'],
+    '/workers': ['BUGALTERIYA'],
+
+    // SNABJENIYA pages
+    '/supply': ['SNABJENIYA'],
+    '/suppliers': ['SNABJENIYA'],
+
+    // SKLAD pages
+    '/warehouse': ['SKLAD'],
+
+    // PRORAB pages
+    '/foreman': ['PRORAB'],
+
+    // PTO pages
+    '/smeta-comparison': ['PTO'],
+
+    // Kassa - all operational roles (not BOSS)
+    '/kassa': ['DIREKTOR', 'BUGALTERIYA', 'SNABJENIYA', 'SKLAD', 'PRORAB', 'PTO', 'HAYDOVCHI', 'MODERATOR'],
+
+    // Portal roles
+    '/driver': ['HAYDOVCHI'],
+    '/moderator': ['MODERATOR'],
+    '/worker-portal': ['WORKER'],
+    '/supplier-portal': ['POSTAVSHIK'],
+
+    // Projects - limited access
+    '/projects': ['DIREKTOR', 'BOSS', 'BUGALTERIYA', 'PTO', 'SNABJENIYA', 'SKLAD', 'PRORAB'],
   };
 
-  // Check if route has restrictions
-  const allowedRoles = Object.entries(routeRoles).find(([route]) =>
-    pathname.startsWith(route)
-  )?.[1];
+  // Check if route has restrictions (match longest prefix first)
+  const sortedRoutes = Object.keys(routeRoles).sort((a, b) => b.length - a.length);
+  const matchedRoute = sortedRoutes.find(route => pathname.startsWith(route));
 
-  // If no restrictions, allow access
-  if (!allowedRoles) return true;
+  // If no restrictions, allow access (home page "/" is accessible to all)
+  if (!matchedRoute) return true;
 
+  const allowedRoles = routeRoles[matchedRoute];
   return hasRole(userRole, allowedRoles);
 }
 

@@ -25,6 +25,7 @@ import {
   DialogFooter,
 } from "@/components/ui/dialog";
 import { Textarea } from "@/components/ui/textarea";
+import { useAuth } from "@/lib/auth";
 import { requestsApi, PurchaseRequest } from "@/lib/api/requests";
 
 // Group requests by batchId for batch display
@@ -47,6 +48,9 @@ const formatNumber = (value: number) => {
 };
 
 export default function PendingApprovalsPage() {
+  const { user } = useAuth();
+  const isReadOnly = user?.role === "BOSS";
+
   const [requestGroups, setRequestGroups] = useState<RequestGroup[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -313,39 +317,41 @@ export default function PendingApprovalsPage() {
                       )}
                     </div>
 
-                    <div className="lg:w-48 space-y-2">
-                      <div className="flex gap-2 pt-2">
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          className="flex-1 text-destructive hover:text-destructive hover:bg-destructive/10"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            setSelectedGroup(group);
-                            setRejectDialogOpen(true);
-                          }}
-                        >
-                          <XCircle className="h-4 w-4 mr-1" />
-                          Rad
-                        </Button>
-                        <Button
-                          size="sm"
-                          className="flex-1 bg-success hover:bg-success/90"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            handleApprove(group);
-                          }}
-                          disabled={isApproving}
-                        >
-                          {isApproving ? (
-                            <Loader2 className="h-4 w-4 mr-1 animate-spin" />
-                          ) : (
-                            <CheckCircle className="h-4 w-4 mr-1" />
-                          )}
-                          Tasdiqlash
-                        </Button>
+                    {!isReadOnly && (
+                      <div className="lg:w-48 space-y-2">
+                        <div className="flex gap-2 pt-2">
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            className="flex-1 text-destructive hover:text-destructive hover:bg-destructive/10"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setSelectedGroup(group);
+                              setRejectDialogOpen(true);
+                            }}
+                          >
+                            <XCircle className="h-4 w-4 mr-1" />
+                            Rad
+                          </Button>
+                          <Button
+                            size="sm"
+                            className="flex-1 bg-success hover:bg-success/90"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleApprove(group);
+                            }}
+                            disabled={isApproving}
+                          >
+                            {isApproving ? (
+                              <Loader2 className="h-4 w-4 mr-1 animate-spin" />
+                            ) : (
+                              <CheckCircle className="h-4 w-4 mr-1" />
+                            )}
+                            Tasdiqlash
+                          </Button>
+                        </div>
                       </div>
-                    </div>
+                    )}
                   </div>
                 </CardContent>
               </Card>
@@ -444,31 +450,33 @@ export default function PendingApprovalsPage() {
                 </div>
               </div>
 
-              <DialogFooter className="gap-2">
-                <Button
-                  variant="outline"
-                  className="text-destructive hover:text-destructive"
-                  onClick={() => {
-                    setRejectDialogOpen(true);
-                  }}
-                  disabled={isRejecting}
-                >
-                  <XCircle className="h-4 w-4 mr-2" />
-                  Rad etish
-                </Button>
-                <Button
-                  className="bg-success hover:bg-success/90"
-                  onClick={() => handleApprove(selectedGroup)}
-                  disabled={isApproving}
-                >
-                  {isApproving ? (
-                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                  ) : (
-                    <CheckCircle className="h-4 w-4 mr-2" />
-                  )}
-                  Tasdiqlash
-                </Button>
-              </DialogFooter>
+              {!isReadOnly && (
+                <DialogFooter className="gap-2">
+                  <Button
+                    variant="outline"
+                    className="text-destructive hover:text-destructive"
+                    onClick={() => {
+                      setRejectDialogOpen(true);
+                    }}
+                    disabled={isRejecting}
+                  >
+                    <XCircle className="h-4 w-4 mr-2" />
+                    Rad etish
+                  </Button>
+                  <Button
+                    className="bg-success hover:bg-success/90"
+                    onClick={() => handleApprove(selectedGroup)}
+                    disabled={isApproving}
+                  >
+                    {isApproving ? (
+                      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                    ) : (
+                      <CheckCircle className="h-4 w-4 mr-2" />
+                    )}
+                    Tasdiqlash
+                  </Button>
+                </DialogFooter>
+              )}
             </>
           )}
         </DialogContent>

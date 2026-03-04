@@ -29,6 +29,9 @@ import ModeratorPage from '@/pages/dashboard/moderator';
 import WorkerPortalPage from '@/pages/dashboard/worker-portal';
 import SupplierPortalPage from '@/pages/dashboard/supplier-portal';
 import SmetaComparisonPage from '@/pages/dashboard/smeta-comparison';
+import ForemanPage from '@/pages/dashboard/foreman';
+import DirektorPage from '@/pages/dashboard/direktor';
+import SupplyPage from '@/pages/dashboard/supply';
 
 // Admin pages
 import AdminHomePage from '@/pages/admin/index';
@@ -89,6 +92,9 @@ function App() {
         <Route path="/worker-portal" element={<WorkerPortalPage />} />
         <Route path="/supplier-portal" element={<SupplierPortalPage />} />
         <Route path="/smeta-comparison" element={<SmetaComparisonPage />} />
+        <Route path="/foreman" element={<ForemanPage />} />
+        <Route path="/direktor" element={<DirektorPage />} />
+        <Route path="/supply" element={<SupplyPage />} />
       </Route>
 
       {/* Fallback */}

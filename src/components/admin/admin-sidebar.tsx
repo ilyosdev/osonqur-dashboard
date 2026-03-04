@@ -82,10 +82,10 @@ export function AdminSidebar() {
           </div>
           <div className="flex flex-col group-data-[collapsible=icon]:hidden">
             <span className="text-base font-bold tracking-tight text-foreground">
-              SMETAKON
+              Osonqur
             </span>
             <span className="text-[10px] text-muted-foreground -mt-0.5">
-              Admin panel
+              qurilish boshqaruv tizimi
             </span>
           </div>
         </Link>
