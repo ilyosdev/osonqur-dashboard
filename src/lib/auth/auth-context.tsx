@@ -146,7 +146,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     loadUser();
   }, []);
 
-  const isAdmin = !!user && (user.role === 'SUPER_ADMIN' || user.role === 'OPERATOR');
+  const isAdmin = !!user && (user.role === 'SUPER_ADMIN' || user.role === 'OPERATOR' || user.role === 'ADMIN');
 
   const value: AuthContextType = {
     user,

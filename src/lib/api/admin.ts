@@ -2,10 +2,13 @@ import { apiClient, PaginationParams } from './client';
 
 // ─── Types ────────────────────────────────────────
 
+export type SubscriptionTier = 'ODDIY' | 'PRO' | 'ENTERPRISE';
+
 export interface AdminOrganization {
   id: string;
   name: string;
   phone?: string;
+  subscriptionTier: SubscriptionTier;
   isActive: boolean;
   userCount: number;
   projectCount: number;
@@ -97,7 +100,7 @@ export const adminApi = {
   getOrganization: (id: string) =>
     apiClient<AdminOrganization>(`/admin/organizations/${id}`, { method: 'GET' }),
 
-  createOrganization: (data: { name: string; phone?: string }) =>
+  createOrganization: (data: { name: string; phone?: string; subscriptionTier?: SubscriptionTier }) =>
     apiClient<AdminOrganization>('/admin/organizations', {
       method: 'POST',
       body: JSON.stringify(data),

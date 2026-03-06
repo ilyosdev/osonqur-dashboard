@@ -20,7 +20,10 @@ import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem,
   DropdownMenuSeparator, DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { adminApi, AdminOrganization } from "@/lib/api/admin";
+import { adminApi, AdminOrganization, SubscriptionTier } from "@/lib/api/admin";
+import {
+  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
+} from "@/components/ui/select";
 import { useAuth } from "@/lib/auth";
 
 export default function OrganizationsPage() {
@@ -39,7 +42,19 @@ export default function OrganizationsPage() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [formError, setFormError] = useState("");
 
-  const [formData, setFormData] = useState({ name: "", phone: "" });
+  const [formData, setFormData] = useState({ name: "", phone: "", subscriptionTier: "ODDIY" as SubscriptionTier });
+
+  const TIER_LABELS: Record<SubscriptionTier, string> = {
+    ODDIY: "Oddiy (1 loyiha)",
+    PRO: "Pro (3 loyiha)",
+    ENTERPRISE: "Enterprise (10 loyiha)",
+  };
+
+  const TIER_COLORS: Record<SubscriptionTier, string> = {
+    ODDIY: "bg-gray-500/10 text-gray-600",
+    PRO: "bg-blue-500/10 text-blue-600",
+    ENTERPRISE: "bg-purple-500/10 text-purple-600",
+  };
 
   const isSuperAdmin = user?.role === "SUPER_ADMIN";
 
@@ -62,7 +77,7 @@ export default function OrganizationsPage() {
   }, [fetchOrgs]);
 
   const resetForm = () => {
-    setFormData({ name: "", phone: "" });
+    setFormData({ name: "", phone: "", subscriptionTier: "ODDIY" });
     setFormError("");
   };
 
@@ -70,7 +85,7 @@ export default function OrganizationsPage() {
 
   const openEditDialog = (org: AdminOrganization) => {
     setSelectedOrg(org);
-    setFormData({ name: org.name, phone: (org.phone || "").replace("+998", "") });
+    setFormData({ name: org.name, phone: (org.phone || "").replace("+998", ""), subscriptionTier: org.subscriptionTier || "ODDIY" });
     setFormError("");
     setEditDialogOpen(true);
   };
@@ -86,7 +101,7 @@ export default function OrganizationsPage() {
     setFormError("");
     try {
       const phone = formData.phone.trim() ? "+998" + formData.phone.replace(/\s/g, "") : undefined;
-      await adminApi.createOrganization({ name: formData.name, phone });
+      await adminApi.createOrganization({ name: formData.name, phone, subscriptionTier: formData.subscriptionTier });
       setAddDialogOpen(false);
       fetchOrgs();
     } catch (err) {
@@ -248,10 +263,15 @@ export default function OrganizationsPage() {
                 </div>
 
                 <div className="mt-4 pt-4 border-t flex items-center justify-between">
-                  <Badge variant={org.isActive ? "default" : "secondary"}
-                    className={org.isActive ? "bg-green-500/10 text-green-600" : ""}>
-                    {org.isActive ? "Faol" : "Nofaol"}
-                  </Badge>
+                  <div className="flex gap-2">
+                    <Badge variant="outline" className={TIER_COLORS[org.subscriptionTier || "ODDIY"]}>
+                      {org.subscriptionTier || "ODDIY"}
+                    </Badge>
+                    <Badge variant={org.isActive ? "default" : "secondary"}
+                      className={org.isActive ? "bg-green-500/10 text-green-600" : ""}>
+                      {org.isActive ? "Faol" : "Nofaol"}
+                    </Badge>
+                  </div>
                   <div className="flex gap-1">
                     <Button variant="ghost" size="sm" asChild>
                       <Link to={`/admin/organizations/${org.id}/users`}>Xodimlar</Link>
@@ -298,6 +318,19 @@ export default function OrganizationsPage() {
                 <Input className="pl-14" placeholder="__ ___ __ __" value={formData.phone}
                   onChange={(e) => setFormData(p => ({ ...p, phone: formatPhone(e.target.value) }))} />
               </div>
+            </div>
+            <div className="space-y-2">
+              <Label>Tarif</Label>
+              <Select value={formData.subscriptionTier} onValueChange={(v) => setFormData(p => ({ ...p, subscriptionTier: v as SubscriptionTier }))}>
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="ODDIY">{TIER_LABELS.ODDIY}</SelectItem>
+                  <SelectItem value="PRO">{TIER_LABELS.PRO}</SelectItem>
+                  <SelectItem value="ENTERPRISE">{TIER_LABELS.ENTERPRISE}</SelectItem>
+                </SelectContent>
+              </Select>
             </div>
           </div>
           <DialogFooter>

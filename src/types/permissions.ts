@@ -1,6 +1,7 @@
 export enum UserRole {
   SUPER_ADMIN = 'SUPER_ADMIN',
   OPERATOR = 'OPERATOR',
+  ADMIN = 'ADMIN',
   DIREKTOR = 'DIREKTOR',
   BOSS = 'BOSS',
   BUGALTERIYA = 'BUGALTERIYA',
@@ -14,12 +15,18 @@ export enum UserRole {
   POSTAVSHIK = 'POSTAVSHIK',
 }
 
+export enum SubscriptionTier {
+  ODDIY = 'ODDIY',
+  PRO = 'PRO',
+  ENTERPRISE = 'ENTERPRISE',
+}
+
 export const PERMISSIONS = {
   // Admin
   "admin:operators": ["SUPER_ADMIN"],
   "admin:organizations": ["SUPER_ADMIN", "OPERATOR"],
-  "admin:org_users": ["SUPER_ADMIN", "OPERATOR"],
-  "admin:org_projects": ["SUPER_ADMIN", "OPERATOR"],
+  "admin:org_users": ["SUPER_ADMIN", "OPERATOR", "ADMIN"],
+  "admin:org_projects": ["SUPER_ADMIN", "OPERATOR", "ADMIN"],
 
   // Organization
   "org:create": ["DIREKTOR"],
@@ -247,6 +254,7 @@ export function canAssignRole(
   const hierarchy: Record<UserRole, number> = {
     SUPER_ADMIN: 10,
     OPERATOR: 9,
+    ADMIN: 8,
     DIREKTOR: 7,
     BOSS: 6,
     BUGALTERIYA: 5,
@@ -262,6 +270,8 @@ export function canAssignRole(
 
   if (assignerRole === "SUPER_ADMIN") return true;
   if (assignerRole === "OPERATOR") return targetRole !== "SUPER_ADMIN" && targetRole !== "OPERATOR";
+  // ADMIN cannot create other ADMINs
+  if (assignerRole === "ADMIN") return targetRole !== "SUPER_ADMIN" && targetRole !== "OPERATOR" && targetRole !== "ADMIN";
   if (assignerRole === "DIREKTOR") return true;
   if (targetRole === "DIREKTOR") return false;
   if (targetRole === "BOSS") return false;
