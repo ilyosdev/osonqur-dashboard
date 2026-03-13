@@ -80,7 +80,7 @@ export default function ModeratorPage() {
   const {
     data: finalizedResponse,
     loading: finalizedLoading,
-  } = useApi(() => requestsApi.getAll({ status: "FULFILLED", limit: 50 }), []);
+  } = useApi(() => requestsApi.getAll({ status: "FINALIZED", limit: 50 }), []);
 
   // Mutation for finalizing
   const { mutate: finalize, loading: finalizing } = useMutation(

@@ -94,7 +94,7 @@ function filterByDateRange(requests: PurchaseRequest[], start: Date, end: Date):
 
 // Calculate stats from requests
 function calculateStats(requests: PurchaseRequest[]): ReportStats {
-  const approved = requests.filter(r => r.status === 'APPROVED' || r.status === 'ASSIGNED' || r.status === 'COLLECTED' || r.status === 'IN_DELIVERY' || r.status === 'DELIVERED' || r.status === 'RECEIVED' || r.status === 'FINALIZED');
+  const approved = requests.filter(r => r.status === 'APPROVED' || r.status === 'IN_TRANSIT' || r.status === 'DELIVERED' || r.status === 'RECEIVED' || r.status === 'FINALIZED');
   const rejected = requests.filter(r => r.status === 'REJECTED');
   const pending = requests.filter(r => r.status === 'PENDING');
 

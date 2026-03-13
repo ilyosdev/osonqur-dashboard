@@ -548,7 +548,7 @@ function CashRequestsSection({
       PENDING: { label: "Kutilmoqda", className: "bg-warning/10 text-warning" },
       APPROVED: { label: "Tasdiqlangan", className: "bg-success/10 text-success" },
       REJECTED: { label: "Rad etilgan", className: "bg-destructive/10 text-destructive" },
-      FULFILLED: { label: "Bajarilgan", className: "bg-primary/10 text-primary" },
+      FINALIZED: { label: "Bajarilgan", className: "bg-primary/10 text-primary" },
     };
     const config = statusMap[status] || statusMap.PENDING;
     return <Badge className={config.className}>{config.label}</Badge>;

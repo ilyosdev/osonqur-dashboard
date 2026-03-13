@@ -52,7 +52,7 @@ function formatDate(dateStr: string): string {
   });
 }
 
-type DeliveryStatus = "APPROVED" | "IN_TRANSIT" | "DELIVERED" | "RECEIVED" | "FULFILLED";
+type DeliveryStatus = "APPROVED" | "IN_TRANSIT" | "DELIVERED" | "RECEIVED" | "FINALIZED";
 
 interface DeliveryRequest extends PurchaseRequest {
   driverId?: string;

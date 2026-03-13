@@ -20,7 +20,7 @@ export interface PurchaseRequest {
   requestedQty: number;
   requestedAmount: number;
   note?: string;
-  status: 'PENDING' | 'APPROVED' | 'REJECTED' | 'ASSIGNED' | 'COLLECTED' | 'IN_DELIVERY' | 'DELIVERED' | 'RECEIVED' | 'FINALIZED';
+  status: 'PENDING' | 'APPROVED' | 'REJECTED' | 'IN_TRANSIT' | 'DELIVERED' | 'RECEIVED' | 'FINALIZED';
   requestedById: string;
   approvedById?: string;
   approvedAt?: string;
