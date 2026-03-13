@@ -8,6 +8,7 @@ interface User {
   name: string;
   phone: string;
   role: string;
+  allowedRoles?: string[];
   orgId: string;
 }
 
@@ -16,9 +17,12 @@ interface AuthContextType {
   isLoading: boolean;
   isAuthenticated: boolean;
   isAdmin: boolean;
+  currentRole: string | null;
+  allowedRoles: string[];
   login: (phone: string, password: string) => Promise<void>;
   logout: () => void;
   refreshAuth: () => Promise<void>;
+  switchRole: (role: string) => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -142,20 +146,57 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     await loadUser();
   };
 
+  const switchRole = async (role: string) => {
+    const token = getAccessToken();
+    if (!token) {
+      throw new Error('Not authenticated');
+    }
+
+    const response = await fetch(`${API_URL}/vendor/auth/switch-role`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${token}`,
+      },
+      body: JSON.stringify({ role }),
+    });
+
+    if (!response.ok) {
+      const error = await response.json().catch(() => ({ message: 'Failed to switch role' }));
+      throw new Error(error.message || 'Failed to switch role');
+    }
+
+    const data = await response.json();
+    const tokens = data.tokens;
+
+    if (tokens?.accessToken && tokens?.refreshToken) {
+      setTokens(tokens.accessToken, tokens.refreshToken);
+    }
+
+    if (data.user) {
+      setUser(data.user);
+    }
+  };
+
   useEffect(() => {
     loadUser();
   }, []);
 
   const isAdmin = !!user && (user.role === 'SUPER_ADMIN' || user.role === 'OPERATOR' || user.role === 'ADMIN');
+  const currentRole = user?.role ?? null;
+  const allowedRoles = user?.allowedRoles ?? (user?.role ? [user.role] : []);
 
   const value: AuthContextType = {
     user,
     isLoading,
     isAuthenticated: !!user,
     isAdmin,
+    currentRole,
+    allowedRoles,
     login,
     logout,
     refreshAuth,
+    switchRole,
   };
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

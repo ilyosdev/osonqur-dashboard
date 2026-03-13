@@ -106,10 +106,11 @@ export function RoleGuard({
   fallback,
   redirectTo = '/'
 }: RoleGuardProps) {
-  const { user, isLoading } = useAuth();
+  const { user, isLoading, currentRole } = useAuth();
   const navigate = useNavigate();
 
-  const hasAccess = hasRole(user?.role, allowedRoles);
+  // Use currentRole for access check - this respects role switching
+  const hasAccess = hasRole(currentRole ?? user?.role, allowedRoles);
 
   useEffect(() => {
     if (!isLoading && !hasAccess && redirectTo) {
@@ -139,8 +140,9 @@ export function RoleGuard({
 
 // Hook to check role access
 export function useRoleAccess(allowedRoles: string[]): boolean {
-  const { user } = useAuth();
-  return hasRole(user?.role, allowedRoles);
+  const { user, currentRole } = useAuth();
+  // Use currentRole for access check - this respects role switching
+  return hasRole(currentRole ?? user?.role, allowedRoles);
 }
 
 // Component to conditionally render based on role

@@ -1,5 +1,6 @@
 import { Link, useNavigate } from "react-router-dom";
-import { Bell, Search, ChevronDown, LogOut, User, Settings } from "lucide-react";
+import { useState } from "react";
+import { Bell, Search, ChevronDown, LogOut, User, Settings, RefreshCw, Check } from "lucide-react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import {
@@ -15,18 +16,51 @@ import { Badge } from "@/components/ui/badge";
 import { SidebarTrigger } from "@/components/ui/sidebar";
 import { useAuth } from "@/lib/auth";
 
+const ROLE_LABELS: Record<string, string> = {
+  SUPER_ADMIN: "Super Admin",
+  OPERATOR: "Operator",
+  ADMIN: "Admin",
+  BOSS: "Boss",
+  DIREKTOR: "Direktor",
+  BUGALTERIYA: "Buxgalteriya",
+  PTO: "PTO",
+  SNABJENIYA: "Ta'minot",
+  SKLAD: "Ombor",
+  PRORAB: "Prorab",
+  HAYDOVCHI: "Haydovchi",
+  MODERATOR: "Moderator",
+  WORKER: "Ishchi",
+  POSTAVSHIK: "Yetkazuvchi",
+};
+
 export function Header() {
   const navigate = useNavigate();
-  const { user, logout } = useAuth();
+  const { user, logout, currentRole, allowedRoles, switchRole } = useAuth();
+  const [isSwitching, setIsSwitching] = useState(false);
 
   const handleLogout = () => {
     logout();
     navigate('/login', { replace: true });
   };
 
+  const handleSwitchRole = async (role: string) => {
+    if (role === currentRole || isSwitching) return;
+    setIsSwitching(true);
+    try {
+      await switchRole(role);
+      navigate('/', { replace: true });
+    } catch (error) {
+      console.error('Failed to switch role:', error);
+    } finally {
+      setIsSwitching(false);
+    }
+  };
+
   const getInitials = (name: string) => {
     return name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2);
   };
+
+  const canSwitchRoles = allowedRoles.length > 1;
 
   return (
     <header className="sticky top-0 z-40 flex h-16 items-center justify-between gap-4 border-b border-border bg-card/80 backdrop-blur-sm px-4 md:px-6">
@@ -42,6 +76,44 @@ export function Header() {
       </div>
 
       <div className="flex items-center gap-2">
+        {/* Role Switcher */}
+        {canSwitchRoles && (
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button
+                variant="outline"
+                size="sm"
+                className="hidden md:flex items-center gap-2 h-9"
+                disabled={isSwitching}
+              >
+                {isSwitching ? (
+                  <RefreshCw className="h-4 w-4 animate-spin" />
+                ) : (
+                  <RefreshCw className="h-4 w-4" />
+                )}
+                <span>{ROLE_LABELS[currentRole || ''] || currentRole}</span>
+                <ChevronDown className="h-3 w-3" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="w-48">
+              <DropdownMenuLabel>Rolni almashtirish</DropdownMenuLabel>
+              <DropdownMenuSeparator />
+              {allowedRoles.map((role) => (
+                <DropdownMenuItem
+                  key={role}
+                  onClick={() => handleSwitchRole(role)}
+                  className="cursor-pointer"
+                >
+                  {role === currentRole && <Check className="mr-2 h-4 w-4" />}
+                  <span className={role === currentRole ? 'font-medium' : ''}>
+                    {ROLE_LABELS[role] || role}
+                  </span>
+                </DropdownMenuItem>
+              ))}
+            </DropdownMenuContent>
+          </DropdownMenu>
+        )}
+
         <Button
           variant="ghost"
           size="icon"
