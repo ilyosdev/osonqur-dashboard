@@ -47,6 +47,8 @@ export interface UpdateSmetaItemRequest {
   unit?: string;
   quantity?: number;
   unitPrice?: number;
+  usedQuantity?: number;
+  usedAmount?: number;
   percentRate?: number;
   machineType?: string;
   laborHours?: number;

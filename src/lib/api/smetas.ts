@@ -1,13 +1,23 @@
 import { apiClient, PaginationParams, PaginatedResponse } from './client';
 
+export type SmetaType = 'CONSTRUCTION' | 'ELECTRICAL' | 'PLUMBING' | 'HVAC' | 'FINISHING' | 'OTHER';
+
 export interface Smeta {
   id: string;
   name: string;
   projectId: string;
-  status: string;
-  totalAmount?: number;
+  projectName?: string;
+  type: SmetaType;
   description?: string;
-  vendorId: string;
+  budget: number;
+  deadline?: string;
+  currentVersion: number;
+  totalWorkAmount: number;
+  totalMachineAmount: number;
+  totalMaterialAmount: number;
+  totalOtherAmount: number;
+  grandTotal: number;
+  overheadPercent: number;
   createdAt: string;
   updatedAt: string;
 }
@@ -15,20 +25,25 @@ export interface Smeta {
 export interface CreateSmetaRequest {
   name: string;
   projectId: string;
-  status?: string;
+  type?: SmetaType;
   description?: string;
+  budget?: number;
+  deadline?: string;
+  overheadPercent?: number;
 }
 
 export interface UpdateSmetaRequest {
   name?: string;
-  projectId?: string;
-  status?: string;
+  type?: SmetaType;
   description?: string;
+  budget?: number;
+  deadline?: string;
+  overheadPercent?: number;
 }
 
 export interface GetSmetasParams extends PaginationParams {
   projectId?: string;
-  status?: string;
+  type?: SmetaType;
   search?: string;
 }
 
@@ -38,7 +53,7 @@ export const smetasApi = {
     if (params?.page) searchParams.append('page', params.page.toString());
     if (params?.limit) searchParams.append('limit', params.limit.toString());
     if (params?.projectId) searchParams.append('projectId', params.projectId);
-    if (params?.status) searchParams.append('status', params.status);
+    if (params?.type) searchParams.append('type', params.type);
     if (params?.search) searchParams.append('search', params.search);
     
     const query = searchParams.toString();

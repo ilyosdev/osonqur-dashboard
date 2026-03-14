@@ -23,7 +23,10 @@ import KassaPage from '@/pages/dashboard/kassa';
 import ReportsPage from '@/pages/dashboard/reports';
 import SettingsPage from '@/pages/dashboard/settings';
 import ValidationPage from '@/pages/dashboard/validation';
+import SmetasPage from '@/pages/dashboard/smetas';
+import NewSmetaPage from '@/pages/dashboard/smetas/new';
 import SmetaDetailPage from '@/pages/dashboard/smetas/[id]';
+import AddSmetaItemPage from '@/pages/dashboard/smetas/[id]/add-item';
 import DriverPage from '@/pages/dashboard/driver';
 import ModeratorPage from '@/pages/dashboard/moderator';
 import WorkerPortalPage from '@/pages/dashboard/worker-portal';
@@ -86,7 +89,10 @@ function App() {
         <Route path="/reports" element={<ReportsPage />} />
         <Route path="/settings" element={<SettingsPage />} />
         <Route path="/validation" element={<ValidationPage />} />
+        <Route path="/smetas" element={<SmetasPage />} />
+        <Route path="/smetas/new" element={<NewSmetaPage />} />
         <Route path="/smetas/:id" element={<SmetaDetailPage />} />
+        <Route path="/smetas/:id/add-item" element={<AddSmetaItemPage />} />
         <Route path="/driver" element={<DriverPage />} />
         <Route path="/moderator" element={<ModeratorPage />} />
         <Route path="/worker-portal" element={<WorkerPortalPage />} />

@@ -60,6 +60,12 @@ const mainNavItems: NavItem[] = [
     roles: ["DIREKTOR", "BOSS", "BUGALTERIYA", "PTO", "SNABJENIYA", "SKLAD", "PRORAB"],
   },
   {
+    title: "Smetalar",
+    url: "/smetas",
+    icon: FileText,
+    roles: ["BOSS", "DIREKTOR", "PTO"],
+  },
+  {
     title: "So'rovlar",
     url: "/requests",
     icon: ClipboardList,

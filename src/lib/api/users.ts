@@ -7,6 +7,7 @@ export interface User {
   email?: string;
   telegramId?: string;
   role: string;
+  allowedRoles?: string[];
   isActive: boolean;
   createdAt: string;
   updatedAt: string;
@@ -19,6 +20,7 @@ export interface CreateUserRequest {
   password?: string;
   telegramId?: string;
   role?: string;
+  allowedRoles?: string[];
 }
 
 export interface UpdateUserRequest {
@@ -26,6 +28,7 @@ export interface UpdateUserRequest {
   phone?: string;
   email?: string;
   role?: string;
+  allowedRoles?: string[];
   isActive?: boolean;
 }
 

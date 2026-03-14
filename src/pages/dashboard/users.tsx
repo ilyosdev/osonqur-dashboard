@@ -52,6 +52,7 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { Label } from "@/components/ui/label";
+import { Checkbox } from "@/components/ui/checkbox";
 import { usersApi, User, CreateUserRequest, UpdateUserRequest, GetUsersParams } from "@/lib/api/users";
 import { projectsApi, Project } from "@/lib/api/projects";
 
@@ -102,6 +103,7 @@ interface UserFormData {
   name: string;
   phone: string;
   role: string;
+  allowedRoles: string[];
   password: string;
   projectId: string;
 }
@@ -110,6 +112,7 @@ const initialFormData: UserFormData = {
   name: "",
   phone: "",
   role: "PRORAB",
+  allowedRoles: ["PRORAB"],
   password: "",
   projectId: "",
 };
@@ -197,6 +200,7 @@ export default function UsersPage() {
         name: formData.name.trim(),
         phone: "+998" + formData.phone.replace(/\s/g, ""),
         role: formData.role,
+        allowedRoles: formData.allowedRoles.length > 0 ? formData.allowedRoles : [formData.role],
         password: formData.password,
       };
 
@@ -221,6 +225,7 @@ export default function UsersPage() {
       const payload: UpdateUserRequest = {
         name: formData.name.trim() || undefined,
         role: formData.role,
+        allowedRoles: formData.allowedRoles.length > 0 ? formData.allowedRoles : [formData.role],
       };
 
       if (formData.phone.trim()) {
@@ -262,6 +267,7 @@ export default function UsersPage() {
       name: user.name || "",
       phone: formatPhoneInput(phoneDigits),
       role: user.role,
+      allowedRoles: user.allowedRoles || [user.role],
       password: "",
       projectId: "",
     });
@@ -401,7 +407,13 @@ export default function UsersPage() {
                     <div className="space-y-1">
                       <div className="flex items-center gap-2 flex-wrap">
                         <h3 className="font-semibold">{getUserDisplayName(user)}</h3>
-                        {getRoleBadge(user.role)}
+                        {user.allowedRoles && user.allowedRoles.length > 1 ? (
+                          user.allowedRoles.map((r) => (
+                            <span key={r}>{getRoleBadge(r)}</span>
+                          ))
+                        ) : (
+                          getRoleBadge(user.role)
+                        )}
                         <Badge
                           variant="outline"
                           className={
@@ -548,35 +560,54 @@ export default function UsersPage() {
             </div>
 
             <div className="space-y-2">
-              <Label>Rol</Label>
-              <Select
-                value={formData.role}
-                onValueChange={(value) => setFormData((prev) => ({ ...prev, role: value }))}
-              >
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {roles.map((role) => (
-                    <SelectItem key={role.value} value={role.value}>
-                      {role.label}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              <Label>Rollar (bir nechta tanlash mumkin)</Label>
               <Card className="p-3 bg-muted/50">
-                <div className="flex items-start gap-2">
+                <div className="grid grid-cols-2 gap-2">
+                  {roles.map((role) => (
+                    <label
+                      key={role.value}
+                      className="flex items-center space-x-2 cursor-pointer hover:bg-muted rounded p-1"
+                    >
+                      <Checkbox
+                        checked={formData.allowedRoles.includes(role.value)}
+                        onCheckedChange={(checked) => {
+                          if (checked) {
+                            const newRoles = [...formData.allowedRoles, role.value];
+                            setFormData((prev) => ({
+                              ...prev,
+                              allowedRoles: newRoles,
+                              role: newRoles[0],
+                            }));
+                          } else {
+                            const newRoles = formData.allowedRoles.filter((r) => r !== role.value);
+                            if (newRoles.length > 0) {
+                              setFormData((prev) => ({
+                                ...prev,
+                                allowedRoles: newRoles,
+                                role: newRoles[0],
+                              }));
+                            }
+                          }
+                        }}
+                      />
+                      <span className="text-sm">{role.label}</span>
+                    </label>
+                  ))}
+                </div>
+              </Card>
+              {formData.allowedRoles.length > 0 && (
+                <div className="flex items-start gap-2 pt-2">
                   <Shield className="h-4 w-4 text-muted-foreground mt-0.5" />
                   <div>
                     <p className="text-sm font-medium">
-                      {roles.find((r) => r.value === formData.role)?.label}
+                      Asosiy rol: {roles.find((r) => r.value === formData.role)?.label}
                     </p>
                     <p className="text-xs text-muted-foreground">
-                      {roles.find((r) => r.value === formData.role)?.description}
+                      Jami {formData.allowedRoles.length} ta rol tanlangan
                     </p>
                   </div>
                 </div>
-              </Card>
+              )}
             </div>
 
             <div className="space-y-2">
@@ -676,41 +707,49 @@ export default function UsersPage() {
             </div>
 
             <div className="space-y-2">
-              <Label>Rol</Label>
-              <Select
-                value={formData.role}
-                onValueChange={(value) => setFormData((prev) => ({ ...prev, role: value }))}
-              >
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
+              <Label>Rollar (bir nechta tanlash mumkin)</Label>
+              <Card className="p-3 bg-muted/50">
+                <div className="grid grid-cols-2 gap-2">
                   {roles.map((role) => (
-                    <SelectItem key={role.value} value={role.value}>
-                      {role.label}
-                    </SelectItem>
+                    <label
+                      key={role.value}
+                      className="flex items-center space-x-2 cursor-pointer hover:bg-muted rounded p-1"
+                    >
+                      <Checkbox
+                        checked={formData.allowedRoles.includes(role.value)}
+                        onCheckedChange={(checked) => {
+                          if (checked) {
+                            const newRoles = [...formData.allowedRoles, role.value];
+                            setFormData((prev) => ({
+                              ...prev,
+                              allowedRoles: newRoles,
+                              role: newRoles[0],
+                            }));
+                          } else {
+                            const newRoles = formData.allowedRoles.filter((r) => r !== role.value);
+                            if (newRoles.length > 0) {
+                              setFormData((prev) => ({
+                                ...prev,
+                                allowedRoles: newRoles,
+                                role: newRoles[0],
+                              }));
+                            }
+                          }
+                        }}
+                      />
+                      <span className="text-sm">{role.label}</span>
+                    </label>
                   ))}
-                </SelectContent>
-              </Select>
-            </div>
-
-            <div className="space-y-2">
-              <Label>Loyiha</Label>
-              <Select
-                value={formData.projectId}
-                onValueChange={(value) => setFormData((prev) => ({ ...prev, projectId: value }))}
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="Loyihani tanlang" />
-                </SelectTrigger>
-                <SelectContent>
-                  {projects.map((project) => (
-                    <SelectItem key={project.id} value={project.id}>
-                      {project.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+                </div>
+              </Card>
+              {formData.allowedRoles.length > 0 && (
+                <div className="flex items-start gap-2 pt-2">
+                  <Shield className="h-4 w-4 text-muted-foreground mt-0.5" />
+                  <p className="text-xs text-muted-foreground">
+                    Jami {formData.allowedRoles.length} ta rol tanlangan
+                  </p>
+                </div>
+              )}
             </div>
           </div>
 
