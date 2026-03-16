@@ -39,7 +39,7 @@ import { projectsApi, Project } from "@/lib/api/projects";
 import { telegramGroupsApi, TelegramGroup } from "@/lib/api/telegram-groups";
 import { ErrorMessage } from "@/components/ui/error-message";
 
-const BOT_USERNAME = "SmetakonBot"; // TODO: Move to env config
+const BOT_USERNAME = import.meta.env.VITE_BOT_USERNAME || "SmetakonBot";
 
 export default function ProjectDetailPage() {
   const { id } = useParams<{ id: string }>();

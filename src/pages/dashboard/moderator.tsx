@@ -84,8 +84,8 @@ export default function ModeratorPage() {
 
   // Mutation for finalizing
   const { mutate: finalize, loading: finalizing } = useMutation(
-    (data: { id: string; requestedAmount: number }) =>
-      requestsApi.update(data.id, { requestedAmount: data.requestedAmount })
+    (data: { id: string; finalAmount: number; finalUnitPrice: number }) =>
+      requestsApi.finalize(data.id, { finalAmount: data.finalAmount, finalUnitPrice: data.finalUnitPrice })
   );
 
   const loading = pendingLoading || finalizedLoading;
@@ -120,7 +120,8 @@ export default function ModeratorPage() {
     try {
       await finalize({
         id: finalizeDialog.id,
-        requestedAmount: Number(finalizeData.finalAmount),
+        finalAmount: Number(finalizeData.finalAmount),
+        finalUnitPrice: Number(finalizeData.finalUnitPrice),
       });
       setFinalizeDialog(null);
       setFinalizeData({ finalUnitPrice: "", finalAmount: "", note: "" });

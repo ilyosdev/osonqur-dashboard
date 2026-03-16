@@ -66,7 +66,7 @@ export function DebtsSection({ className }: DebtsSectionProps) {
             {supplierLoading ? (
               <DebtsSkeleton />
             ) : (
-              <SupplierDebtsList data={supplierDebts} />
+              <SupplierDebtsList data={supplierDebts ?? undefined} />
             )}
           </TabsContent>
 
@@ -74,7 +74,7 @@ export function DebtsSection({ className }: DebtsSectionProps) {
             {workerLoading ? (
               <DebtsSkeleton />
             ) : (
-              <WorkerDebtsList data={workerDebts} />
+              <WorkerDebtsList data={workerDebts ?? undefined} />
             )}
           </TabsContent>
         </Tabs>

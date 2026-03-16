@@ -30,6 +30,16 @@ export interface ParsedMaterial {
   price: number;
 }
 
+export interface ParsedWorkVolume {
+  rowNumber: number;
+  name: string;
+  unit: string;
+  quantity: number;
+  unitPrice: number;
+  totalAmount: number;
+  itemType: 'WORK' | 'MACHINE' | 'MATERIAL' | 'OTHER';
+}
+
 export interface ParseResult<T> {
   success: boolean;
   type: string;
@@ -56,7 +66,7 @@ const uploadFile = async <T>(
     formData.append('useAi', 'true');
   }
 
-  const token = localStorage.getItem('token');
+  const token = localStorage.getItem('accessToken');
   const response = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:4001'}${endpoint}`, {
     method: 'POST',
     headers: {
@@ -97,6 +107,12 @@ export const uploadApi = {
    */
   parseMaterials: (file: File) =>
     uploadFile<ParsedMaterial>('/vendor/upload/parse/materials', file),
+
+  /**
+   * Parse Work Volume Excel (ВЕДОМОСТЬ ОБЪЕМОВ РАБОТ)
+   */
+  parseWorkVolume: (file: File, useAi = false) =>
+    uploadFile<ParsedWorkVolume>('/vendor/upload/parse/work-volume', file, { useAi }),
 
   /**
    * Import parsed smeta items
