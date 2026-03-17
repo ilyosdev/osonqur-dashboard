@@ -92,7 +92,7 @@ export default function SmetaDetailPage() {
     try {
       const [smetaData, itemsData] = await Promise.all([
         smetasApi.getById(id),
-        smetaItemsApi.getAll({ smetaId: id, limit: 100 }),
+        smetaItemsApi.getAll({ smetaId: id, limit: 5000 }),
       ]);
       setSmeta(smetaData);
       setItems(itemsData.data);
