@@ -16,6 +16,7 @@ import {
   Building2,
   AlertCircle,
   Upload,
+  Trash2,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -81,6 +82,10 @@ export default function SmetaDetailPage() {
   const [isImporting, setIsImporting] = useState(false);
   const [importError, setImportError] = useState<string | null>(null);
   const [importProgress, setImportProgress] = useState<string | null>(null);
+
+  // Delete all state
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
 
   const canEditProgress = ["PRORAB", "DIREKTOR", "BOSS"].includes(currentRole ?? user?.role ?? "");
   const canUpload = ["DIREKTOR", "BOSS", "PTO", "OPERATOR"].includes(currentRole ?? user?.role ?? "");
@@ -215,6 +220,20 @@ export default function SmetaDetailPage() {
 
   const isOverBudget = () => {
     return smeta && smeta.budget > 0 && getTotalUsed() > smeta.budget;
+  };
+
+  const handleDeleteAll = async () => {
+    if (!id) return;
+    setIsDeleting(true);
+    try {
+      await smetaItemsApi.deleteAllBySmeta(id);
+      setItems([]);
+      setShowDeleteConfirm(false);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "O'chirishda xatolik");
+    } finally {
+      setIsDeleting(false);
+    }
   };
 
   if (isLoading) {
@@ -424,6 +443,50 @@ export default function SmetaDetailPage() {
         </div>
       )}
 
+      {/* Delete Confirmation */}
+      {showDeleteConfirm && (
+        <Card className="border-destructive">
+          <CardContent className="p-4">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div className="p-2 rounded-lg bg-destructive/10">
+                  <AlertCircle className="h-5 w-5 text-destructive" />
+                </div>
+                <div>
+                  <p className="font-medium">Barcha elementlarni o'chirish</p>
+                  <p className="text-sm text-muted-foreground">
+                    {items.length} ta element o'chiriladi. Bu amalni qaytarib bo'lmaydi!
+                  </p>
+                </div>
+              </div>
+              <div className="flex gap-2">
+                <Button variant="outline" size="sm" onClick={() => setShowDeleteConfirm(false)}>
+                  Bekor qilish
+                </Button>
+                <Button
+                  variant="destructive"
+                  size="sm"
+                  onClick={handleDeleteAll}
+                  disabled={isDeleting}
+                >
+                  {isDeleting ? (
+                    <>
+                      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                      O'chirilmoqda...
+                    </>
+                  ) : (
+                    <>
+                      <Trash2 className="h-4 w-4 mr-2" />
+                      Ha, o'chirish
+                    </>
+                  )}
+                </Button>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
       {/* Items List */}
       <Card>
         <CardHeader className="flex flex-row items-center justify-between">
@@ -432,6 +495,17 @@ export default function SmetaDetailPage() {
             Smeta elementlari
           </CardTitle>
           <div className="flex gap-2">
+            {canUpload && items.length > 0 && (
+              <Button
+                variant="outline"
+                size="sm"
+                className="text-destructive hover:text-destructive"
+                onClick={() => setShowDeleteConfirm(true)}
+              >
+                <Trash2 className="h-4 w-4 mr-2" />
+                Hammasini o'chirish
+              </Button>
+            )}
             {canUpload && (
               <Button
                 variant={showUpload ? "secondary" : "outline"}

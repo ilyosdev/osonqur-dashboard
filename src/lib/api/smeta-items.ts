@@ -100,6 +100,11 @@ export const smetaItemsApi = {
       method: 'DELETE',
     }),
 
+  deleteAllBySmeta: (smetaId: string) =>
+    apiClient<{ success: boolean; deleted: number }>(`/vendor/smeta-items/smeta/${smetaId}/all`, {
+      method: 'DELETE',
+    }),
+
   // Smeta comparison
   getComparison: (projectId: string) =>
     apiClient<{
