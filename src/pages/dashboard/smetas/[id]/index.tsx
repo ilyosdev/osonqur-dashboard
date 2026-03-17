@@ -77,8 +77,10 @@ export default function SmetaDetailPage() {
   // Excel upload state
   const [showUpload, setShowUpload] = useState(false);
   const [parsedItems, setParsedItems] = useState<ParsedSmetaItem[]>([]);
+  const [uploadedFile, setUploadedFile] = useState<File | null>(null);
   const [isImporting, setIsImporting] = useState(false);
   const [importError, setImportError] = useState<string | null>(null);
+  const [importProgress, setImportProgress] = useState<string | null>(null);
 
   const canEditProgress = ["PRORAB", "DIREKTOR", "BOSS"].includes(currentRole ?? user?.role ?? "");
   const canUpload = ["DIREKTOR", "BOSS", "PTO", "OPERATOR"].includes(currentRole ?? user?.role ?? "");
@@ -145,8 +147,9 @@ export default function SmetaDetailPage() {
     }
   };
 
-  const handleParsedItems = (data: ParsedSmetaItem[], warnings: string[]) => {
+  const handleParsedItems = (data: ParsedSmetaItem[], warnings: string[], file?: File) => {
     setParsedItems(data);
+    if (file) setUploadedFile(file);
     if (warnings.length > 0) {
       console.log("Excel parsing warnings:", warnings);
     }
@@ -157,24 +160,47 @@ export default function SmetaDetailPage() {
 
     setIsImporting(true);
     setImportError(null);
+    setImportProgress(null);
 
     try {
-      const result = await uploadApi.importSmetaItems(id, parsedItems);
+      // Use direct import for large files (1000+ items) to avoid JSON size limits
+      const useDirectImport = parsedItems.length >= 1000 && uploadedFile;
 
-      if (result.errors.length > 0) {
-        setImportError(result.errors.join("; "));
-      }
+      if (useDirectImport) {
+        setImportProgress(`To'g'ridan-to'g'ri import qilinmoqda (${parsedItems.length} ta element)...`);
+        const result = await uploadApi.directImport(id, uploadedFile, 'auto');
 
-      if (result.imported > 0) {
-        // Refresh items list
-        await fetchData();
-        setParsedItems([]);
-        setShowUpload(false);
+        if (result.errors.length > 0) {
+          setImportError(`${result.skipped} ta xato: ${result.errors.slice(0, 5).join("; ")}${result.errors.length > 5 ? "..." : ""}`);
+        }
+
+        if (result.imported > 0) {
+          await fetchData();
+          setParsedItems([]);
+          setUploadedFile(null);
+          setShowUpload(false);
+        }
+      } else {
+        // Standard import for smaller files
+        setImportProgress(`Import qilinmoqda (${parsedItems.length} ta element)...`);
+        const result = await uploadApi.importSmetaItems(id, parsedItems);
+
+        if (result.errors.length > 0) {
+          setImportError(result.errors.join("; "));
+        }
+
+        if (result.imported > 0) {
+          await fetchData();
+          setParsedItems([]);
+          setUploadedFile(null);
+          setShowUpload(false);
+        }
       }
     } catch (err) {
       setImportError(err instanceof Error ? err.message : "Import xatoligi");
     } finally {
       setIsImporting(false);
+      setImportProgress(null);
     }
   };
 
@@ -367,15 +393,22 @@ export default function SmetaDetailPage() {
                   </div>
                 )}
 
+                {parsedItems.length >= 1000 && uploadedFile && (
+                  <div className="flex items-center gap-2 p-3 rounded-lg bg-blue-50 text-blue-700 text-sm">
+                    <TrendingUp className="h-4 w-4" />
+                    <span>Katta fayl aniqlandi. To'g'ridan-to'g'ri import ishlatiladi.</span>
+                  </div>
+                )}
+
                 <div className="flex justify-end gap-2">
-                  <Button variant="outline" onClick={() => { setParsedItems([]); setShowUpload(false); }}>
+                  <Button variant="outline" onClick={() => { setParsedItems([]); setUploadedFile(null); setShowUpload(false); }}>
                     Bekor qilish
                   </Button>
                   <Button onClick={handleImport} disabled={isImporting}>
                     {isImporting ? (
                       <>
                         <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                        Import qilinmoqda...
+                        {importProgress || "Import qilinmoqda..."}
                       </>
                     ) : (
                       <>

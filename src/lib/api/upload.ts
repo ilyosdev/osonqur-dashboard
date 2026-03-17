@@ -55,6 +55,13 @@ export interface ImportResult {
   errors: string[];
 }
 
+export interface DirectImportResult {
+  success: boolean;
+  imported: number;
+  skipped: number;
+  errors: string[];
+}
+
 const uploadFile = async <T>(
   endpoint: string,
   file: File,
@@ -122,4 +129,38 @@ export const uploadApi = {
       method: 'POST',
       body: JSON.stringify({ smetaId, items }),
     }),
+
+  /**
+   * Direct import from file - best for large files (1000+ items)
+   * Parses and imports in one step, avoiding JSON size limits
+   */
+  directImport: async (
+    smetaId: string,
+    file: File,
+    format: 'auto' | 'smeta' | 'work_volume' = 'auto',
+  ): Promise<DirectImportResult> => {
+    const formData = new FormData();
+    formData.append('file', file);
+    formData.append('smetaId', smetaId);
+    formData.append('format', format);
+
+    const token = localStorage.getItem('accessToken');
+    const response = await fetch(
+      `${import.meta.env.VITE_API_URL || 'http://localhost:4001'}/vendor/upload/import/direct`,
+      {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+        body: formData,
+      },
+    );
+
+    if (!response.ok) {
+      const error = await response.json();
+      throw new Error(error.message || 'Import failed');
+    }
+
+    return response.json();
+  },
 };

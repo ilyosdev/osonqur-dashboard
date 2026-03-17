@@ -17,7 +17,7 @@ import { Label } from "@/components/ui/label";
 export interface ExcelUploadProps<T> {
   title: string;
   description?: string;
-  onParsed: (data: T[], warnings: string[]) => void;
+  onParsed: (data: T[], warnings: string[], file?: File) => void;
   parseFunction: (file: File, useAi?: boolean) => Promise<{
     success: boolean;
     data: T[];
@@ -72,7 +72,7 @@ export function ExcelUpload<T>({
 
       if (result.data.length > 0) {
         setParsedCount(result.data.length);
-        onParsed(result.data, result.warnings);
+        onParsed(result.data, result.warnings, file);
       } else {
         setError("Faylda ma'lumot topilmadi");
       }
