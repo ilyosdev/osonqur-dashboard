@@ -209,17 +209,25 @@ export default function SmetaDetailPage() {
     }
   };
 
+  // Rejalashtirilgan byudjet - sum of all items' totalAmount (quantity * unitPrice)
+  const getPlannedBudget = () => {
+    return items.reduce((sum, item) => sum + item.totalAmount, 0);
+  };
+
+  // Haqiqiy sarflangan - sum of all items' usedAmount (usedQuantity * unitPrice)
   const getTotalUsed = () => {
     return items.reduce((sum, item) => sum + item.usedAmount, 0);
   };
 
   const getOverallProgress = () => {
-    if (!smeta || smeta.budget === 0) return 0;
-    return Math.min(100, Math.round((getTotalUsed() / smeta.budget) * 100));
+    const planned = getPlannedBudget();
+    if (planned === 0) return 0;
+    return Math.min(100, Math.round((getTotalUsed() / planned) * 100));
   };
 
   const isOverBudget = () => {
-    return smeta && smeta.budget > 0 && getTotalUsed() > smeta.budget;
+    const planned = getPlannedBudget();
+    return planned > 0 && getTotalUsed() > planned;
   };
 
   const handleDeleteAll = async () => {
@@ -326,7 +334,7 @@ export default function SmetaDetailPage() {
               </div>
               <div>
                 <p className="text-sm text-muted-foreground">Rejalashtirilgan byudjet</p>
-                <p className="text-xl font-bold">{formatNumber(smeta.budget)} so'm</p>
+                <p className="text-xl font-bold">{formatNumber(getPlannedBudget())} so'm</p>
               </div>
             </div>
           </CardContent>
@@ -355,14 +363,14 @@ export default function SmetaDetailPage() {
               </div>
               <ProgressBar
                 value={getTotalUsed()}
-                max={smeta.budget || 1}
+                max={getPlannedBudget() || 1}
                 size="md"
                 variant={isOverBudget() ? "destructive" : "default"}
               />
               {isOverBudget() && (
                 <div className="flex items-center gap-1 text-xs text-destructive">
                   <AlertCircle className="h-3 w-3" />
-                  Byudjetdan {formatNumber(getTotalUsed() - smeta.budget)} so'm oshdi
+                  Byudjetdan {formatNumber(getTotalUsed() - getPlannedBudget())} so'm oshdi
                 </div>
               )}
             </div>
