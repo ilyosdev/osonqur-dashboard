@@ -71,6 +71,9 @@ export interface AdminOrgProject {
   floors?: number;
   budget?: number;
   status: string;
+  userCount: number;
+  smetaCount: number;
+  smetaBudgetTotal: number;
   createdAt: string;
   updatedAt: string;
 }

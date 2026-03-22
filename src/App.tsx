@@ -11,7 +11,6 @@ import LoginPage from '@/pages/auth/login';
 import HomePage from '@/pages/dashboard/index';
 import ProjectsPage from '@/pages/dashboard/projects';
 import ProjectDetailPage from '@/pages/dashboard/projects/[id]';
-import SubProjectDetailPage from '@/pages/dashboard/projects/[id]/sub-projects/[projectId]';
 import RequestsPage from '@/pages/dashboard/requests';
 import PendingRequestsPage from '@/pages/dashboard/requests/pending';
 import UsersPage from '@/pages/dashboard/users';
@@ -77,7 +76,6 @@ function App() {
         <Route path="/" element={<HomePage />} />
         <Route path="/projects" element={<ProjectsPage />} />
         <Route path="/projects/:id" element={<ProjectDetailPage />} />
-        <Route path="/projects/:id/projects/:projectId" element={<SubProjectDetailPage />} />
         <Route path="/requests" element={<RequestsPage />} />
         <Route path="/requests/pending" element={<PendingRequestsPage />} />
         <Route path="/users" element={<UsersPage />} />

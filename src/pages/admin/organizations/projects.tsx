@@ -2,7 +2,7 @@ import { useEffect, useState, useCallback } from "react";
 import { useParams, Link } from "react-router-dom";
 import {
   FolderOpen, Plus, Search, RefreshCw, Loader2, MoreVertical,
-  Edit, Trash2, AlertCircle, ArrowLeft, MapPin,
+  Edit, Trash2, AlertCircle, ArrowLeft, MapPin, Users, FileSpreadsheet,
 } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -230,11 +230,27 @@ export default function OrgProjectsPage() {
                   {project.address && (
                     <div className="flex items-center gap-2"><MapPin className="h-4 w-4" /><span>{project.address}</span></div>
                   )}
-                  {project.floors && <div>Qavatlar: {project.floors}</div>}
-                  {project.budget && <div>Byudjet: {project.budget.toLocaleString()} so'm</div>}
+                  <div className="flex items-center gap-4">
+                    <div className="flex items-center gap-1">
+                      <Users className="h-4 w-4" />
+                      <span>{project.userCount || 0} xodim</span>
+                    </div>
+                    <div className="flex items-center gap-1">
+                      <FileSpreadsheet className="h-4 w-4" />
+                      <span>{project.smetaCount || 0} smeta</span>
+                    </div>
+                  </div>
+                  {project.smetaBudgetTotal > 0 && (
+                    <div>Byudjet: {project.smetaBudgetTotal.toLocaleString()} so'm</div>
+                  )}
                 </div>
-                <div className="mt-4 pt-4 border-t">
+                <div className="mt-4 pt-4 border-t flex items-center justify-between">
                   {getStatusBadge(project.status)}
+                  <div className="flex gap-1">
+                    <Button variant="ghost" size="sm" asChild>
+                      <Link to={`/admin/organizations/${orgId}/projects/${project.id}/smetas`}>Smetalar</Link>
+                    </Button>
+                  </div>
                 </div>
               </CardContent>
             </Card>

@@ -355,10 +355,6 @@ export default function ProjectsPage() {
                     <Calendar className="h-4 w-4" />
                     <span>{new Date(project.createdAt).toLocaleDateString("uz-UZ")}</span>
                   </div>
-                  <div className="flex items-center gap-2">
-                    <Building2 className="h-4 w-4" />
-                    <span>0 ta sub-loyiha</span>
-                  </div>
                 </div>
 
                 <div className="mt-4 pt-4 border-t flex items-center justify-between">
