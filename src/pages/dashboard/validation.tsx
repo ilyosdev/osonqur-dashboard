@@ -125,10 +125,18 @@ export default function ValidationPage() {
   } = useApi(() => analyticsApi.getSmetaMonitoring(), [], { enabled: activeTab === "progress" });
 
   // Mutation for validating work logs
-  const { mutate: validateWorkLog, loading: validatingId } = useMutation(
-    ({ id, isValidated }: { id: string; isValidated: boolean }) =>
-      workersApi.validateWorkLog(id, { isValidated })
+  const { mutate: approveWorkLog, loading: approvingId } = useMutation(
+    ({ id, unitPrice, totalAmount }: { id: string; unitPrice?: number; totalAmount?: number }) =>
+      workersApi.validateWithPrice(id, { unitPrice: unitPrice || 0, totalAmount: totalAmount || 0 })
   );
+
+  // Mutation for rejecting work logs
+  const { mutate: rejectWorkLogMutation, loading: rejectingId } = useMutation(
+    ({ id, reason }: { id: string; reason?: string }) =>
+      workersApi.rejectWorkLog(id, { reason })
+  );
+
+  const validatingId = approvingId || rejectingId;
 
   const loading = pendingLoading || allWorkLogsLoading || smetaItemsLoading;
   const error = pendingError || smetaItemsError;
@@ -142,9 +150,14 @@ export default function ValidationPage() {
     (log) => log.isValidated && log.validatedAt && log.validatedAt.startsWith(todayStr)
   );
 
+  // Filter work logs rejected today
+  const rejectedToday = allWorkLogs.filter(
+    (log) => log.isRejected && log.validatedAt && log.validatedAt.startsWith(todayStr)
+  );
+
   // Count approved (validated) and rejected
   const approvedCount = validatedToday.length;
-  const rejectedCount = 0;
+  const rejectedCount = rejectedToday.length;
 
   // Calculate smeta alerts - items where usedQuantity/quantity >= 80%
   const smetaAlerts: SmetaAlert[] = smetaItems
@@ -173,9 +186,14 @@ export default function ValidationPage() {
     );
   };
 
-  const handleValidate = async (workLog: WorkLog, approve: boolean) => {
+  const handleValidate = async (workLog: WorkLog) => {
     try {
-      await validateWorkLog({ id: workLog.id, isValidated: approve });
+      const smetaItem = getSmetaItem(workLog);
+      await approveWorkLog({
+        id: workLog.id,
+        unitPrice: workLog.unitPrice || smetaItem?.unitPrice || 0,
+        totalAmount: workLog.totalAmount || (workLog.quantity * (smetaItem?.unitPrice || 0)),
+      });
       refetchPending();
     } catch (err) {
       console.error("Failed to validate work log:", err);
@@ -203,8 +221,11 @@ export default function ValidationPage() {
   const handleValidateWithPrice = async () => {
     if (!priceDialog) return;
     try {
-      // In a real implementation, this would call a specific endpoint to update price
-      await validateWorkLog({ id: priceDialog.id, isValidated: true });
+      await approveWorkLog({
+        id: priceDialog.id,
+        unitPrice: Number(priceData.unitPrice) || 0,
+        totalAmount: Number(priceData.totalAmount) || 0,
+      });
       setPriceDialog(null);
       setPriceData({ unitPrice: "", totalAmount: "" });
       refetchPending();
@@ -216,7 +237,7 @@ export default function ValidationPage() {
   const handleReject = async () => {
     if (!rejectDialog || !rejectReason.trim()) return;
     try {
-      await validateWorkLog({ id: rejectDialog.id, isValidated: false });
+      await rejectWorkLogMutation({ id: rejectDialog.id, reason: rejectReason });
       setRejectDialog(null);
       setRejectReason("");
       refetchPending();
@@ -435,7 +456,7 @@ export default function ValidationPage() {
                               </Button>
                               <Button
                                 size="sm"
-                                onClick={() => handleValidate(log, true)}
+                                onClick={() => handleValidate(log)}
                                 disabled={!!validatingId}
                               >
                                 <CheckCircle className="h-4 w-4 mr-1" />

@@ -34,6 +34,8 @@ export interface WorkLog {
   totalAmount?: number | null;
   date: string;
   isValidated: boolean;
+  isRejected?: boolean;
+  rejectionReason?: string | null;
   validatedAt?: string | null;
   worker?: { id: string; name: string };
   project?: { id: string; name: string };
@@ -222,12 +224,12 @@ export const workersApi = {
 
   // Enhanced validation methods
   validateWithPrice: (id: string, data: { unitPrice: number; totalAmount: number }) =>
-    apiClient<WorkLog>(`/vendor/workers/work-logs/${id}/validate-with-price`, {
+    apiClient<WorkLog>(`/vendor/workers/work-logs/${id}/validate`, {
       method: 'POST',
-      body: JSON.stringify({ isValidated: true, ...data }),
+      body: JSON.stringify(data),
     }),
 
-  rejectWorkLog: (id: string, data: { reason: string }) =>
+  rejectWorkLog: (id: string, data: { reason?: string }) =>
     apiClient<WorkLog>(`/vendor/workers/work-logs/${id}/reject`, {
       method: 'POST',
       body: JSON.stringify(data),

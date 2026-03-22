@@ -71,6 +71,8 @@ export default function SupplyPage() {
   const [createOrderDialogOpen, setCreateOrderDialogOpen] = useState(false);
   const [payDebtDialogOpen, setPayDebtDialogOpen] = useState(false);
   const [selectedDebt, setSelectedDebt] = useState<SupplierDebt | null>(null);
+  const [supplierDebtsDialogOpen, setSupplierDebtsDialogOpen] = useState(false);
+  const [selectedSupplierForDebts, setSelectedSupplierForDebts] = useState<{ id: string; name: string } | null>(null);
   const [assignSupplierDialogOpen, setAssignSupplierDialogOpen] = useState(false);
   const [selectedRequest, setSelectedRequest] = useState<PurchaseRequest | null>(null);
 
@@ -109,6 +111,19 @@ export default function SupplyPage() {
     refetch: refetchDebts,
   } = useApi(() => analyticsApi.getSupplierDebts(), []);
 
+  // Fetch individual debts for selected supplier
+  const {
+    data: selectedSupplierDebtsData,
+    loading: selectedSupplierDebtsLoading,
+    refetch: refetchSelectedSupplierDebts,
+  } = useApi(
+    () => selectedSupplierForDebts
+      ? suppliersApi.getDebts(selectedSupplierForDebts.id, { isPaid: false, limit: 50 })
+      : Promise.resolve({ data: [] as SupplierDebt[], total: 0, page: 1, limit: 50, totalPages: 0 }),
+    [selectedSupplierForDebts?.id],
+    { enabled: !!selectedSupplierForDebts }
+  );
+
   // Fetch smeta items for new order
   const {
     data: smetaItemsData,
@@ -118,6 +133,11 @@ export default function SupplyPage() {
     [],
     { enabled: createOrderDialogOpen }
   );
+
+  // Fetch today's payments
+  const {
+    data: todayPaymentsData,
+  } = useApi(() => analyticsApi.getTodayPayments(), []);
 
   // Mutations
   const { mutate: createOrder, loading: creatingOrder } = useMutation(
@@ -144,9 +164,9 @@ export default function SupplyPage() {
   const pendingOrders = allOrders.filter(o => o.status === "PENDING" || o.status === "PROCESSING");
   const completedOrders = allOrders.filter(o => o.status === "COMPLETED" || o.status === "DELIVERED");
 
-  // Calculate today's payments
-  const todayStr = new Date().toISOString().split("T")[0];
-  const todayPayments = 0; // Would need a payments endpoint
+  // Today's payments from API
+  const todayPayments = todayPaymentsData?.count || 0;
+  const todayPaymentsAmount = todayPaymentsData?.totalAmount || 0;
 
   const loading = approvedRequestsLoading || suppliersLoading || ordersLoading || supplierDebtsLoading;
   const error = approvedRequestsError;
@@ -301,9 +321,9 @@ export default function SupplyPage() {
         <DebtsSection
           supplierDebts={supplierDebts}
           loading={supplierDebtsLoading}
-          onPayDebt={(debt) => {
-            setSelectedDebt(debt);
-            setPayDebtDialogOpen(true);
+          onViewSupplierDebts={(supplierId, supplierName) => {
+            setSelectedSupplierForDebts({ id: supplierId, name: supplierName });
+            setSupplierDebtsDialogOpen(true);
           }}
           totalDebt={supplierDebtsData?.totalDebt || 0}
         />
@@ -452,6 +472,77 @@ export default function SupplyPage() {
             </Button>
             <Button onClick={handlePayDebt} disabled={payingDebt}>
               {payingDebt ? "To'lanmoqda..." : "To'lash"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Supplier Debts Dialog */}
+      <Dialog open={supplierDebtsDialogOpen} onOpenChange={(open) => {
+        setSupplierDebtsDialogOpen(open);
+        if (!open) setSelectedSupplierForDebts(null);
+      }}>
+        <DialogContent className="sm:max-w-lg">
+          <DialogHeader>
+            <DialogTitle>Qarzlar - {selectedSupplierForDebts?.name}</DialogTitle>
+            <DialogDescription>
+              Har bir qarzni alohida to'lang
+            </DialogDescription>
+          </DialogHeader>
+          <div className="max-h-[400px] overflow-y-auto space-y-3 py-2">
+            {selectedSupplierDebtsLoading ? (
+              <div className="space-y-3">
+                {[1, 2, 3].map((i) => (
+                  <div key={i} className="h-16 bg-muted/50 rounded-lg animate-pulse" />
+                ))}
+              </div>
+            ) : (selectedSupplierDebtsData?.data || []).length === 0 ? (
+              <div className="text-center py-6 text-muted-foreground">
+                <CreditCard className="h-10 w-10 mx-auto mb-3 opacity-50" />
+                <p className="text-sm">To'lanmagan qarzlar yo'q</p>
+              </div>
+            ) : (
+              (selectedSupplierDebtsData?.data || []).map((debt) => (
+                <div
+                  key={debt.id}
+                  className="p-3 rounded-lg border bg-card space-y-2"
+                >
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="font-bold text-lg">{formatMoney(debt.amount)} so'm</p>
+                      {debt.description && (
+                        <p className="text-sm text-muted-foreground">{debt.description}</p>
+                      )}
+                      <p className="text-xs text-muted-foreground mt-1">
+                        {new Date(debt.createdAt).toLocaleDateString("uz-UZ")}
+                      </p>
+                    </div>
+                    <Button
+                      size="sm"
+                      onClick={async () => {
+                        try {
+                          await payDebt(debt.id);
+                          refetchSelectedSupplierDebts();
+                          refetchDebts();
+                        } catch {
+                          // Error handled by mutation
+                        }
+                      }}
+                      disabled={payingDebt}
+                    >
+                      {payingDebt ? "..." : "To'lash"}
+                    </Button>
+                  </div>
+                </div>
+              ))
+            )}
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => {
+              setSupplierDebtsDialogOpen(false);
+              setSelectedSupplierForDebts(null);
+            }}>
+              Yopish
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -687,12 +778,12 @@ function OrdersSection({
 function DebtsSection({
   supplierDebts,
   loading,
-  onPayDebt,
+  onViewSupplierDebts,
   totalDebt,
 }: {
   supplierDebts: { supplierId: string; supplierName: string; totalDebt: number; unpaidCount: number }[];
   loading: boolean;
-  onPayDebt: (debt: SupplierDebt) => void;
+  onViewSupplierDebts: (supplierId: string, supplierName: string) => void;
   totalDebt: number;
 }) {
   return (
@@ -740,7 +831,7 @@ function DebtsSection({
                     <Button
                       size="sm"
                       className="mt-2"
-                      onClick={() => onPayDebt({ id: debt.supplierId, amount: debt.totalDebt } as SupplierDebt)}
+                      onClick={() => onViewSupplierDebts(debt.supplierId, debt.supplierName)}
                     >
                       <DollarSign className="h-4 w-4 mr-1" />
                       To'lash

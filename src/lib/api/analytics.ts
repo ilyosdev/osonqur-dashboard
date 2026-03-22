@@ -242,4 +242,9 @@ export const analyticsApi = {
     apiClient<PendingSummary>('/vendor/analytics/pending-summary', {
       method: 'GET',
     }),
+
+  getTodayPayments: () =>
+    apiClient<{ count: number; totalAmount: number }>('/vendor/analytics/today-payments', {
+      method: 'GET',
+    }),
 };

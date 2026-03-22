@@ -87,6 +87,8 @@ export default function DirektorPage() {
   const [addDebtDialogOpen, setAddDebtDialogOpen] = useState(false);
   const [payDebtDialogOpen, setPayDebtDialogOpen] = useState(false);
   const [selectedDebt, setSelectedDebt] = useState<SupplierDebt | null>(null);
+  const [supplierDebtsDialogOpen, setSupplierDebtsDialogOpen] = useState(false);
+  const [selectedSupplierForDebts, setSelectedSupplierForDebts] = useState<{ id: string; name: string } | null>(null);
   const [priceDialog, setPriceDialog] = useState<WorkLog | null>(null);
   const [requestDetailDialog, setRequestDetailDialog] = useState<PurchaseRequest | null>(null);
 
@@ -139,6 +141,19 @@ export default function DirektorPage() {
     loading: supplierDebtsLoading,
     refetch: refetchDebts,
   } = useApi(() => analyticsApi.getSupplierDebts(projectIdParam), [selectedProjectId]);
+
+  // Fetch individual debts for selected supplier
+  const {
+    data: selectedSupplierDebtsData,
+    loading: selectedSupplierDebtsLoading,
+    refetch: refetchSelectedSupplierDebts,
+  } = useApi(
+    () => selectedSupplierForDebts
+      ? suppliersApi.getDebts(selectedSupplierForDebts.id, { isPaid: false, limit: 50 })
+      : Promise.resolve({ data: [] as SupplierDebt[], total: 0, page: 1, limit: 50, totalPages: 0 }),
+    [selectedSupplierForDebts?.id],
+    { enabled: !!selectedSupplierForDebts }
+  );
 
   // Fetch worker debts from analytics
   const {
@@ -418,9 +433,9 @@ export default function DirektorPage() {
           workerDebts={workerDebts}
           loading={supplierDebtsLoading || workerDebtsLoading}
           onAddDebt={() => setAddDebtDialogOpen(true)}
-          onPayDebt={(debt) => {
-            setSelectedDebt(debt);
-            setPayDebtDialogOpen(true);
+          onViewSupplierDebts={(supplierId, supplierName) => {
+            setSelectedSupplierForDebts({ id: supplierId, name: supplierName });
+            setSupplierDebtsDialogOpen(true);
           }}
           totalSupplierDebt={supplierDebtsData?.totalDebt || 0}
           totalWorkerDebt={workerDebtsData?.totalDebt || 0}
@@ -593,6 +608,77 @@ export default function DirektorPage() {
             </Button>
             <Button onClick={handlePayDebt} disabled={payingDebt}>
               {payingDebt ? "To'lanmoqda..." : "To'lash"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Supplier Debts Dialog */}
+      <Dialog open={supplierDebtsDialogOpen} onOpenChange={(open) => {
+        setSupplierDebtsDialogOpen(open);
+        if (!open) setSelectedSupplierForDebts(null);
+      }}>
+        <DialogContent className="sm:max-w-lg">
+          <DialogHeader>
+            <DialogTitle>Qarzlar - {selectedSupplierForDebts?.name}</DialogTitle>
+            <DialogDescription>
+              Har bir qarzni alohida to'lang
+            </DialogDescription>
+          </DialogHeader>
+          <div className="max-h-[400px] overflow-y-auto space-y-3 py-2">
+            {selectedSupplierDebtsLoading ? (
+              <div className="space-y-3">
+                {[1, 2, 3].map((i) => (
+                  <div key={i} className="h-16 bg-muted/50 rounded-lg animate-pulse" />
+                ))}
+              </div>
+            ) : (selectedSupplierDebtsData?.data || []).length === 0 ? (
+              <div className="text-center py-6 text-muted-foreground">
+                <CreditCard className="h-10 w-10 mx-auto mb-3 opacity-50" />
+                <p className="text-sm">To'lanmagan qarzlar yo'q</p>
+              </div>
+            ) : (
+              (selectedSupplierDebtsData?.data || []).map((debt) => (
+                <div
+                  key={debt.id}
+                  className="p-3 rounded-lg border bg-card space-y-2"
+                >
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="font-bold text-lg">{formatMoney(debt.amount)} so'm</p>
+                      {debt.description && (
+                        <p className="text-sm text-muted-foreground">{debt.description}</p>
+                      )}
+                      <p className="text-xs text-muted-foreground mt-1">
+                        {new Date(debt.createdAt).toLocaleDateString("uz-UZ")}
+                      </p>
+                    </div>
+                    <Button
+                      size="sm"
+                      onClick={async () => {
+                        try {
+                          await payDebt(debt.id);
+                          refetchSelectedSupplierDebts();
+                          refetchDebts();
+                        } catch {
+                          // Error handled by mutation
+                        }
+                      }}
+                      disabled={payingDebt}
+                    >
+                      {payingDebt ? "..." : "To'lash"}
+                    </Button>
+                  </div>
+                </div>
+              ))
+            )}
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => {
+              setSupplierDebtsDialogOpen(false);
+              setSelectedSupplierForDebts(null);
+            }}>
+              Yopish
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -861,7 +947,7 @@ function DebtsSection({
   workerDebts,
   loading,
   onAddDebt,
-  onPayDebt,
+  onViewSupplierDebts,
   totalSupplierDebt,
   totalWorkerDebt,
 }: {
@@ -869,7 +955,7 @@ function DebtsSection({
   workerDebts: { workerId: string; workerName: string; debt: number }[];
   loading: boolean;
   onAddDebt: () => void;
-  onPayDebt: (debt: SupplierDebt) => void;
+  onViewSupplierDebts: (supplierId: string, supplierName: string) => void;
   totalSupplierDebt: number;
   totalWorkerDebt: number;
 }) {
@@ -925,7 +1011,7 @@ function DebtsSection({
                         size="sm"
                         variant="outline"
                         className="mt-1"
-                        onClick={() => onPayDebt({ id: debt.supplierId, amount: debt.totalDebt } as SupplierDebt)}
+                        onClick={() => onViewSupplierDebts(debt.supplierId, debt.supplierName)}
                       >
                         To'lash
                       </Button>
