@@ -8,12 +8,36 @@ export interface AdminOrganization {
   id: string;
   name: string;
   phone?: string;
+  inn?: string;
+  address?: string;
+  responsiblePerson?: string;
+  logo?: string;
   subscriptionTier: SubscriptionTier;
   isActive: boolean;
   userCount: number;
   projectCount: number;
   createdAt: string;
   updatedAt: string;
+}
+
+export interface CreateOrganizationRequest {
+  name: string;
+  phone: string;
+  responsiblePerson: string;
+  password: string;
+  subscriptionTier?: SubscriptionTier;
+  inn?: string;
+  address?: string;
+  logo?: string;
+}
+
+export interface CreateOrganizationResponse {
+  organization: AdminOrganization;
+  adminUser: {
+    id: string;
+    name: string;
+    phone: string;
+  };
 }
 
 export interface AdminOperator {
@@ -100,8 +124,8 @@ export const adminApi = {
   getOrganization: (id: string) =>
     apiClient<AdminOrganization>(`/admin/organizations/${id}`, { method: 'GET' }),
 
-  createOrganization: (data: { name: string; phone?: string; subscriptionTier?: SubscriptionTier }) =>
-    apiClient<AdminOrganization>('/admin/organizations', {
+  createOrganization: (data: CreateOrganizationRequest) =>
+    apiClient<CreateOrganizationResponse>('/admin/organizations', {
       method: 'POST',
       body: JSON.stringify(data),
     }),

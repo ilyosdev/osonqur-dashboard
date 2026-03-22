@@ -2,7 +2,7 @@ import { useEffect, useState, useCallback } from "react";
 import { Link } from "react-router-dom";
 import {
   Building2, Plus, Search, RefreshCw, Loader2, MoreVertical,
-  Edit, Trash2, AlertCircle, Users, FolderOpen, Eye, EyeOff,
+  Edit, Trash2, AlertCircle, Users, FolderOpen, Eye, EyeOff, CheckCircle,
 } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -42,7 +42,17 @@ export default function OrganizationsPage() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [formError, setFormError] = useState("");
 
-  const [formData, setFormData] = useState({ name: "", phone: "", subscriptionTier: "ODDIY" as SubscriptionTier });
+  const [formData, setFormData] = useState({
+    name: "",
+    phone: "",
+    inn: "",
+    address: "",
+    responsiblePerson: "",
+    password: "",
+    subscriptionTier: "ODDIY" as SubscriptionTier,
+  });
+  const [showPassword, setShowPassword] = useState(false);
+  const [createdAdmin, setCreatedAdmin] = useState<{ name: string; phone: string } | null>(null);
 
   const TIER_LABELS: Record<SubscriptionTier, string> = {
     ODDIY: "Oddiy (1 loyiha)",
@@ -77,15 +87,33 @@ export default function OrganizationsPage() {
   }, [fetchOrgs]);
 
   const resetForm = () => {
-    setFormData({ name: "", phone: "", subscriptionTier: "ODDIY" });
+    setFormData({
+      name: "",
+      phone: "",
+      inn: "",
+      address: "",
+      responsiblePerson: "",
+      password: "",
+      subscriptionTier: "ODDIY",
+    });
     setFormError("");
+    setShowPassword(false);
+    setCreatedAdmin(null);
   };
 
   const openAddDialog = () => { resetForm(); setAddDialogOpen(true); };
 
   const openEditDialog = (org: AdminOrganization) => {
     setSelectedOrg(org);
-    setFormData({ name: org.name, phone: (org.phone || "").replace("+998", ""), subscriptionTier: org.subscriptionTier || "ODDIY" });
+    setFormData({
+      name: org.name,
+      phone: (org.phone || "").replace("+998", ""),
+      inn: org.inn || "",
+      address: org.address || "",
+      responsiblePerson: org.responsiblePerson || "",
+      password: "",
+      subscriptionTier: org.subscriptionTier || "ODDIY",
+    });
     setFormError("");
     setEditDialogOpen(true);
   };
@@ -96,16 +124,33 @@ export default function OrganizationsPage() {
   };
 
   const handleAdd = async () => {
-    if (!formData.name.trim()) { setFormError("Nomi kiritilishi kerak"); return; }
+    if (!formData.name.trim()) { setFormError("Kompaniya nomi kiritilishi kerak"); return; }
+    if (!formData.responsiblePerson.trim()) { setFormError("Mas'ul shaxs ismi kiritilishi kerak"); return; }
+    if (!formData.phone.trim()) { setFormError("Telefon raqami kiritilishi kerak"); return; }
+    if (!formData.password.trim()) { setFormError("Parol kiritilishi kerak"); return; }
+    if (formData.password.length < 4) { setFormError("Parol kamida 4 ta belgi bo'lishi kerak"); return; }
+
     setIsSubmitting(true);
     setFormError("");
     try {
-      const phone = formData.phone.trim() ? "+998" + formData.phone.replace(/\s/g, "") : undefined;
-      await adminApi.createOrganization({ name: formData.name, phone, subscriptionTier: formData.subscriptionTier });
-      setAddDialogOpen(false);
+      const phone = "+998" + formData.phone.replace(/\s/g, "");
+      const result = await adminApi.createOrganization({
+        name: formData.name,
+        phone,
+        responsiblePerson: formData.responsiblePerson,
+        password: formData.password,
+        subscriptionTier: formData.subscriptionTier,
+        inn: formData.inn.trim() || undefined,
+        address: formData.address.trim() || undefined,
+      });
+      setCreatedAdmin({ name: result.adminUser.name, phone: result.adminUser.phone });
       fetchOrgs();
     } catch (err) {
-      setFormError(err instanceof Error ? err.message : "Xatolik");
+      if (err instanceof Error && err.message.includes("PHONE_ALREADY_EXISTS")) {
+        setFormError("Bu telefon raqami allaqachon ro'yxatdan o'tgan");
+      } else {
+        setFormError(err instanceof Error ? err.message : "Xatolik");
+      }
     } finally {
       setIsSubmitting(false);
     }
@@ -299,46 +344,109 @@ export default function OrganizationsPage() {
       )}
 
       {/* Add Dialog */}
-      <Dialog open={addDialogOpen} onOpenChange={setAddDialogOpen}>
-        <DialogContent className="max-w-md">
+      <Dialog open={addDialogOpen} onOpenChange={(open) => { setAddDialogOpen(open); if (!open) resetForm(); }}>
+        <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>Yangi kompaniya</DialogTitle>
-            <DialogDescription>Yangi kompaniya yarating</DialogDescription>
+            <DialogDescription>Yangi kompaniya va ADMIN yarating</DialogDescription>
           </DialogHeader>
-          {formError && <div className="p-3 rounded-lg bg-destructive/10 text-destructive text-sm">{formError}</div>}
-          <div className="space-y-4">
-            <div className="space-y-2">
-              <Label>Nomi *</Label>
-              <Input placeholder="Kompaniya nomi" value={formData.name} onChange={(e) => setFormData(p => ({ ...p, name: e.target.value }))} />
-            </div>
-            <div className="space-y-2">
-              <Label>Telefon (ixtiyoriy)</Label>
-              <div className="relative">
-                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground text-sm">+998</span>
-                <Input className="pl-14" placeholder="__ ___ __ __" value={formData.phone}
-                  onChange={(e) => setFormData(p => ({ ...p, phone: formatPhone(e.target.value) }))} />
+
+          {createdAdmin ? (
+            <div className="space-y-4">
+              <div className="p-4 rounded-lg bg-green-500/10 border border-green-500/20">
+                <div className="flex items-center gap-2 text-green-600 mb-3">
+                  <CheckCircle className="h-5 w-5" />
+                  <span className="font-medium">Kompaniya muvaffaqiyatli yaratildi!</span>
+                </div>
+                <div className="space-y-2 text-sm">
+                  <p><strong>ADMIN yaratildi:</strong></p>
+                  <p>Ism: {createdAdmin.name}</p>
+                  <p>Login: {createdAdmin.phone}</p>
+                  <p>Parol: (siz kiritgan)</p>
+                </div>
               </div>
+              <DialogFooter>
+                <Button onClick={() => setAddDialogOpen(false)}>Yopish</Button>
+              </DialogFooter>
             </div>
-            <div className="space-y-2">
-              <Label>Tarif</Label>
-              <Select value={formData.subscriptionTier} onValueChange={(v) => setFormData(p => ({ ...p, subscriptionTier: v as SubscriptionTier }))}>
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="ODDIY">{TIER_LABELS.ODDIY}</SelectItem>
-                  <SelectItem value="PRO">{TIER_LABELS.PRO}</SelectItem>
-                  <SelectItem value="ENTERPRISE">{TIER_LABELS.ENTERPRISE}</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-          </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setAddDialogOpen(false)} disabled={isSubmitting}>Bekor qilish</Button>
-            <Button onClick={handleAdd} disabled={isSubmitting}>
-              {isSubmitting ? <><Loader2 className="h-4 w-4 mr-2 animate-spin" />Yaratilmoqda...</> : "Yaratish"}
-            </Button>
-          </DialogFooter>
+          ) : (
+            <>
+              {formError && <div className="p-3 rounded-lg bg-destructive/10 text-destructive text-sm">{formError}</div>}
+              <div className="space-y-4">
+                <div className="space-y-2">
+                  <Label>Kompaniya nomi *</Label>
+                  <Input placeholder="Kompaniya nomi" value={formData.name} onChange={(e) => setFormData(p => ({ ...p, name: e.target.value }))} />
+                </div>
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label>INN (ixtiyoriy)</Label>
+                    <Input placeholder="123456789" value={formData.inn} onChange={(e) => setFormData(p => ({ ...p, inn: e.target.value }))} />
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Tarif</Label>
+                    <Select value={formData.subscriptionTier} onValueChange={(v) => setFormData(p => ({ ...p, subscriptionTier: v as SubscriptionTier }))}>
+                      <SelectTrigger>
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="ODDIY">{TIER_LABELS.ODDIY}</SelectItem>
+                        <SelectItem value="PRO">{TIER_LABELS.PRO}</SelectItem>
+                        <SelectItem value="ENTERPRISE">{TIER_LABELS.ENTERPRISE}</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
+                <div className="space-y-2">
+                  <Label>Manzil (ixtiyoriy)</Label>
+                  <Input placeholder="Toshkent, Mirzo Ulug'bek" value={formData.address} onChange={(e) => setFormData(p => ({ ...p, address: e.target.value }))} />
+                </div>
+
+                <div className="border-t pt-4">
+                  <p className="text-sm text-muted-foreground mb-3">Mas'ul shaxs (ADMIN sifatida yaratiladi)</p>
+                  <div className="space-y-4">
+                    <div className="space-y-2">
+                      <Label>Mas'ul shaxs ismi *</Label>
+                      <Input placeholder="Ism familiya" value={formData.responsiblePerson} onChange={(e) => setFormData(p => ({ ...p, responsiblePerson: e.target.value }))} />
+                    </div>
+                    <div className="space-y-2">
+                      <Label>Telefon raqami * (ADMIN login)</Label>
+                      <div className="relative">
+                        <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground text-sm">+998</span>
+                        <Input className="pl-14" placeholder="__ ___ __ __" value={formData.phone}
+                          onChange={(e) => setFormData(p => ({ ...p, phone: formatPhone(e.target.value) }))} />
+                      </div>
+                    </div>
+                    <div className="space-y-2">
+                      <Label>Parol * (ADMIN uchun)</Label>
+                      <div className="relative">
+                        <Input
+                          type={showPassword ? "text" : "password"}
+                          placeholder="Kamida 4 ta belgi"
+                          value={formData.password}
+                          onChange={(e) => setFormData(p => ({ ...p, password: e.target.value }))}
+                        />
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="icon"
+                          className="absolute right-0 top-0 h-full px-3"
+                          onClick={() => setShowPassword(!showPassword)}
+                        >
+                          {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                        </Button>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+              <DialogFooter>
+                <Button variant="outline" onClick={() => setAddDialogOpen(false)} disabled={isSubmitting}>Bekor qilish</Button>
+                <Button onClick={handleAdd} disabled={isSubmitting}>
+                  {isSubmitting ? <><Loader2 className="h-4 w-4 mr-2 animate-spin" />Yaratilmoqda...</> : "Yaratish"}
+                </Button>
+              </DialogFooter>
+            </>
+          )}
         </DialogContent>
       </Dialog>
 
