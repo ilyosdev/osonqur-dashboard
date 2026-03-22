@@ -2,13 +2,14 @@ import { useEffect, useState, useCallback } from "react";
 import { useParams, Link } from "react-router-dom";
 import {
   Users, Plus, Search, RefreshCw, Loader2, MoreVertical,
-  Edit, Trash2, AlertCircle, ArrowLeft, Eye, EyeOff, FolderOpen,
+  Edit, Trash2, AlertCircle, ArrowLeft, Eye, EyeOff, FolderOpen, Shield,
 } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
+import { Checkbox } from "@/components/ui/checkbox";
 import {
   Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle,
 } from "@/components/ui/dialog";
@@ -63,7 +64,7 @@ export default function OrgUsersPage() {
   const [selectedProjectId, setSelectedProjectId] = useState("");
 
   const [formData, setFormData] = useState({
-    name: "", phone: "", password: "", role: "PRORAB", telegramId: "",
+    name: "", phone: "", password: "", role: "PRORAB", telegramId: "", allowedRoles: [] as string[],
   });
 
   const fetchOrg = useCallback(async () => {
@@ -93,7 +94,7 @@ export default function OrgUsersPage() {
   useEffect(() => { fetchUsers(); }, [fetchUsers]);
 
   const resetForm = () => {
-    setFormData({ name: "", phone: "", password: "", role: "PRORAB", telegramId: "" });
+    setFormData({ name: "", phone: "", password: "", role: "PRORAB", telegramId: "", allowedRoles: [] });
     setFormError("");
     setShowPassword(false);
   };
@@ -108,6 +109,7 @@ export default function OrgUsersPage() {
       password: "",
       role: u.role,
       telegramId: u.telegramId || "",
+      allowedRoles: u.allowedRoles || [],
     });
     setFormError("");
     setEditDialogOpen(true);
@@ -144,6 +146,7 @@ export default function OrgUsersPage() {
         password: formData.password,
         role: formData.role,
         telegramId: formData.telegramId || undefined,
+        allowedRoles: formData.allowedRoles.length > 0 ? formData.allowedRoles : undefined,
       });
       setAddDialogOpen(false);
       fetchUsers();
@@ -159,12 +162,14 @@ export default function OrgUsersPage() {
     setIsSubmitting(true);
     setFormError("");
     try {
-      const data: Record<string, string | boolean | undefined> = {};
+      const data: Record<string, string | boolean | string[] | undefined> = {};
       if (formData.name.trim()) data.name = formData.name;
       if (formData.phone.trim()) data.phone = "+998" + formData.phone.replace(/\s/g, "");
       if (formData.password.trim()) data.password = formData.password;
       if (formData.role) data.role = formData.role;
       if (formData.telegramId !== undefined) data.telegramId = formData.telegramId || undefined;
+      // Always send allowedRoles (empty array clears them)
+      data.allowedRoles = formData.allowedRoles;
       await adminApi.updateOrgUser(orgId, selectedUser.id, data);
       setEditDialogOpen(false);
       fetchUsers();
@@ -212,6 +217,15 @@ export default function OrgUsersPage() {
     if (digits.length <= 5) return `${digits.slice(0, 2)} ${digits.slice(2)}`;
     if (digits.length <= 7) return `${digits.slice(0, 2)} ${digits.slice(2, 5)} ${digits.slice(5)}`;
     return `${digits.slice(0, 2)} ${digits.slice(2, 5)} ${digits.slice(5, 7)} ${digits.slice(7, 9)}`;
+  };
+
+  const toggleAllowedRole = (role: string) => {
+    setFormData(prev => {
+      const roles = prev.allowedRoles.includes(role)
+        ? prev.allowedRoles.filter(r => r !== role)
+        : [...prev.allowedRoles, role];
+      return { ...prev, allowedRoles: roles };
+    });
   };
 
   const totalPages = Math.ceil(total / 20);
@@ -280,7 +294,16 @@ export default function OrgUsersPage() {
                 <TableRow key={u.id}>
                   <TableCell className="font-medium">{u.name}</TableCell>
                   <TableCell>{u.phone || "—"}</TableCell>
-                  <TableCell><Badge variant="outline">{u.role}</Badge></TableCell>
+                  <TableCell>
+                    <div className="flex items-center gap-1.5">
+                      <Badge variant="outline">{u.role}</Badge>
+                      {u.allowedRoles && u.allowedRoles.length > 1 && (
+                        <Badge variant="secondary" className="text-[10px] px-1.5">
+                          +{u.allowedRoles.length - 1}
+                        </Badge>
+                      )}
+                    </div>
+                  </TableCell>
                   <TableCell className="text-muted-foreground">{u.telegramId || "—"}</TableCell>
                   <TableCell>
                     <Badge variant={u.isActive ? "default" : "secondary"}
@@ -372,6 +395,29 @@ export default function OrgUsersPage() {
               <Input placeholder="123456789" value={formData.telegramId}
                 onChange={(e) => setFormData(p => ({ ...p, telegramId: e.target.value }))} />
             </div>
+            <div className="space-y-2">
+              <Label className="flex items-center gap-2">
+                <Shield className="h-4 w-4" />
+                Qo'shimcha rollar (ixtiyoriy)
+              </Label>
+              <p className="text-xs text-muted-foreground mb-2">
+                Foydalanuvchi ushbu rollar o'rtasida almashtira oladi
+              </p>
+              <div className="grid grid-cols-2 gap-2">
+                {ORG_ROLES.filter(r => r.value !== formData.role).map(r => (
+                  <div key={r.value} className="flex items-center space-x-2">
+                    <Checkbox
+                      id={`add-role-${r.value}`}
+                      checked={formData.allowedRoles.includes(r.value)}
+                      onCheckedChange={() => toggleAllowedRole(r.value)}
+                    />
+                    <label htmlFor={`add-role-${r.value}`} className="text-sm cursor-pointer">
+                      {r.label}
+                    </label>
+                  </div>
+                ))}
+              </div>
+            </div>
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setAddDialogOpen(false)} disabled={isSubmitting}>Bekor qilish</Button>
@@ -420,6 +466,29 @@ export default function OrgUsersPage() {
             <div className="space-y-2">
               <Label>Telegram ID</Label>
               <Input value={formData.telegramId} onChange={(e) => setFormData(p => ({ ...p, telegramId: e.target.value }))} />
+            </div>
+            <div className="space-y-2">
+              <Label className="flex items-center gap-2">
+                <Shield className="h-4 w-4" />
+                Qo'shimcha rollar
+              </Label>
+              <p className="text-xs text-muted-foreground mb-2">
+                Foydalanuvchi ushbu rollar o'rtasida almashtira oladi
+              </p>
+              <div className="grid grid-cols-2 gap-2">
+                {ORG_ROLES.filter(r => r.value !== formData.role).map(r => (
+                  <div key={r.value} className="flex items-center space-x-2">
+                    <Checkbox
+                      id={`edit-role-${r.value}`}
+                      checked={formData.allowedRoles.includes(r.value)}
+                      onCheckedChange={() => toggleAllowedRole(r.value)}
+                    />
+                    <label htmlFor={`edit-role-${r.value}`} className="text-sm cursor-pointer">
+                      {r.label}
+                    </label>
+                  </div>
+                ))}
+              </div>
             </div>
           </div>
           <DialogFooter>

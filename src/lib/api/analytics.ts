@@ -191,15 +191,19 @@ export const analyticsApi = {
       method: 'GET',
     }),
 
-  getSupplierDebts: () =>
-    apiClient<SupplierDebtsSummary>('/vendor/analytics/supplier-debts', {
+  getSupplierDebts: (projectId?: string) => {
+    const params = projectId ? `?projectId=${projectId}` : '';
+    return apiClient<SupplierDebtsSummary>(`/vendor/analytics/supplier-debts${params}`, {
       method: 'GET',
-    }),
+    });
+  },
 
-  getWorkerDebts: () =>
-    apiClient<WorkerDebtsSummary>('/vendor/analytics/worker-debts', {
+  getWorkerDebts: (projectId?: string) => {
+    const params = projectId ? `?projectId=${projectId}` : '';
+    return apiClient<WorkerDebtsSummary>(`/vendor/analytics/worker-debts${params}`, {
       method: 'GET',
-    }),
+    });
+  },
 
   getWarehouseValue: () =>
     apiClient<WarehouseValueSummary>('/vendor/analytics/warehouse-value', {

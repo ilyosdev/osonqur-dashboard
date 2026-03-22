@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import {
   Package,
   Users,
@@ -14,6 +14,7 @@ import {
   ChevronLeft,
   ChevronRight,
   Eye,
+  FolderOpen,
 } from "lucide-react";
 import { StatsCard } from "@/components/dashboard/stats-card";
 import {
@@ -49,6 +50,7 @@ import { requestsApi, PurchaseRequest } from "@/lib/api/requests";
 import { suppliersApi, Supplier, SupplierDebt } from "@/lib/api/suppliers";
 import { workersApi, WorkLog } from "@/lib/api/workers";
 import { analyticsApi } from "@/lib/api/analytics";
+import { projectsApi, Project } from "@/lib/api/projects";
 import { StatsSkeleton } from "@/components/ui/table-skeleton";
 import { ErrorMessage } from "@/components/ui/error-message";
 
@@ -65,9 +67,21 @@ function formatDate(dateStr: string): string {
 
 type ActiveView = "requests" | "debts" | "validation" | "suppliers";
 
+const STORAGE_KEY = "direktor_selected_project";
+
 export default function DirektorPage() {
   const { user } = useAuth();
   const [activeView, setActiveView] = useState<ActiveView>("requests");
+
+  // Project selection state
+  const [selectedProjectId, setSelectedProjectId] = useState<string>(() =>
+    localStorage.getItem(STORAGE_KEY) || "all"
+  );
+
+  // Persist project selection
+  useEffect(() => {
+    localStorage.setItem(STORAGE_KEY, selectedProjectId);
+  }, [selectedProjectId]);
 
   // Dialog states
   const [addDebtDialogOpen, setAddDebtDialogOpen] = useState(false);
@@ -86,20 +100,31 @@ export default function DirektorPage() {
   const [unitPrice, setUnitPrice] = useState("");
   const [totalAmount, setTotalAmount] = useState("");
 
+  // Get projectId for API calls (undefined means all projects)
+  const projectIdParam = selectedProjectId !== "all" ? selectedProjectId : undefined;
+
+  // Fetch projects list
+  const {
+    data: projectsData,
+    loading: projectsLoading,
+  } = useApi(() => projectsApi.getAll({ limit: 100 }), []);
+
+  const projects = projectsData?.data || [];
+
   // Fetch pending requests
   const {
     data: pendingRequestsData,
     loading: pendingRequestsLoading,
     error: pendingRequestsError,
     refetch: refetchPendingRequests,
-  } = useApi(() => requestsApi.getAll({ status: "PENDING", limit: 50 }), []);
+  } = useApi(() => requestsApi.getAll({ status: "PENDING", limit: 50, projectId: projectIdParam }), [selectedProjectId]);
 
   // Fetch finalized requests (for debt creation)
   const {
     data: finalizedRequestsData,
     loading: finalizedRequestsLoading,
     refetch: refetchFinalizedRequests,
-  } = useApi(() => requestsApi.getAll({ status: "FINALIZED", limit: 50 }), []);
+  } = useApi(() => requestsApi.getAll({ status: "FINALIZED", limit: 50, projectId: projectIdParam }), [selectedProjectId]);
 
   // Fetch suppliers
   const {
@@ -113,20 +138,20 @@ export default function DirektorPage() {
     data: supplierDebtsData,
     loading: supplierDebtsLoading,
     refetch: refetchDebts,
-  } = useApi(() => analyticsApi.getSupplierDebts(), []);
+  } = useApi(() => analyticsApi.getSupplierDebts(projectIdParam), [selectedProjectId]);
 
   // Fetch worker debts from analytics
   const {
     data: workerDebtsData,
     loading: workerDebtsLoading,
-  } = useApi(() => analyticsApi.getWorkerDebts(), []);
+  } = useApi(() => analyticsApi.getWorkerDebts(projectIdParam), [selectedProjectId]);
 
   // Fetch unvalidated work logs
   const {
     data: unvalidatedWorkLogsData,
     loading: unvalidatedWorkLogsLoading,
     refetch: refetchWorkLogs,
-  } = useApi(() => workersApi.getUnvalidatedWorkLogs({ limit: 50 }), []);
+  } = useApi(() => workersApi.getUnvalidatedWorkLogs({ limit: 50, projectId: projectIdParam }), [selectedProjectId]);
 
   // Fetch dashboard summary
   const {
@@ -276,11 +301,33 @@ export default function DirektorPage() {
   return (
     <div className="space-y-6 animate-fade-in">
       {/* Header */}
-      <div className="flex flex-col gap-1">
-        <h1 className="text-2xl font-bold tracking-tight">Direktor</h1>
-        <p className="text-muted-foreground">
-          Xush kelibsiz, {user?.name || "Direktor"}
-        </p>
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+        <div className="flex flex-col gap-1">
+          <h1 className="text-2xl font-bold tracking-tight">Direktor</h1>
+          <p className="text-muted-foreground">
+            Xush kelibsiz, {user?.name || "Direktor"}
+          </p>
+        </div>
+
+        {/* Project Selector */}
+        {projects.length > 1 && (
+          <div className="w-full sm:w-auto">
+            <Select value={selectedProjectId} onValueChange={setSelectedProjectId}>
+              <SelectTrigger className="w-full sm:w-[280px]">
+                <FolderOpen className="h-4 w-4 mr-2 text-muted-foreground" />
+                <SelectValue placeholder="Loyihani tanlang" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">Barcha loyihalar</SelectItem>
+                {projects.map((p) => (
+                  <SelectItem key={p.id} value={p.id}>
+                    {p.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+        )}
       </div>
 
       {/* Stats */}

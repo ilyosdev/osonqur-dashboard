@@ -1,0 +1,11 @@
+
+> smetakon-dashboard@0.1.0 dev /Users/macbookpro/Desktop/projects/smeta/dashboard
+> vite --port 4004
+
+Port 4004 is in use, trying another one...
+Port 4005 is in use, trying another one...
+
+  VITE v6.4.1  ready in 193 ms
+
+  ➜  Local:   http://localhost:4006/
+  ➜  Network: http://10.89.1.43:4006/

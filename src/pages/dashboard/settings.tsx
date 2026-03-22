@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from "react";
+import { useNavigate } from "react-router-dom";
 import {
   Settings,
   Building2,
@@ -10,6 +11,8 @@ import {
   CheckCircle,
   AlertCircle,
   RefreshCw,
+  Shield,
+  Check,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -18,16 +21,36 @@ import { Label } from "@/components/ui/label";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Separator } from "@/components/ui/separator";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { Badge } from "@/components/ui/badge";
 import { useAuth } from "@/lib/auth";
+
+const ROLE_LABELS: Record<string, string> = {
+  SUPER_ADMIN: "Super Admin",
+  OPERATOR: "Operator",
+  ADMIN: "Admin",
+  BOSS: "Boss",
+  DIREKTOR: "Direktor",
+  BUGALTERIYA: "Buxgalteriya",
+  PTO: "PTO",
+  SNABJENIYA: "Ta'minot",
+  SKLAD: "Ombor",
+  PRORAB: "Prorab",
+  HAYDOVCHI: "Haydovchi",
+  MODERATOR: "Moderator",
+  WORKER: "Ishchi",
+  POSTAVSHIK: "Yetkazuvchi",
+};
 import { authApi, telegramGroupsApi, TelegramGroup } from "@/lib/api";
 
 export default function SettingsPage() {
-  const { user, refreshAuth } = useAuth();
+  const navigate = useNavigate();
+  const { user, refreshAuth, currentRole, allowedRoles, switchRole } = useAuth();
 
   // Loading and status states
   const [isLoadingProfile, setIsLoadingProfile] = useState(false);
   const [isLoadingTelegram, setIsLoadingTelegram] = useState(false);
   const [isSavingProfile, setIsSavingProfile] = useState(false);
+  const [isSwitchingRole, setIsSwitchingRole] = useState(false);
 
   // Message states
   const [profileMessage, setProfileMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
@@ -160,6 +183,21 @@ export default function SettingsPage() {
     return "U";
   };
 
+  const handleSwitchRole = async (role: string) => {
+    if (role === currentRole || isSwitchingRole) return;
+    setIsSwitchingRole(true);
+    try {
+      await switchRole(role);
+      navigate('/', { replace: true });
+    } catch (error) {
+      console.error('Failed to switch role:', error);
+    } finally {
+      setIsSwitchingRole(false);
+    }
+  };
+
+  const canSwitchRoles = allowedRoles.length > 1;
+
   return (
     <div className="space-y-6 animate-fade-in">
       <div>
@@ -180,6 +218,12 @@ export default function SettingsPage() {
             <MessageCircle className="h-4 w-4 mr-2" />
             Telegram
           </TabsTrigger>
+          {canSwitchRoles && (
+            <TabsTrigger value="role" className="data-[state=active]:bg-white data-[state=active]:shadow-sm">
+              <Shield className="h-4 w-4 mr-2" />
+              Rol
+            </TabsTrigger>
+          )}
           <TabsTrigger value="profile" className="data-[state=active]:bg-white data-[state=active]:shadow-sm">
             <User className="h-4 w-4 mr-2" />
             Profil
@@ -299,6 +343,69 @@ export default function SettingsPage() {
             </CardContent>
           </Card>
         </TabsContent>
+
+        {canSwitchRoles && (
+          <TabsContent value="role" className="space-y-6 mt-0">
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-base flex items-center gap-2">
+                  <Shield className="h-5 w-5 text-primary" />
+                  Rol sozlamalari
+                </CardTitle>
+                <CardDescription>Mavjud rollar o'rtasida almashtiring</CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-6">
+                <div className="p-4 rounded-lg bg-muted/50">
+                  <p className="text-sm text-muted-foreground mb-2">Joriy rol:</p>
+                  <Badge className="text-base px-3 py-1">
+                    {ROLE_LABELS[currentRole || ''] || currentRole}
+                  </Badge>
+                </div>
+
+                <div className="space-y-3">
+                  <p className="text-sm font-medium text-muted-foreground">Mavjud rollar:</p>
+                  <div className="space-y-2">
+                    {allowedRoles.map((role) => (
+                      <div
+                        key={role}
+                        className={`flex items-center justify-between p-3 rounded-lg border transition-colors ${
+                          role === currentRole
+                            ? 'bg-primary/5 border-primary/30'
+                            : 'hover:bg-muted/50'
+                        }`}
+                      >
+                        <div className="flex items-center gap-3">
+                          {role === currentRole && (
+                            <Check className="h-4 w-4 text-primary" />
+                          )}
+                          <span className={role === currentRole ? 'font-medium' : ''}>
+                            {ROLE_LABELS[role] || role}
+                          </span>
+                        </div>
+                        {role === currentRole ? (
+                          <Badge variant="secondary">Joriy</Badge>
+                        ) : (
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => handleSwitchRole(role)}
+                            disabled={isSwitchingRole}
+                          >
+                            {isSwitchingRole ? (
+                              <Loader2 className="h-4 w-4 animate-spin" />
+                            ) : (
+                              'Tanlash'
+                            )}
+                          </Button>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          </TabsContent>
+        )}
 
         <TabsContent value="profile" className="space-y-6 mt-0">
           <Card>

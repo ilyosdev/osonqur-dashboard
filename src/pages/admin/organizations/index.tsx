@@ -161,14 +161,21 @@ export default function OrganizationsPage() {
     setIsSubmitting(true);
     setFormError("");
     try {
-      const data: { name?: string; phone?: string } = {};
+      const data: { name?: string; phone?: string; inn?: string; address?: string; responsiblePerson?: string } = {};
       if (formData.name.trim()) data.name = formData.name;
       if (formData.phone.trim()) data.phone = "+998" + formData.phone.replace(/\s/g, "");
+      data.inn = formData.inn.trim() || undefined;
+      data.address = formData.address.trim() || undefined;
+      data.responsiblePerson = formData.responsiblePerson.trim() || undefined;
       await adminApi.updateOrganization(selectedOrg.id, data);
       setEditDialogOpen(false);
       fetchOrgs();
     } catch (err) {
-      setFormError(err instanceof Error ? err.message : "Xatolik");
+      if (err instanceof Error && err.message.includes("PHONE_ALREADY_EXISTS")) {
+        setFormError("Bu telefon raqami allaqachon ro'yxatdan o'tgan");
+      } else {
+        setFormError(err instanceof Error ? err.message : "Xatolik");
+      }
     } finally {
       setIsSubmitting(false);
     }
@@ -452,7 +459,7 @@ export default function OrganizationsPage() {
 
       {/* Edit Dialog */}
       <Dialog open={editDialogOpen} onOpenChange={setEditDialogOpen}>
-        <DialogContent className="max-w-md">
+        <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>Kompaniyani tahrirlash</DialogTitle>
             <DialogDescription>Kompaniya ma'lumotlarini yangilang</DialogDescription>
@@ -460,16 +467,30 @@ export default function OrganizationsPage() {
           {formError && <div className="p-3 rounded-lg bg-destructive/10 text-destructive text-sm">{formError}</div>}
           <div className="space-y-4">
             <div className="space-y-2">
-              <Label>Nomi</Label>
+              <Label>Kompaniya nomi</Label>
               <Input value={formData.name} onChange={(e) => setFormData(p => ({ ...p, name: e.target.value }))} />
             </div>
-            <div className="space-y-2">
-              <Label>Telefon</Label>
-              <div className="relative">
-                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground text-sm">+998</span>
-                <Input className="pl-14" value={formData.phone}
-                  onChange={(e) => setFormData(p => ({ ...p, phone: formatPhone(e.target.value) }))} />
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label>INN</Label>
+                <Input placeholder="123456789" value={formData.inn} onChange={(e) => setFormData(p => ({ ...p, inn: e.target.value }))} />
               </div>
+              <div className="space-y-2">
+                <Label>Telefon</Label>
+                <div className="relative">
+                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground text-sm">+998</span>
+                  <Input className="pl-14" value={formData.phone}
+                    onChange={(e) => setFormData(p => ({ ...p, phone: formatPhone(e.target.value) }))} />
+                </div>
+              </div>
+            </div>
+            <div className="space-y-2">
+              <Label>Manzil</Label>
+              <Input placeholder="Toshkent, Mirzo Ulug'bek" value={formData.address} onChange={(e) => setFormData(p => ({ ...p, address: e.target.value }))} />
+            </div>
+            <div className="space-y-2">
+              <Label>Mas'ul shaxs</Label>
+              <Input placeholder="Ism familiya" value={formData.responsiblePerson} onChange={(e) => setFormData(p => ({ ...p, responsiblePerson: e.target.value }))} />
             </div>
           </div>
           <DialogFooter>

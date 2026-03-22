@@ -58,6 +58,7 @@ export interface AdminOrgUser {
   email?: string;
   telegramId?: string;
   role: string;
+  allowedRoles?: string[];
   isActive: boolean;
   createdAt: string;
   updatedAt: string;
@@ -130,7 +131,7 @@ export const adminApi = {
       body: JSON.stringify(data),
     }),
 
-  updateOrganization: (id: string, data: { name?: string; phone?: string; isActive?: boolean }) =>
+  updateOrganization: (id: string, data: { name?: string; phone?: string; inn?: string; address?: string; responsiblePerson?: string; isActive?: boolean }) =>
     apiClient<AdminOrganization>(`/admin/organizations/${id}`, {
       method: 'PATCH',
       body: JSON.stringify(data),
@@ -168,13 +169,13 @@ export const adminApi = {
       { method: 'GET' },
     ),
 
-  createOrgUser: (orgId: string, data: { name: string; phone: string; password: string; role: string; telegramId?: string }) =>
+  createOrgUser: (orgId: string, data: { name: string; phone: string; password: string; role: string; allowedRoles?: string[]; telegramId?: string }) =>
     apiClient<AdminOrgUser>(`/admin/organizations/${orgId}/users`, {
       method: 'POST',
       body: JSON.stringify(data),
     }),
 
-  updateOrgUser: (orgId: string, userId: string, data: { name?: string; phone?: string; password?: string; role?: string; isActive?: boolean; telegramId?: string }) =>
+  updateOrgUser: (orgId: string, userId: string, data: { name?: string; phone?: string; password?: string; role?: string; allowedRoles?: string[]; isActive?: boolean; telegramId?: string }) =>
     apiClient<AdminOrgUser>(`/admin/organizations/${orgId}/users/${userId}`, {
       method: 'PATCH',
       body: JSON.stringify(data),
