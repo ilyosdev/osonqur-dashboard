@@ -1,5 +1,5 @@
 import { useEffect, useState, useCallback } from "react";
-import { Link } from "react-router-dom";
+import { Link, Navigate } from "react-router-dom";
 import {
   Building2, Plus, Search, RefreshCw, Loader2, MoreVertical,
   Edit, Trash2, AlertCircle, Users, FolderOpen, Eye, EyeOff, CheckCircle,
@@ -67,6 +67,14 @@ export default function OrganizationsPage() {
   };
 
   const isSuperAdmin = user?.role === "SUPER_ADMIN";
+  const isOperator = user?.role === "OPERATOR";
+  const isAdminRole = user?.role === "ADMIN";
+  const canAddOrg = isSuperAdmin || isOperator;
+
+  // ADMIN users should be redirected to their own org
+  if (isAdminRole && user?.orgId) {
+    return <Navigate to={`/admin/organizations/${user.orgId}/users`} replace />;
+  }
 
   const fetchOrgs = useCallback(async () => {
     setIsLoading(true);
@@ -215,10 +223,12 @@ export default function OrganizationsPage() {
           </h1>
           <p className="text-muted-foreground">Kompaniyalarni boshqaring</p>
         </div>
-        <Button onClick={openAddDialog}>
-          <Plus className="h-4 w-4 mr-2" />
-          Kompaniya qo'shish
-        </Button>
+        {canAddOrg && (
+          <Button onClick={openAddDialog}>
+            <Plus className="h-4 w-4 mr-2" />
+            Kompaniya qo'shish
+          </Button>
+        )}
       </div>
 
       <Card className="p-4">
@@ -256,10 +266,12 @@ export default function OrganizationsPage() {
           <Building2 className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
           <h3 className="text-lg font-semibold mb-2">Kompaniyalar topilmadi</h3>
           <p className="text-muted-foreground mb-4">Hozircha kompaniyalar yo'q</p>
-          <Button onClick={openAddDialog}>
-            <Plus className="h-4 w-4 mr-2" />
-            Birinchi kompaniyani qo'shing
-          </Button>
+          {canAddOrg && (
+            <Button onClick={openAddDialog}>
+              <Plus className="h-4 w-4 mr-2" />
+              Birinchi kompaniyani qo'shing
+            </Button>
+          )}
         </Card>
       ) : (
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">

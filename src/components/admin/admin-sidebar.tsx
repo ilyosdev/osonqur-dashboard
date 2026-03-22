@@ -49,6 +49,7 @@ const managementNavItems: NavItem[] = [
     title: "Kompaniyalar",
     url: "/admin/organizations",
     icon: Building2,
+    roles: ["SUPER_ADMIN", "OPERATOR"],
   },
 ];
 
@@ -72,6 +73,10 @@ export function AdminSidebar() {
 
   // Detect active org from URL
   const activeOrgId = orgId || pathname.match(/\/admin\/organizations\/([^/]+)/)?.[1];
+
+  // For ADMIN role, always show their own org links
+  const isAdminRole = user?.role === "ADMIN";
+  const adminOrgId = user?.orgId;
 
   return (
     <Sidebar collapsible="icon" className="border-r border-sidebar-border">
@@ -144,23 +149,23 @@ export function AdminSidebar() {
           </SidebarGroupContent>
         </SidebarGroup>
 
-        {activeOrgId && (
+        {(activeOrgId || (isAdminRole && adminOrgId)) && (
           <>
             <SidebarSeparator className="my-2" />
             <SidebarGroup>
               <SidebarGroupLabel className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
-                Kompaniya
+                {isAdminRole ? "Mening kompaniyam" : "Kompaniya"}
               </SidebarGroupLabel>
               <SidebarGroupContent>
                 <SidebarMenu>
                   <SidebarMenuItem>
                     <SidebarMenuButton
                       asChild
-                      isActive={pathname.includes(`/organizations/${activeOrgId}/users`)}
+                      isActive={pathname.includes(`/organizations/${activeOrgId || adminOrgId}/users`)}
                       tooltip="Xodimlar"
                       className="transition-all duration-200"
                     >
-                      <Link to={`/admin/organizations/${activeOrgId}/users`}>
+                      <Link to={`/admin/organizations/${activeOrgId || adminOrgId}/users`}>
                         <Users className="h-4 w-4" />
                         <span>Xodimlar</span>
                       </Link>
@@ -169,11 +174,11 @@ export function AdminSidebar() {
                   <SidebarMenuItem>
                     <SidebarMenuButton
                       asChild
-                      isActive={pathname.includes(`/organizations/${activeOrgId}/projects`)}
+                      isActive={pathname.includes(`/organizations/${activeOrgId || adminOrgId}/projects`)}
                       tooltip="Loyihalar"
                       className="transition-all duration-200"
                     >
-                      <Link to={`/admin/organizations/${activeOrgId}/projects`}>
+                      <Link to={`/admin/organizations/${activeOrgId || adminOrgId}/projects`}>
                         <FolderOpen className="h-4 w-4" />
                         <span>Loyihalar</span>
                       </Link>
