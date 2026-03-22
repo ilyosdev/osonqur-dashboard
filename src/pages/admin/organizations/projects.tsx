@@ -50,7 +50,7 @@ export default function OrgProjectsPage() {
   const [formError, setFormError] = useState("");
 
   const [formData, setFormData] = useState({
-    name: "", address: "", floors: "", budget: "", status: "PLANNING",
+    name: "", address: "", floors: "", budget: "", status: "ACTIVE",
   });
 
   const fetchOrg = useCallback(async () => {
@@ -77,7 +77,7 @@ export default function OrgProjectsPage() {
   useEffect(() => { fetchProjects(); }, [fetchProjects]);
 
   const resetForm = () => {
-    setFormData({ name: "", address: "", floors: "", budget: "", status: "PLANNING" });
+    setFormData({ name: "", address: "", floors: "", budget: "", status: "ACTIVE" });
     setFormError("");
   };
 
