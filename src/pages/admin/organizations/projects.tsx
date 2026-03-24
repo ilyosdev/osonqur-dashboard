@@ -248,7 +248,7 @@ export default function OrgProjectsPage() {
                   {getStatusBadge(project.status)}
                   <div className="flex gap-1">
                     <Button variant="ghost" size="sm" asChild>
-                      <Link to={`/admin/organizations/${orgId}/projects/${project.id}/smetas`}>Smetalar</Link>
+                      <Link to={`/admin/organizations/${orgId}/projects/${project.id}`}>Batafsil</Link>
                     </Button>
                   </div>
                 </div>

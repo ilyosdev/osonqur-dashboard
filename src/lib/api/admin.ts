@@ -90,6 +90,37 @@ export interface UserProjectAssignment {
   projectName: string;
 }
 
+export type AdminSmetaType = 'CONSTRUCTION' | 'ELECTRICAL' | 'PLUMBING' | 'HVAC' | 'FINISHING' | 'OTHER';
+
+export interface AdminProjectSmeta {
+  id: string;
+  projectId: string;
+  name: string;
+  type: AdminSmetaType;
+  description?: string;
+  budget: number;
+  deadline?: string;
+  currentVersion: number;
+  totalWorkAmount: number;
+  totalMachineAmount: number;
+  totalMaterialAmount: number;
+  totalOtherAmount: number;
+  grandTotal: number;
+  overheadPercent: number;
+  createdAt: string;
+  updatedAt: string;
+  project?: { name: string };
+}
+
+export interface AdminProjectUser {
+  id: string;
+  name: string;
+  phone?: string;
+  role: string;
+  isActive: boolean;
+  projectId: string;
+}
+
 interface PaginatedResponse<T> {
   data: T[];
   total: number;
@@ -97,6 +128,10 @@ interface PaginatedResponse<T> {
 
 interface SearchParams extends PaginationParams {
   search?: string;
+}
+
+interface SmetaSearchParams extends SearchParams {
+  type?: AdminSmetaType;
 }
 
 // ─── Helpers ──────────────────────────────────────
@@ -107,6 +142,17 @@ function buildQuery(params?: SearchParams): string {
   if (params.page) searchParams.append('page', params.page.toString());
   if (params.limit) searchParams.append('limit', params.limit.toString());
   if (params.search) searchParams.append('search', params.search);
+  const query = searchParams.toString();
+  return query ? `?${query}` : '';
+}
+
+function buildSmetaQuery(params?: SmetaSearchParams): string {
+  if (!params) return '';
+  const searchParams = new URLSearchParams();
+  if (params.page) searchParams.append('page', params.page.toString());
+  if (params.limit) searchParams.append('limit', params.limit.toString());
+  if (params.search) searchParams.append('search', params.search);
+  if (params.type) searchParams.append('type', params.type);
   const query = searchParams.toString();
   return query ? `?${query}` : '';
 }
@@ -221,4 +267,33 @@ export const adminApi = {
 
   unassignUserFromProject: (orgId: string, userId: string, projectId: string) =>
     apiClient<{ success: boolean }>(`/admin/organizations/${orgId}/users/${userId}/projects/${projectId}`, { method: 'DELETE' }),
+
+  // Project Smetas
+  getProjectSmetas: (orgId: string, projectId: string, params?: SmetaSearchParams) =>
+    apiClient<PaginatedResponse<AdminProjectSmeta>>(
+      `/admin/organizations/${orgId}/projects/${projectId}/smetas${buildSmetaQuery(params)}`,
+      { method: 'GET' },
+    ),
+
+  getProjectSmeta: (orgId: string, projectId: string, smetaId: string) =>
+    apiClient<AdminProjectSmeta>(`/admin/organizations/${orgId}/projects/${projectId}/smetas/${smetaId}`, { method: 'GET' }),
+
+  createProjectSmeta: (orgId: string, projectId: string, data: { name: string; type?: AdminSmetaType; description?: string; budget?: number; deadline?: string; overheadPercent?: number }) =>
+    apiClient<AdminProjectSmeta>(`/admin/organizations/${orgId}/projects/${projectId}/smetas`, {
+      method: 'POST',
+      body: JSON.stringify(data),
+    }),
+
+  updateProjectSmeta: (orgId: string, projectId: string, smetaId: string, data: { name?: string; type?: AdminSmetaType; description?: string; budget?: number; deadline?: string; overheadPercent?: number }) =>
+    apiClient<AdminProjectSmeta>(`/admin/organizations/${orgId}/projects/${projectId}/smetas/${smetaId}`, {
+      method: 'PATCH',
+      body: JSON.stringify(data),
+    }),
+
+  deleteProjectSmeta: (orgId: string, projectId: string, smetaId: string) =>
+    apiClient<{ success: boolean }>(`/admin/organizations/${orgId}/projects/${projectId}/smetas/${smetaId}`, { method: 'DELETE' }),
+
+  // Project Users (assigned)
+  getProjectUsers: (orgId: string, projectId: string) =>
+    apiClient<AdminProjectUser[]>(`/admin/organizations/${orgId}/projects/${projectId}/users`, { method: 'GET' }),
 };

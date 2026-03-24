@@ -41,6 +41,7 @@ import OperatorsPage from '@/pages/admin/operators';
 import OrganizationsPage from '@/pages/admin/organizations/index';
 import OrgUsersPage from '@/pages/admin/organizations/users';
 import OrgProjectsPage from '@/pages/admin/organizations/projects';
+import OrgProjectDetailPage from '@/pages/admin/organizations/project-detail';
 
 function App() {
   return (
@@ -63,6 +64,7 @@ function App() {
         <Route path="/admin/organizations" element={<OrganizationsPage />} />
         <Route path="/admin/organizations/:orgId/users" element={<OrgUsersPage />} />
         <Route path="/admin/organizations/:orgId/projects" element={<OrgProjectsPage />} />
+        <Route path="/admin/organizations/:orgId/projects/:projectId" element={<OrgProjectDetailPage />} />
       </Route>
 
       {/* Dashboard routes (protected) */}
