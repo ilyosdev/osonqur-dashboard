@@ -6,13 +6,15 @@ import {
   Trash2,
   Phone,
   MessageCircle,
-  MoreVertical,
   UserPlus,
   Shield,
   Loader2,
   AlertCircle,
   RefreshCw,
   Building2,
+  FolderKanban,
+  Plus,
+  X,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -26,13 +28,6 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
 import {
   Dialog,
   DialogContent,
@@ -51,12 +46,27 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
-import { usersApi, User, CreateUserRequest, UpdateUserRequest, GetUsersParams } from "@/lib/api/users";
+import { usersApi, User, UserProject, CreateUserRequest, UpdateUserRequest, GetUsersParams } from "@/lib/api/users";
 import { projectsApi, Project } from "@/lib/api/projects";
 
 const roles = [
+  { value: "ADMIN", label: "Admin", description: "Kompaniya admini" },
   { value: "DIREKTOR", label: "Direktor", description: "Loyihalarni kuzatish va tasdiqlash" },
   { value: "PRORAB", label: "Prorab", description: "Zayavka berish va ishlarni boshqarish" },
   { value: "SNABJENIYA", label: "Snabjenets", description: "Material sotib olish va yetkazish" },
@@ -68,6 +78,7 @@ const roles = [
 const getRoleBadge = (role: string) => {
   const roleInfo = roles.find((r) => r.value === role);
   const colors: Record<string, string> = {
+    ADMIN: "bg-red-100 text-red-700",
     DIREKTOR: "bg-purple-100 text-purple-700",
     PRORAB: "bg-blue-100 text-blue-700",
     SNABJENIYA: "bg-warning/10 text-warning",
@@ -105,7 +116,7 @@ interface UserFormData {
   role: string;
   allowedRoles: string[];
   password: string;
-  projectId: string;
+  projectIds: string[];
 }
 
 const initialFormData: UserFormData = {
@@ -114,11 +125,12 @@ const initialFormData: UserFormData = {
   role: "PRORAB",
   allowedRoles: ["PRORAB"],
   password: "",
-  projectId: "",
+  projectIds: [],
 };
 
 export default function UsersPage() {
   const [users, setUsers] = useState<User[]>([]);
+  const [userProjects, setUserProjects] = useState<Record<string, UserProject[]>>({});
   const [projects, setProjects] = useState<Project[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -132,6 +144,7 @@ export default function UsersPage() {
   const [addDialogOpen, setAddDialogOpen] = useState(false);
   const [editDialogOpen, setEditDialogOpen] = useState(false);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [projectDialogOpen, setProjectDialogOpen] = useState(false);
   const [selectedUser, setSelectedUser] = useState<User | null>(null);
   const [formData, setFormData] = useState<UserFormData>(initialFormData);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -150,6 +163,21 @@ export default function UsersPage() {
     fetchProjects();
   }, []);
 
+  const fetchUserProjects = useCallback(async (userIds: string[]) => {
+    const projectsMap: Record<string, UserProject[]> = {};
+    await Promise.all(
+      userIds.map(async (userId) => {
+        try {
+          const response = await usersApi.getUserProjects(userId);
+          projectsMap[userId] = response.projects;
+        } catch {
+          projectsMap[userId] = [];
+        }
+      })
+    );
+    setUserProjects(projectsMap);
+  }, []);
+
   const fetchUsers = useCallback(async () => {
     setIsLoading(true);
     setError(null);
@@ -166,12 +194,17 @@ export default function UsersPage() {
       setUsers(response.data);
       setTotalPages(response.totalPages);
       setTotal(response.total);
+
+      // Fetch projects for all users
+      if (response.data.length > 0) {
+        await fetchUserProjects(response.data.map((u) => u.id));
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : "Foydalanuvchilarni yuklashda xatolik");
     } finally {
       setIsLoading(false);
     }
-  }, [page, searchQuery, roleFilter, statusFilter]);
+  }, [page, searchQuery, roleFilter, statusFilter, fetchUserProjects]);
 
   useEffect(() => {
     fetchUsers();
@@ -187,8 +220,8 @@ export default function UsersPage() {
       return;
     }
 
-    if (!formData.projectId) {
-      setFormError("Loyihani tanlash shart");
+    if (formData.projectIds.length === 0) {
+      setFormError("Kamida bitta loyiha tanlash shart");
       return;
     }
 
@@ -204,7 +237,13 @@ export default function UsersPage() {
         password: formData.password,
       };
 
-      await usersApi.create(payload);
+      const newUser = await usersApi.create(payload);
+
+      // Assign user to selected projects
+      for (const projectId of formData.projectIds) {
+        await usersApi.assignToProject(newUser.id, projectId);
+      }
+
       setAddDialogOpen(false);
       setFormData(initialFormData);
       fetchUsers();
@@ -260,6 +299,47 @@ export default function UsersPage() {
     }
   };
 
+  const handleAssignProject = async (projectId: string) => {
+    if (!selectedUser) return;
+
+    setIsSubmitting(true);
+    try {
+      await usersApi.assignToProject(selectedUser.id, projectId);
+      // Update local state
+      const updatedProjects = [...(userProjects[selectedUser.id] || [])];
+      const project = projects.find((p) => p.id === projectId);
+      if (project) {
+        updatedProjects.push({
+          id: project.id,
+          name: project.name,
+          status: project.status || "ACTIVE",
+          budget: project.budget || 0,
+        });
+      }
+      setUserProjects((prev) => ({ ...prev, [selectedUser.id]: updatedProjects }));
+    } catch (err) {
+      setFormError(err instanceof Error ? err.message : "Loyihaga qo'shishda xatolik");
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const handleRemoveFromProject = async (projectId: string) => {
+    if (!selectedUser) return;
+
+    setIsSubmitting(true);
+    try {
+      await usersApi.removeFromProject(selectedUser.id, projectId);
+      // Update local state
+      const updatedProjects = (userProjects[selectedUser.id] || []).filter((p) => p.id !== projectId);
+      setUserProjects((prev) => ({ ...prev, [selectedUser.id]: updatedProjects }));
+    } catch (err) {
+      setFormError(err instanceof Error ? err.message : "Loyihadan o'chirishda xatolik");
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
   const openEditDialog = (user: User) => {
     setSelectedUser(user);
     const phoneDigits = user.phone?.replace(/\D/g, "").slice(-9) || "";
@@ -269,7 +349,7 @@ export default function UsersPage() {
       role: user.role,
       allowedRoles: user.allowedRoles || [user.role],
       password: "",
-      projectId: "",
+      projectIds: [],
     });
     setFormError(null);
     setEditDialogOpen(true);
@@ -278,6 +358,12 @@ export default function UsersPage() {
   const openDeleteDialog = (user: User) => {
     setSelectedUser(user);
     setDeleteDialogOpen(true);
+  };
+
+  const openProjectDialog = (user: User) => {
+    setSelectedUser(user);
+    setFormError(null);
+    setProjectDialogOpen(true);
   };
 
   const openAddDialog = () => {
@@ -324,7 +410,7 @@ export default function UsersPage() {
           <div className="relative flex-1">
             <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
             <Input
-              placeholder="Ism yoki telefon raqam bo'yicha qidirish..."
+              placeholder="Ism bo'yicha qidirish..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               className="pl-9 bg-muted/50 border-0"
@@ -389,85 +475,137 @@ export default function UsersPage() {
           </Button>
         </Card>
       ) : (
-        <div className="grid gap-4">
-          {users.map((user, index) => (
-            <Card
-              key={user.id}
-              className="overflow-hidden transition-all duration-200 hover:shadow-md animate-slide-up"
-              style={{ animationDelay: `${index * 0.05}s` }}
-            >
-              <CardContent className="p-4">
-                <div className="flex items-center justify-between gap-4">
-                  <div className="flex items-center gap-4">
-                    <Avatar className="h-12 w-12 border-2 border-primary/10">
-                      <AvatarFallback className="bg-gradient-to-br from-primary/80 to-primary text-white font-semibold">
-                        {getUserInitials(user)}
-                      </AvatarFallback>
-                    </Avatar>
-                    <div className="space-y-1">
-                      <div className="flex items-center gap-2 flex-wrap">
-                        <h3 className="font-semibold">{getUserDisplayName(user)}</h3>
-                        {user.allowedRoles && user.allowedRoles.length > 1 ? (
-                          user.allowedRoles.map((r) => (
-                            <span key={r}>{getRoleBadge(r)}</span>
-                          ))
-                        ) : (
-                          getRoleBadge(user.role)
+        <Card>
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>Ism</TableHead>
+                <TableHead>Telefon</TableHead>
+                <TableHead>Rol</TableHead>
+                <TableHead>Loyiha</TableHead>
+                <TableHead>Telegram ID</TableHead>
+                <TableHead>Holat</TableHead>
+                <TableHead className="w-[100px]">Amallar</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {users.map((user) => {
+                const userProjectsList = userProjects[user.id] || [];
+                return (
+                  <TableRow key={user.id}>
+                    <TableCell>
+                      <div className="flex items-center gap-3">
+                        <Avatar className="h-10 w-10 border-2 border-primary/10">
+                          <AvatarFallback className="bg-gradient-to-br from-primary/80 to-primary text-white font-semibold text-sm">
+                            {getUserInitials(user)}
+                          </AvatarFallback>
+                        </Avatar>
+                        <span className="font-medium">{getUserDisplayName(user)}</span>
+                      </div>
+                    </TableCell>
+                    <TableCell className="text-muted-foreground">
+                      {formatPhoneDisplay(user.phone || "")}
+                    </TableCell>
+                    <TableCell>
+                      <div className="flex items-center gap-1 flex-wrap">
+                        {getRoleBadge(user.role)}
+                        {user.allowedRoles && user.allowedRoles.length > 1 && (
+                          <Badge variant="outline" className="text-xs">
+                            +{user.allowedRoles.length - 1}
+                          </Badge>
                         )}
-                        <Badge
-                          variant="outline"
-                          className={
-                            user.isActive
-                              ? "border-success text-success"
-                              : "border-muted-foreground text-muted-foreground"
-                          }
-                        >
-                          {user.isActive ? "Faol" : "Nofaol"}
-                        </Badge>
                       </div>
-                      <div className="flex items-center gap-4 text-sm text-muted-foreground">
-                        <span className="flex items-center gap-1">
-                          <Phone className="h-3.5 w-3.5" />
-                          {formatPhoneDisplay(user.phone || '')}
-                        </span>
-                        <span className="flex items-center gap-1">
-                          <MessageCircle className="h-3.5 w-3.5" />
-                          {"Ulanmagan"}
-                        </span>
+                    </TableCell>
+                    <TableCell>
+                      <div className="flex items-center gap-2">
+                        {userProjectsList.length > 0 ? (
+                          <TooltipProvider>
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                <button
+                                  onClick={() => openProjectDialog(user)}
+                                  className="flex items-center gap-1 text-sm text-primary hover:underline"
+                                >
+                                  <FolderKanban className="h-3.5 w-3.5" />
+                                  {userProjectsList[0].name}
+                                  {userProjectsList.length > 1 && (
+                                    <Badge variant="outline" className="text-xs ml-1">
+                                      +{userProjectsList.length - 1}
+                                    </Badge>
+                                  )}
+                                </button>
+                              </TooltipTrigger>
+                              <TooltipContent>
+                                <p>Loyihalarni boshqarish uchun bosing</p>
+                              </TooltipContent>
+                            </Tooltip>
+                          </TooltipProvider>
+                        ) : (
+                          <button
+                            onClick={() => openProjectDialog(user)}
+                            className="flex items-center gap-1 text-sm text-muted-foreground hover:text-primary"
+                          >
+                            <Plus className="h-3.5 w-3.5" />
+                            Loyiha qo'shish
+                          </button>
+                        )}
                       </div>
-                    </div>
-                  </div>
-
-                  <DropdownMenu>
-                    <DropdownMenuTrigger asChild>
-                      <Button variant="ghost" size="icon">
-                        <MoreVertical className="h-4 w-4" />
-                      </Button>
-                    </DropdownMenuTrigger>
-                    <DropdownMenuContent align="end">
-                      <DropdownMenuItem onClick={() => openEditDialog(user)}>
-                        <Edit className="h-4 w-4 mr-2" />
-                        Tahrirlash
-                      </DropdownMenuItem>
-                      <DropdownMenuItem onClick={() => openEditDialog(user)}>
-                        <Shield className="h-4 w-4 mr-2" />
-                        Rolni o'zgartirish
-                      </DropdownMenuItem>
-                      <DropdownMenuSeparator />
-                      <DropdownMenuItem
-                        className="text-destructive focus:text-destructive"
-                        onClick={() => openDeleteDialog(user)}
+                    </TableCell>
+                    <TableCell className="text-muted-foreground">
+                      {user.telegramId || "—"}
+                    </TableCell>
+                    <TableCell>
+                      <Badge
+                        variant="outline"
+                        className={
+                          user.isActive
+                            ? "border-success text-success"
+                            : "border-muted-foreground text-muted-foreground"
+                        }
                       >
-                        <Trash2 className="h-4 w-4 mr-2" />
-                        O'chirish
-                      </DropdownMenuItem>
-                    </DropdownMenuContent>
-                  </DropdownMenu>
-                </div>
-              </CardContent>
-            </Card>
-          ))}
-        </div>
+                        {user.isActive ? "Faol" : "Nofaol"}
+                      </Badge>
+                    </TableCell>
+                    <TableCell>
+                      <div className="flex items-center gap-1">
+                        <TooltipProvider>
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                className="h-8 w-8"
+                                onClick={() => openEditDialog(user)}
+                              >
+                                <Edit className="h-4 w-4" />
+                              </Button>
+                            </TooltipTrigger>
+                            <TooltipContent>Tahrirlash</TooltipContent>
+                          </Tooltip>
+                        </TooltipProvider>
+                        <TooltipProvider>
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                className="h-8 w-8 text-destructive hover:text-destructive"
+                                onClick={() => openDeleteDialog(user)}
+                              >
+                                <Trash2 className="h-4 w-4" />
+                              </Button>
+                            </TooltipTrigger>
+                            <TooltipContent>O'chirish</TooltipContent>
+                          </Tooltip>
+                        </TooltipProvider>
+                      </div>
+                    </TableCell>
+                  </TableRow>
+                );
+              })}
+            </TableBody>
+          </Table>
+        </Card>
       )}
 
       <div className="flex items-center justify-between pt-4">
@@ -503,6 +641,7 @@ export default function UsersPage() {
         </div>
       </div>
 
+      {/* Add User Dialog */}
       <Dialog open={addDialogOpen} onOpenChange={setAddDialogOpen}>
         <DialogContent className="max-w-md">
           <DialogHeader>
@@ -595,46 +734,36 @@ export default function UsersPage() {
                   ))}
                 </div>
               </Card>
-              {formData.allowedRoles.length > 0 && (
-                <div className="flex items-start gap-2 pt-2">
-                  <Shield className="h-4 w-4 text-muted-foreground mt-0.5" />
-                  <div>
-                    <p className="text-sm font-medium">
-                      Asosiy rol: {roles.find((r) => r.value === formData.role)?.label}
-                    </p>
-                    <p className="text-xs text-muted-foreground">
-                      Jami {formData.allowedRoles.length} ta rol tanlangan
-                    </p>
-                  </div>
-                </div>
-              )}
             </div>
 
             <div className="space-y-2">
-              <Label>Loyiha *</Label>
-              <Select
-                value={formData.projectId}
-                onValueChange={(value) => setFormData((prev) => ({ ...prev, projectId: value }))}
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="Loyihani tanlang" />
-                </SelectTrigger>
-                <SelectContent>
-                  {projects.map((project) => (
-                    <SelectItem key={project.id} value={project.id}>
-                      {project.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              <Label>Loyihalar *</Label>
               <Card className="p-3 bg-muted/50">
-                <div className="flex items-start gap-2">
-                  <Building2 className="h-4 w-4 text-muted-foreground mt-0.5" />
-                  <div>
-                    <p className="text-xs text-muted-foreground">
-                      Xodim qaysi loyihada ishlashini tanlang
-                    </p>
-                  </div>
+                <div className="space-y-2 max-h-40 overflow-auto">
+                  {projects.map((project) => (
+                    <label
+                      key={project.id}
+                      className="flex items-center space-x-2 cursor-pointer hover:bg-muted rounded p-1"
+                    >
+                      <Checkbox
+                        checked={formData.projectIds.includes(project.id)}
+                        onCheckedChange={(checked) => {
+                          if (checked) {
+                            setFormData((prev) => ({
+                              ...prev,
+                              projectIds: [...prev.projectIds, project.id],
+                            }));
+                          } else {
+                            setFormData((prev) => ({
+                              ...prev,
+                              projectIds: prev.projectIds.filter((id) => id !== project.id),
+                            }));
+                          }
+                        }}
+                      />
+                      <span className="text-sm">{project.name}</span>
+                    </label>
+                  ))}
                 </div>
               </Card>
             </div>
@@ -661,6 +790,7 @@ export default function UsersPage() {
         </DialogContent>
       </Dialog>
 
+      {/* Edit User Dialog */}
       <Dialog open={editDialogOpen} onOpenChange={setEditDialogOpen}>
         <DialogContent className="max-w-md">
           <DialogHeader>
@@ -742,14 +872,6 @@ export default function UsersPage() {
                   ))}
                 </div>
               </Card>
-              {formData.allowedRoles.length > 0 && (
-                <div className="flex items-start gap-2 pt-2">
-                  <Shield className="h-4 w-4 text-muted-foreground mt-0.5" />
-                  <p className="text-xs text-muted-foreground">
-                    Jami {formData.allowedRoles.length} ta rol tanlangan
-                  </p>
-                </div>
-              )}
             </div>
           </div>
 
@@ -775,6 +897,90 @@ export default function UsersPage() {
         </DialogContent>
       </Dialog>
 
+      {/* Manage Projects Dialog */}
+      <Dialog open={projectDialogOpen} onOpenChange={setProjectDialogOpen}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <FolderKanban className="h-5 w-5 text-primary" />
+              Loyihalarni boshqarish
+            </DialogTitle>
+            <DialogDescription>
+              {selectedUser && getUserDisplayName(selectedUser)} uchun loyihalarni tanlang
+            </DialogDescription>
+          </DialogHeader>
+
+          {formError && (
+            <div className="p-3 rounded-lg bg-destructive/10 text-destructive text-sm">
+              {formError}
+            </div>
+          )}
+
+          <div className="space-y-4">
+            {/* Current projects */}
+            <div className="space-y-2">
+              <Label>Joriy loyihalar</Label>
+              {selectedUser && (userProjects[selectedUser.id] || []).length > 0 ? (
+                <div className="space-y-2">
+                  {(userProjects[selectedUser.id] || []).map((project) => (
+                    <div
+                      key={project.id}
+                      className="flex items-center justify-between p-2 rounded-lg bg-muted/50"
+                    >
+                      <div className="flex items-center gap-2">
+                        <FolderKanban className="h-4 w-4 text-primary" />
+                        <span className="text-sm font-medium">{project.name}</span>
+                      </div>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-6 w-6 text-destructive hover:text-destructive"
+                        onClick={() => handleRemoveFromProject(project.id)}
+                        disabled={isSubmitting}
+                      >
+                        <X className="h-4 w-4" />
+                      </Button>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <p className="text-sm text-muted-foreground">Hech qanday loyiha biriktirilmagan</p>
+              )}
+            </div>
+
+            {/* Add new project */}
+            <div className="space-y-2">
+              <Label>Yangi loyiha qo'shish</Label>
+              <Select onValueChange={(value) => handleAssignProject(value)} disabled={isSubmitting}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Loyihani tanlang..." />
+                </SelectTrigger>
+                <SelectContent>
+                  {projects
+                    .filter(
+                      (p) =>
+                        !selectedUser ||
+                        !(userProjects[selectedUser.id] || []).some((up) => up.id === p.id)
+                    )
+                    .map((project) => (
+                      <SelectItem key={project.id} value={project.id}>
+                        {project.name}
+                      </SelectItem>
+                    ))}
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setProjectDialogOpen(false)}>
+              Yopish
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Delete User Dialog */}
       <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
         <AlertDialogContent>
           <AlertDialogHeader>

@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import {
   FileSpreadsheet,
   ArrowLeft,
@@ -46,13 +46,15 @@ function formatNumberInput(value: number): string {
 
 export default function NewSmetaPage() {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const preselectedProjectId = searchParams.get("projectId");
   const [projects, setProjects] = useState<Project[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [isLoadingProjects, setIsLoadingProjects] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
   const [formData, setFormData] = useState({
-    projectId: "",
+    projectId: preselectedProjectId || "",
     name: "",
     type: "CONSTRUCTION" as SmetaType,
     description: "",

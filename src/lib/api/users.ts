@@ -1,5 +1,12 @@
 import { apiClient, PaginationParams, PaginatedResponse } from './client';
 
+export interface UserProject {
+  id: string;
+  name: string;
+  status: string;
+  budget: number;
+}
+
 export interface User {
   id: string;
   name: string;
@@ -11,6 +18,7 @@ export interface User {
   isActive: boolean;
   createdAt: string;
   updatedAt: string;
+  projects?: UserProject[];
 }
 
 export interface CreateUserRequest {
@@ -73,6 +81,22 @@ export const usersApi = {
 
   delete: (id: string) =>
     apiClient<void>(`/vendor/users/${id}`, {
+      method: 'DELETE',
+    }),
+
+  // User-Project assignments
+  getUserProjects: (userId: string) =>
+    apiClient<{ projects: UserProject[] }>(`/vendor/users/${userId}/projects`, {
+      method: 'GET',
+    }),
+
+  assignToProject: (userId: string, projectId: string) =>
+    apiClient<{ success: boolean }>(`/vendor/users/${userId}/projects/${projectId}`, {
+      method: 'POST',
+    }),
+
+  removeFromProject: (userId: string, projectId: string) =>
+    apiClient<{ success: boolean }>(`/vendor/users/${userId}/projects/${projectId}`, {
       method: 'DELETE',
     }),
 };
