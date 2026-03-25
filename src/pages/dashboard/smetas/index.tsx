@@ -110,12 +110,12 @@ export default function SmetasPage() {
   }, [searchQuery, projectFilter, typeFilter]);
 
   const getProgressPercent = (smeta: Smeta) => {
-    if (smeta.budget === 0) return 0;
-    return Math.min(100, Math.round((smeta.grandTotal / smeta.budget) * 100));
+    if (smeta.grandTotal === 0) return 0;
+    return Math.min(100, Math.round((smeta.totalUsedAmount / smeta.grandTotal) * 100));
   };
 
   const isOverBudget = (smeta: Smeta) => {
-    return smeta.grandTotal > smeta.budget && smeta.budget > 0;
+    return smeta.totalUsedAmount > smeta.grandTotal && smeta.grandTotal > 0;
   };
 
   const isDeadlineSoon = (smeta: Smeta) => {
@@ -276,7 +276,7 @@ export default function SmetasPage() {
                             Byudjet
                           </span>
                           <span className="font-medium">
-                            {formatNumber(smeta.budget)} so'm
+                            {formatNumber(smeta.grandTotal)} so'm
                           </span>
                         </div>
                         <div className="flex justify-between text-sm">
@@ -285,7 +285,7 @@ export default function SmetasPage() {
                             Haqiqiy
                           </span>
                           <span className={`font-medium ${isOverBudget(smeta) ? "text-destructive" : ""}`}>
-                            {formatNumber(smeta.grandTotal)} so'm
+                            {formatNumber(smeta.totalUsedAmount)} so'm
                           </span>
                         </div>
                       </div>
@@ -296,8 +296,8 @@ export default function SmetasPage() {
                           <span>{getProgressPercent(smeta)}%</span>
                         </div>
                         <ProgressBar
-                          value={smeta.grandTotal}
-                          max={smeta.budget || 1}
+                          value={smeta.totalUsedAmount}
+                          max={smeta.grandTotal || 1}
                           size="sm"
                           variant={isOverBudget(smeta) ? "destructive" : "default"}
                         />

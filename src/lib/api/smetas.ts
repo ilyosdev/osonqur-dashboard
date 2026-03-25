@@ -17,6 +17,7 @@ export interface Smeta {
   totalMaterialAmount: number;
   totalOtherAmount: number;
   grandTotal: number;
+  totalUsedAmount: number;
   overheadPercent: number;
   createdAt: string;
   updatedAt: string;
