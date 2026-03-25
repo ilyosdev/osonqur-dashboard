@@ -186,10 +186,15 @@ export interface PendingSummary {
 
 // Analytics API
 export const analyticsApi = {
-  getDashboardSummary: () =>
-    apiClient<DashboardSummary>('/vendor/analytics/summary', {
+  getDashboardSummary: (params?: { dateFrom?: string; dateTo?: string }) => {
+    const searchParams = new URLSearchParams();
+    if (params?.dateFrom) searchParams.append('dateFrom', params.dateFrom);
+    if (params?.dateTo) searchParams.append('dateTo', params.dateTo);
+    const query = searchParams.toString();
+    return apiClient<DashboardSummary>(`/vendor/analytics/summary${query ? `?${query}` : ''}`, {
       method: 'GET',
-    }),
+    });
+  },
 
   getSupplierDebts: (projectId?: string) => {
     const params = projectId ? `?projectId=${projectId}` : '';

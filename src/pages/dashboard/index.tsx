@@ -1,7 +1,7 @@
+import { useState, useMemo, useCallback } from "react";
 import { Link } from "react-router-dom";
 import {
   FolderKanban,
-  ClipboardList,
   TrendingUp,
   TrendingDown,
   ArrowRight,
@@ -10,6 +10,8 @@ import {
   Percent,
   DollarSign,
   Calculator,
+  Wallet,
+  CalendarDays,
 } from "lucide-react";
 import { StatsCard } from "@/components/dashboard/stats-card";
 import { DebtsSection } from "@/components/dashboard/debts-section";
@@ -20,7 +22,7 @@ import { Badge } from "@/components/ui/badge";
 import { useAuth, RoleGuard, useRoleAccess } from "@/lib/auth";
 import { useApi } from "@/hooks/use-api";
 import { projectsApi, requestsApi, analyticsApi } from "@/lib/api";
-import { StatsSkeleton, CardSkeleton } from "@/components/ui/table-skeleton";
+import { StatsSkeleton } from "@/components/ui/table-skeleton";
 import { ErrorMessage } from "@/components/ui/error-message";
 
 function formatNumber(num: number): string {
@@ -33,18 +35,58 @@ function formatNumber(num: number): string {
   return num.toLocaleString("uz-UZ");
 }
 
+type Period = "all" | "today" | "week" | "month" | "last_month";
+
+function getDateRange(period: Period): { dateFrom?: string; dateTo?: string } {
+  const now = new Date();
+  const startOfDay = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+
+  switch (period) {
+    case "today":
+      return {
+        dateFrom: startOfDay.toISOString(),
+        dateTo: new Date(startOfDay.getTime() + 86400000).toISOString(),
+      };
+    case "week": {
+      const weekAgo = new Date(startOfDay.getTime() - 7 * 86400000);
+      return { dateFrom: weekAgo.toISOString(), dateTo: new Date(startOfDay.getTime() + 86400000).toISOString() };
+    }
+    case "month": {
+      const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
+      return { dateFrom: monthStart.toISOString(), dateTo: new Date(startOfDay.getTime() + 86400000).toISOString() };
+    }
+    case "last_month": {
+      const lastMonthStart = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+      const thisMonthStart = new Date(now.getFullYear(), now.getMonth(), 1);
+      return { dateFrom: lastMonthStart.toISOString(), dateTo: thisMonthStart.toISOString() };
+    }
+    default:
+      return {};
+  }
+}
+
+const PERIOD_LABELS: Record<Period, string> = {
+  all: "Barchasi",
+  today: "Bugun",
+  week: "Hafta",
+  month: "Bu oy",
+  last_month: "O'tgan oy",
+};
+
 export default function HomePage() {
   const { user } = useAuth();
-  const isBoss = user?.role === 'BOSS';
   const canSeeActions = useRoleAccess(['DIREKTOR', 'BUGALTERIYA', 'PTO', 'SNABJENIYA', 'SKLAD', 'PRORAB']);
+  const [period, setPeriod] = useState<Period>("all");
 
-  // Analytics summary
+  const dateRange = useMemo(() => getDateRange(period), [period]);
+
+  // Analytics summary (with date filtering)
   const {
     data: summary,
     loading: summaryLoading,
     error: summaryError,
     refetch: refetchSummary,
-  } = useApi(() => analyticsApi.getDashboardSummary(), []);
+  } = useApi(() => analyticsApi.getDashboardSummary(dateRange), [period]);
 
   // Work completion
   const {
@@ -58,6 +100,11 @@ export default function HomePage() {
     loading: profitLoading,
   } = useApi(() => analyticsApi.getProfitLoss(), []);
 
+  // Cash register balance
+  const {
+    data: accountBalances,
+  } = useApi(() => analyticsApi.getAccountBalances(), []);
+
   // Recent projects
   const {
     data: projectsResponse,
@@ -66,7 +113,7 @@ export default function HomePage() {
     refetch: refetchProjects,
   } = useApi(() => projectsApi.getAll({ limit: 5 }), []);
 
-  // Pending requests
+  // Pending requests (visible to BOSS + DIREKTOR)
   const {
     data: requestsResponse,
     loading: requestsLoading,
@@ -92,9 +139,27 @@ export default function HomePage() {
 
   return (
     <div className="space-y-6 animate-fade-in">
-      <div className="flex flex-col gap-1">
-        <h1 className="text-2xl font-bold tracking-tight">Bosh sahifa</h1>
-        <p className="text-muted-foreground">Tizimga xush kelibsiz, {user?.name || "Foydalanuvchi"}</p>
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+        <div className="flex flex-col gap-1">
+          <h1 className="text-2xl font-bold tracking-tight">Bosh sahifa</h1>
+          <p className="text-muted-foreground">Tizimga xush kelibsiz, {user?.name || "Foydalanuvchi"}</p>
+        </div>
+
+        {/* Period Selector */}
+        <div className="flex items-center gap-1 flex-wrap">
+          <CalendarDays className="h-4 w-4 text-muted-foreground mr-1" />
+          {(Object.keys(PERIOD_LABELS) as Period[]).map((p) => (
+            <Button
+              key={p}
+              variant={period === p ? "default" : "outline"}
+              size="sm"
+              onClick={() => setPeriod(p)}
+              className="text-xs"
+            >
+              {PERIOD_LABELS[p]}
+            </Button>
+          ))}
+        </div>
       </div>
 
       {/* Main Stats */}
@@ -153,10 +218,10 @@ export default function HomePage() {
         </div>
       )}
 
-      {/* Debt Summary Cards */}
+      {/* Debt + Koshelok Summary Cards */}
       <RoleGuard allowedRoles={["BOSS", "DIREKTOR", "BUGALTERIYA"]}>
         {!summaryLoading && summary && (
-          <div className="grid gap-4 sm:grid-cols-2">
+          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
             <Card className="animate-slide-up" style={{ animationDelay: "0.3s" }}>
               <CardContent className="pt-6">
                 <div className="flex items-center justify-between">
@@ -183,6 +248,21 @@ export default function HomePage() {
                   </div>
                   <div className="h-12 w-12 rounded-xl bg-destructive/10 flex items-center justify-center">
                     <TrendingDown className="h-6 w-6 text-destructive" />
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+            <Card className="animate-slide-up" style={{ animationDelay: "0.4s" }}>
+              <CardContent className="pt-6">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-sm text-muted-foreground">Kosheloklar</p>
+                    <p className="text-2xl font-bold">
+                      {formatNumber(accountBalances?.totalCashRegisterBalance || 0)} so'm
+                    </p>
+                  </div>
+                  <div className="h-12 w-12 rounded-xl bg-primary/10 flex items-center justify-center">
+                    <Wallet className="h-6 w-6 text-primary" />
                   </div>
                 </div>
               </CardContent>
@@ -242,8 +322,8 @@ export default function HomePage() {
           </CardContent>
         </Card>
 
-        {/* Pending Requests Section - BOSS excluded (view-only role) */}
-        <RoleGuard allowedRoles={["DIREKTOR"]}>
+        {/* Pending Requests Section - visible to BOSS + DIREKTOR */}
+        <RoleGuard allowedRoles={["BOSS", "DIREKTOR"]}>
           <Card className="animate-slide-up" style={{ animationDelay: "0.3s" }}>
             <CardHeader className="flex flex-row items-center justify-between pb-2">
               <div>
