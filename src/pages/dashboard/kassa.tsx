@@ -64,11 +64,11 @@ function formatMoney(num: number): string {
 type ActiveView = "balance" | "history" | "expenses" | "requests" | "incomes" | "employees";
 
 export default function KassaPage() {
-  const { user } = useAuth();
-  const role = user?.role;
+  const { user, currentRole } = useAuth();
+  const role = currentRole ?? user?.role;
   const isReadOnly = role === "BOSS";
   const canRequestMoney = role !== "BUGALTERIYA" && !isReadOnly;
-  const isBugalteriya = hasRole(role, ["BUGALTERIYA", "DIREKTOR"]);
+  const isBugalteriya = hasRole(role, ["BUGALTERIYA", "DIREKTOR", "BOSS"]);
 
   const [activeView, setActiveView] = useState<ActiveView>("balance");
   const [requestDialogOpen, setRequestDialogOpen] = useState(false);
