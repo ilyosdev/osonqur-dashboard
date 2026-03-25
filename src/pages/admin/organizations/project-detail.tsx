@@ -24,7 +24,7 @@ import {
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
-import { adminApi, AdminOrgProject, AdminProjectSmeta, AdminProjectUser, AdminSmetaType } from "@/lib/api/admin";
+import { adminApi, AdminOrgProject, AdminProjectSmeta, AdminProjectUser, AdminSmetaType, AdminOrgUser } from "@/lib/api/admin";
 
 const SMETA_TYPES: { value: AdminSmetaType; label: string }[] = [
   { value: "CONSTRUCTION", label: "Qurilish" },
@@ -53,6 +53,11 @@ export default function ProjectDetailPage() {
   const [selectedSmeta, setSelectedSmeta] = useState<AdminProjectSmeta | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [formError, setFormError] = useState("");
+
+  // User assignment state
+  const [assignUserDialogOpen, setAssignUserDialogOpen] = useState(false);
+  const [allOrgUsers, setAllOrgUsers] = useState<AdminOrgUser[]>([]);
+  const [selectedUserId, setSelectedUserId] = useState("");
 
   const [smetaFormData, setSmetaFormData] = useState({
     name: "",
@@ -202,6 +207,33 @@ export default function ProjectDetailPage() {
     }
   };
 
+  const openAssignUserDialog = async () => {
+    setAssignUserDialogOpen(true);
+    setSelectedUserId("");
+    if (!orgId) return;
+    try {
+      const result = await adminApi.getOrgUsers(orgId, { limit: 100 });
+      setAllOrgUsers(result.data);
+    } catch {}
+  };
+
+  const handleAssignUser = async () => {
+    if (!orgId || !projectId || !selectedUserId) return;
+    try {
+      await adminApi.assignUserToProject(orgId, selectedUserId, projectId);
+      setSelectedUserId("");
+      fetchUsers();
+    } catch {}
+  };
+
+  const handleUnassignUser = async (userId: string) => {
+    if (!orgId || !projectId) return;
+    try {
+      await adminApi.unassignUserFromProject(orgId, userId, projectId);
+      fetchUsers();
+    } catch {}
+  };
+
   const formatMoney = (val: number) => {
     return val.toLocaleString("uz-UZ") + " so'm";
   };
@@ -313,7 +345,9 @@ export default function ProjectDetailPage() {
                 <Card key={smeta.id} className="overflow-hidden transition-all duration-200 hover:shadow-md">
                   <CardContent className="p-5">
                     <div className="flex items-start justify-between gap-2 mb-3">
-                      <h3 className="font-semibold text-lg">{smeta.name}</h3>
+                      <Link to={`/smetas/${smeta.id}`} className="font-semibold text-lg hover:text-primary transition-colors">
+                        {smeta.name}
+                      </Link>
                       <DropdownMenu>
                         <DropdownMenuTrigger asChild>
                           <Button variant="ghost" size="icon" className="h-8 w-8">
@@ -342,10 +376,6 @@ export default function ProjectDetailPage() {
                       <div className="pt-2 border-t">
                         <div className="flex justify-between">
                           <span>Byudjet:</span>
-                          <span className="font-medium text-foreground">{formatMoney(smeta.budget || 0)}</span>
-                        </div>
-                        <div className="flex justify-between">
-                          <span>Jami:</span>
                           <span className="font-medium text-foreground">{formatMoney(smeta.grandTotal || 0)}</span>
                         </div>
                       </div>
@@ -379,17 +409,17 @@ export default function ProjectDetailPage() {
         </TabsContent>
 
         <TabsContent value="users" className="space-y-4">
+          <div className="flex justify-end">
+            <Button onClick={openAssignUserDialog}>
+              <Plus className="h-4 w-4 mr-2" />
+              Xodim biriktirish
+            </Button>
+          </div>
           {users.length === 0 ? (
             <Card className="p-8 text-center">
               <Users className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
               <h3 className="text-lg font-semibold mb-2">Xodimlar topilmadi</h3>
               <p className="text-muted-foreground">Bu loyihaga hali xodimlar biriktirilmagan</p>
-              <Button className="mt-4" asChild>
-                <Link to={`/admin/organizations/${orgId}/users`}>
-                  <Users className="h-4 w-4 mr-2" />
-                  Xodimlarni boshqarish
-                </Link>
-              </Button>
             </Card>
           ) : (
             <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
@@ -406,6 +436,10 @@ export default function ProjectDetailPage() {
                     <Badge variant={user.isActive ? "default" : "secondary"}>
                       {user.role}
                     </Badge>
+                    <Button variant="ghost" size="sm" className="text-destructive h-7"
+                      onClick={() => handleUnassignUser(user.id)}>
+                      <Trash2 className="h-3.5 w-3.5" />
+                    </Button>
                   </div>
                 </Card>
               ))}
@@ -572,6 +606,50 @@ export default function ProjectDetailPage() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {/* Assign User to Project Dialog */}
+      <Dialog open={assignUserDialogOpen} onOpenChange={setAssignUserDialogOpen}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Xodim biriktirish</DialogTitle>
+            <DialogDescription>Loyihaga xodim tayinlang</DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div className="flex gap-2">
+              <Select value={selectedUserId} onValueChange={setSelectedUserId}>
+                <SelectTrigger className="flex-1"><SelectValue placeholder="Xodim tanlang" /></SelectTrigger>
+                <SelectContent>
+                  {allOrgUsers
+                    .filter((u) => !users.some((pu) => pu.id === u.id))
+                    .map((u) => (
+                      <SelectItem key={u.id} value={u.id}>
+                        {u.name} ({u.role})
+                      </SelectItem>
+                    ))}
+                </SelectContent>
+              </Select>
+              <Button onClick={handleAssignUser} disabled={!selectedUserId}>Tayinlash</Button>
+            </div>
+            {users.length > 0 && (
+              <div className="space-y-2">
+                <p className="text-sm font-medium text-muted-foreground">Tayinlangan xodimlar:</p>
+                {users.map((u) => (
+                  <div key={u.id} className="flex items-center justify-between p-2 rounded-lg bg-muted/50">
+                    <div className="flex items-center gap-2">
+                      <span className="text-sm font-medium">{u.name}</span>
+                      <Badge variant="outline" className="text-[10px]">{u.role}</Badge>
+                    </div>
+                    <Button variant="ghost" size="sm" className="text-destructive h-7"
+                      onClick={() => handleUnassignUser(u.id)}>
+                      Olib tashlash
+                    </Button>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

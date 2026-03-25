@@ -88,7 +88,7 @@ export default function SmetaDetailPage() {
   const [isDeleting, setIsDeleting] = useState(false);
 
   const canEditProgress = ["PRORAB", "DIREKTOR", "BOSS"].includes(currentRole ?? user?.role ?? "");
-  const canUpload = ["DIREKTOR", "BOSS", "PTO", "OPERATOR"].includes(currentRole ?? user?.role ?? "");
+  const canUpload = ["DIREKTOR", "BOSS", "PTO", "OPERATOR", "ADMIN"].includes(currentRole ?? user?.role ?? "");
 
   const fetchData = useCallback(async () => {
     if (!id) return;
