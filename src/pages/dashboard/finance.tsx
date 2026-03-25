@@ -48,7 +48,7 @@ export default function FinancePage() {
   const {
     data: cashRegistersResponse,
     loading: cashRegistersLoading,
-  } = useApi(() => cashRegistersApi.getAll({ limit: 10 }), []);
+  } = useApi(() => cashRegistersApi.getAll({ limit: 100 }), []);
 
   const loading = accountsLoading || incomesLoading || expensesLoading || cashRegistersLoading;
   const error = accountsError;
@@ -243,10 +243,20 @@ export default function FinancePage() {
               {cashRegisters.map((kassa) => (
                 <div key={kassa.id} className="p-4 rounded-lg border bg-card">
                   <div className="flex items-center justify-between mb-2">
-                    <p className="font-medium">{kassa.name}</p>
-                    {kassa.location && <Badge variant="secondary">{kassa.location}</Badge>}
+                    <p className="font-medium">{kassa.user?.name || kassa.name}</p>
+                    {kassa.user?.role ? (
+                      <Badge variant="secondary">{kassa.user.role}</Badge>
+                    ) : kassa.location ? (
+                      <Badge variant="secondary">{kassa.location}</Badge>
+                    ) : null}
                   </div>
                   <p className="text-2xl font-bold text-primary">{formatNumber(kassa.balance)} so'm</p>
+                  {(kassa.totalIn !== undefined || kassa.totalOut !== undefined) && (
+                    <div className="flex items-center gap-4 mt-1">
+                      <span className="text-xs text-green-600">+{formatNumber(kassa.totalIn || 0)}</span>
+                      <span className="text-xs text-red-600">-{formatNumber(kassa.totalOut || 0)}</span>
+                    </div>
+                  )}
                 </div>
               ))}
             </div>

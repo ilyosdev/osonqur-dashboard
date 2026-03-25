@@ -111,9 +111,13 @@ export interface CashRegister {
   name: string;
   location?: string;
   balance: number;
+  totalIn?: number;
+  totalOut?: number;
   vendorId: string;
+  userId?: string;
   createdAt: string;
   updatedAt: string;
+  user?: { id: string; name: string; role?: string };
 }
 
 export interface CreateCashRegisterRequest {

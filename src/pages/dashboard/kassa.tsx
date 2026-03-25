@@ -61,7 +61,7 @@ function formatMoney(num: number): string {
   return num.toLocaleString("uz-UZ");
 }
 
-type ActiveView = "balance" | "history" | "expenses" | "requests" | "incomes";
+type ActiveView = "balance" | "history" | "expenses" | "requests" | "incomes" | "employees";
 
 export default function KassaPage() {
   const { user } = useAuth();
@@ -149,6 +149,24 @@ export default function KassaPage() {
     [],
     { enabled: isBugalteriya && activeView === "requests" }
   );
+
+  // All employee kosheloks (for BUGALTERIYA)
+  const {
+    data: allKosheloksData,
+    loading: allKosheloksLoading,
+    refetch: refetchAllKosheloks,
+  } = useApi(
+    () => cashRegistersApi.getAll({ limit: 100 }),
+    [],
+    { enabled: isBugalteriya }
+  );
+
+  const allKosheloks = allKosheloksData?.data || [];
+
+  // Fill employee balance state
+  const [fillEmployeeDialogOpen, setFillEmployeeDialogOpen] = useState(false);
+  const [selectedEmployeeCashRegisterId, setSelectedEmployeeCashRegisterId] = useState<string | null>(null);
+  const [selectedEmployeeName, setSelectedEmployeeName] = useState("");
 
   // Mutations for approve/reject
   const { mutate: approveCashRequest, loading: approvingId } = useMutation(
@@ -279,6 +297,12 @@ export default function KassaPage() {
             />
             <ActionButton
               icon={Users}
+              label="Xodimlar koshelogi"
+              active={activeView === "employees"}
+              onClick={() => setActiveView("employees")}
+            />
+            <ActionButton
+              icon={HandCoins}
               label="Pul so'rovlari"
               active={activeView === "requests"}
               onClick={() => setActiveView("requests")}
@@ -473,6 +497,77 @@ export default function KassaPage() {
         </Card>
       )}
 
+      {/* Employee kosheloks view */}
+      {activeView === "employees" && isBugalteriya && (
+        <Card className="animate-slide-up">
+          <CardHeader>
+            <CardTitle className="text-base font-semibold flex items-center gap-2">
+              <Users className="h-4 w-4 text-primary" />
+              Xodimlar koshelogi
+            </CardTitle>
+            <CardDescription>Barcha xodimlarning kosheloklari</CardDescription>
+          </CardHeader>
+          <CardContent>
+            {allKosheloksLoading ? (
+              <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+                {[1, 2, 3, 4, 5, 6].map((i) => (
+                  <div key={i} className="h-32 bg-muted/50 rounded-lg animate-pulse" />
+                ))}
+              </div>
+            ) : allKosheloks.length === 0 ? (
+              <div className="text-center py-8 text-muted-foreground">
+                <Users className="h-12 w-12 mx-auto mb-4 opacity-50" />
+                <p>Hozircha xodim koshelogi yo'q</p>
+              </div>
+            ) : (
+              <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+                {allKosheloks.map((k) => (
+                  <div key={k.id} className="p-4 rounded-lg border bg-card space-y-3">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <User className="h-4 w-4 text-muted-foreground" />
+                        <p className="font-medium">{k.user?.name || k.name}</p>
+                      </div>
+                      {k.user?.role && (
+                        <Badge variant="secondary" className="text-xs">
+                          {k.user.role}
+                        </Badge>
+                      )}
+                    </div>
+                    <div>
+                      <p className="text-2xl font-bold text-primary">
+                        {formatMoney(k.balance)} so'm
+                      </p>
+                      <div className="flex items-center gap-4 mt-1">
+                        <span className="text-xs text-green-600">
+                          +{formatMoney(k.totalIn || 0)}
+                        </span>
+                        <span className="text-xs text-red-600">
+                          -{formatMoney(k.totalOut || 0)}
+                        </span>
+                      </div>
+                    </div>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      className="w-full"
+                      onClick={() => {
+                        setSelectedEmployeeCashRegisterId(k.id);
+                        setSelectedEmployeeName(k.user?.name || k.name);
+                        setFillEmployeeDialogOpen(true);
+                      }}
+                    >
+                      <DollarSign className="h-4 w-4 mr-1" />
+                      Balans to'ldirish
+                    </Button>
+                  </div>
+                ))}
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      )}
+
       {/* Reject request dialog */}
       <Dialog open={!!rejectDialogOpen} onOpenChange={() => setRejectDialogOpen(null)}>
         <DialogContent>
@@ -544,7 +639,7 @@ export default function KassaPage() {
         />
       )}
 
-      {/* Fill balance dialog (for BUGALTERIYA) */}
+      {/* Fill balance dialog (for BUGALTERIYA - own koshelok) */}
       {isBugalteriya && (
         <FillBalanceDialog
           open={fillBalanceDialogOpen}
@@ -554,6 +649,28 @@ export default function KassaPage() {
             setFillBalanceDialogOpen(false);
             refetchKoshelok();
             if (activeView === "history") refetchHistory();
+          }}
+        />
+      )}
+
+      {/* Fill employee balance dialog (for BUGALTERIYA) */}
+      {isBugalteriya && (
+        <FillBalanceDialog
+          open={fillEmployeeDialogOpen}
+          onOpenChange={(open) => {
+            setFillEmployeeDialogOpen(open);
+            if (!open) {
+              setSelectedEmployeeCashRegisterId(null);
+              setSelectedEmployeeName("");
+            }
+          }}
+          koshelokId={selectedEmployeeCashRegisterId || undefined}
+          employeeName={selectedEmployeeName}
+          onSuccess={() => {
+            setFillEmployeeDialogOpen(false);
+            setSelectedEmployeeCashRegisterId(null);
+            setSelectedEmployeeName("");
+            refetchAllKosheloks();
           }}
         />
       )}
@@ -1024,11 +1141,13 @@ function FillBalanceDialog({
   open,
   onOpenChange,
   koshelokId,
+  employeeName,
   onSuccess,
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   koshelokId?: string;
+  employeeName?: string;
   onSuccess: () => void;
 }) {
   const [amount, setAmount] = useState("");
@@ -1062,7 +1181,7 @@ function FillBalanceDialog({
         <DialogHeader>
           <DialogTitle>Balans to'ldirish</DialogTitle>
           <DialogDescription>
-            Koshelok balansini to'ldiring
+            {employeeName ? `${employeeName} koshelogini to'ldiring` : "Koshelok balansini to'ldiring"}
           </DialogDescription>
         </DialogHeader>
         <div className="space-y-4 py-2">
