@@ -63,14 +63,13 @@ const mainNavItems: NavItem[] = [
     title: "Smetalar",
     url: "/smetas",
     icon: FileText,
-    roles: ["BOSS", "DIREKTOR", "PTO"],
+    roles: ["BOSS", "DIREKTOR", "PTO", "PRORAB"],
   },
   {
     title: "So'rovlar",
     url: "/requests",
     icon: ClipboardList,
-    badge: 8,
-    roles: ["DIREKTOR"],
+    roles: ["DIREKTOR", "BOSS"],
   },
   {
     title: "Hisobotlar",
@@ -82,7 +81,7 @@ const mainNavItems: NavItem[] = [
     title: "Xodimlar",
     url: "/users",
     icon: Users,
-    roles: ["DIREKTOR"],
+    roles: ["DIREKTOR", "BOSS"],
   },
 ];
 
@@ -108,47 +107,47 @@ const roleNavItems: NavItem[] = [
     icon: HardHat,
     roles: ["PRORAB"],
   },
-  // Kassa - all operational roles (not BOSS)
+  // Kassa - all roles
   {
     title: "Kassa",
     url: "/kassa",
     icon: Banknote,
-    roles: ["DIREKTOR", "BUGALTERIYA", "SNABJENIYA", "SKLAD", "PRORAB", "PTO", "HAYDOVCHI", "MODERATOR"],
+    roles: ["BOSS", "DIREKTOR", "BUGALTERIYA", "SNABJENIYA", "SKLAD", "PRORAB", "PTO", "HAYDOVCHI", "MODERATOR"],
   },
-  // BUGALTERIYA only
+  // BUGALTERIYA + BOSS + DIREKTOR
   {
     title: "Moliya",
     url: "/finance",
     icon: Wallet,
-    roles: ["BUGALTERIYA"],
+    roles: ["BUGALTERIYA", "BOSS", "DIREKTOR"],
   },
-  // SKLAD only
+  // SKLAD + BOSS + DIREKTOR
   {
     title: "Ombor",
     url: "/warehouse",
     icon: Package,
-    roles: ["SKLAD"],
+    roles: ["SKLAD", "BOSS", "DIREKTOR"],
   },
-  // SNABJENIYA only
+  // SNABJENIYA + DIREKTOR
   {
     title: "Yetkazuvchilar",
     url: "/suppliers",
     icon: Truck,
-    roles: ["SNABJENIYA"],
+    roles: ["SNABJENIYA", "DIREKTOR"],
   },
-  // BUGALTERIYA only
+  // BUGALTERIYA + DIREKTOR
   {
     title: "Ustalar",
     url: "/workers",
     icon: UserCircle,
-    roles: ["BUGALTERIYA"],
+    roles: ["BUGALTERIYA", "DIREKTOR"],
   },
-  // DIREKTOR + PTO
+  // DIREKTOR + PTO + BOSS
   {
     title: "Tekshirish",
     url: "/validation",
     icon: CheckSquare,
-    roles: ["DIREKTOR", "PTO"],
+    roles: ["DIREKTOR", "PTO", "BOSS"],
   },
   // HAYDOVCHI only
   {
@@ -192,7 +191,7 @@ const settingsNavItems: NavItem[] = [
     title: "Sozlamalar",
     url: "/settings",
     icon: Settings,
-    roles: ["DIREKTOR"],
+    roles: ["DIREKTOR", "BOSS"],
   },
 ];
 
