@@ -61,7 +61,7 @@ function formatDate(dateStr: string): string {
   });
 }
 
-type ActiveView = "orders" | "new-order" | "debts" | "history";
+type ActiveView = "orders" | "new-order" | "debts" | "history" | "suppliers" | "pending";
 
 export default function SupplyPage() {
   const { user } = useAuth();
@@ -275,19 +275,31 @@ export default function SupplyPage() {
       )}
 
       {/* Action buttons */}
-      <div className="grid gap-3 grid-cols-2 sm:grid-cols-4">
+      <div className="grid gap-3 grid-cols-2 sm:grid-cols-3 lg:grid-cols-6">
+        <ActionButton
+          icon={ShoppingCart}
+          label="Zayavkalar"
+          active={activeView === "pending"}
+          onClick={() => setActiveView("pending")}
+          badge={approvedRequests.length}
+        />
         <ActionButton
           icon={Package}
           label="Buyurtmalar"
           active={activeView === "orders"}
           onClick={() => setActiveView("orders")}
-          badge={approvedRequests.length}
         />
         <ActionButton
           icon={Plus}
           label="Yangi buyurtma"
           active={activeView === "new-order"}
           onClick={() => setCreateOrderDialogOpen(true)}
+        />
+        <ActionButton
+          icon={Truck}
+          label="Postavshiklar"
+          active={activeView === "suppliers"}
+          onClick={() => setActiveView("suppliers")}
         />
         <ActionButton
           icon={CreditCard}
@@ -333,6 +345,121 @@ export default function SupplyPage() {
           completedOrders={completedOrders}
           loading={ordersLoading}
         />
+      )}
+
+      {/* Pending requests from foreman */}
+      {activeView === "pending" && (
+        <Card className="animate-slide-up">
+          <CardHeader>
+            <CardTitle className="text-base font-semibold flex items-center gap-2">
+              <ShoppingCart className="h-4 w-4 text-warning" />
+              Zayavkalar (Prorabdan)
+            </CardTitle>
+            <CardDescription>Tasdiqlangan material so'rovlari</CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            {approvedRequestsLoading ? (
+              <div className="space-y-3">
+                {[1, 2, 3].map((i) => (
+                  <div key={i} className="h-20 bg-muted/50 rounded-lg animate-pulse" />
+                ))}
+              </div>
+            ) : approvedRequests.length === 0 ? (
+              <div className="text-center py-8 text-muted-foreground">
+                <CheckCircle className="h-12 w-12 mx-auto mb-4 opacity-50 text-success" />
+                <p>Barcha zayavkalar ko'rib chiqilgan</p>
+              </div>
+            ) : (
+              approvedRequests.map((req) => (
+                <div key={req.id} className="p-4 rounded-lg border bg-card space-y-2">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="font-medium text-sm">{req.smetaItem?.name || "Material"}</p>
+                      <p className="text-xs text-muted-foreground">
+                        {req.requestedQty} {req.smetaItem?.unit || ""} • {formatDate(req.createdAt)}
+                      </p>
+                    </div>
+                    <Badge className="bg-success/10 text-success">Tasdiqlangan</Badge>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() => {
+                        setSelectedRequest(req);
+                        setAssignSupplierDialogOpen(true);
+                      }}
+                    >
+                      <Truck className="h-3 w-3 mr-1" />
+                      Yetkazuvchi biriktirish
+                    </Button>
+                  </div>
+                </div>
+              ))
+            )}
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Suppliers list */}
+      {activeView === "suppliers" && (
+        <Card className="animate-slide-up">
+          <CardHeader>
+            <CardTitle className="text-base font-semibold flex items-center gap-2">
+              <Truck className="h-4 w-4 text-primary" />
+              Postavshiklar
+            </CardTitle>
+            <CardDescription>Barcha yetkazuvchilar ro'yxati</CardDescription>
+          </CardHeader>
+          <CardContent>
+            {suppliersLoading ? (
+              <div className="space-y-3">
+                {[1, 2, 3, 4].map((i) => (
+                  <div key={i} className="h-16 bg-muted/50 rounded-lg animate-pulse" />
+                ))}
+              </div>
+            ) : suppliers.length === 0 ? (
+              <div className="text-center py-8 text-muted-foreground">
+                <Truck className="h-12 w-12 mx-auto mb-4 opacity-50" />
+                <p>Hozircha yetkazuvchilar yo'q</p>
+              </div>
+            ) : (
+              <div className="space-y-3">
+                {suppliers.map((supplier) => {
+                  const debt = supplierDebts.find(d => d.supplierId === supplier.id);
+                  return (
+                    <div
+                      key={supplier.id}
+                      className="flex items-center justify-between p-4 rounded-lg border bg-card hover:bg-muted/50 transition-colors cursor-pointer"
+                      onClick={() => {
+                        setSelectedSupplierForDebts({ id: supplier.id, name: supplier.name });
+                        setSupplierDebtsDialogOpen(true);
+                      }}
+                    >
+                      <div>
+                        <p className="font-medium">{supplier.name}</p>
+                        <p className="text-xs text-muted-foreground">
+                          {supplier.phone || "Telefon ko'rsatilmagan"} {supplier.contactPerson ? `• ${supplier.contactPerson}` : ""}
+                        </p>
+                      </div>
+                      <div className="text-right">
+                        {debt && debt.totalDebt > 0 ? (
+                          <p className="font-semibold text-destructive">
+                            {formatMoney(debt.totalDebt)} so'm qarz
+                          </p>
+                        ) : (
+                          <Badge variant="secondary" className="bg-success/10 text-success">
+                            Qarzsiz
+                          </Badge>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </CardContent>
+        </Card>
       )}
 
       {/* Create Order Dialog */}

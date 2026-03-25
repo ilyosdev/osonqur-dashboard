@@ -75,13 +75,21 @@ export default function ForemanPage() {
   const [materialRequestDialogOpen, setMaterialRequestDialogOpen] = useState(false);
   const [cashRequestDialogOpen, setCashRequestDialogOpen] = useState(false);
 
+  // Date filter for work logs
+  const [dateFrom, setDateFrom] = useState("");
+  const [dateTo, setDateTo] = useState("");
+
   // Work logs
   const {
     data: workLogsData,
     loading: workLogsLoading,
     error: workLogsError,
     refetch: refetchWorkLogs,
-  } = useApi(() => workersApi.getWorkLogs({ limit: 50 }), []);
+  } = useApi(() => workersApi.getWorkLogs({
+    limit: 50,
+    ...(dateFrom && { startDate: dateFrom }),
+    ...(dateTo && { endDate: dateTo }),
+  }), [dateFrom, dateTo]);
 
   // Workers
   const {
@@ -220,6 +228,41 @@ export default function ForemanPage() {
           onClick={() => setCashRequestDialogOpen(true)}
         />
       </div>
+
+      {/* Date filters for work logs */}
+      {activeView === "worklogs" && (
+        <Card>
+          <CardContent className="pt-4 pb-3">
+            <div className="flex flex-wrap items-end gap-3">
+              <div className="space-y-1">
+                <Label className="text-xs">Boshlanish</Label>
+                <Input
+                  type="date"
+                  value={dateFrom}
+                  onChange={(e) => setDateFrom(e.target.value)}
+                  className="w-40"
+                />
+              </div>
+              <div className="space-y-1">
+                <Label className="text-xs">Tugash</Label>
+                <Input
+                  type="date"
+                  value={dateTo}
+                  onChange={(e) => setDateTo(e.target.value)}
+                  className="w-40"
+                />
+              </div>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => { setDateFrom(""); setDateTo(""); }}
+              >
+                Tozalash
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       {/* Content sections */}
       {activeView === "worklogs" && (
