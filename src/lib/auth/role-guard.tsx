@@ -44,24 +44,23 @@ export function canAccessRoute(userRole: string | undefined, pathname: string): 
     '/direktor': ['DIREKTOR'],
     '/requests': ['DIREKTOR'],
     '/users': ['DIREKTOR'],
-    '/settings': ['DIREKTOR'],
+    // Shared validation (DIREKTOR + PTO + BOSS)
+    '/validation': ['DIREKTOR', 'PTO', 'BOSS'],
 
-    // Shared validation (DIREKTOR + PTO)
-    '/validation': ['DIREKTOR', 'PTO'],
+    // BOSS pages
+    '/reports': ['BOSS', 'DIREKTOR'],
+    '/settings': ['DIREKTOR', 'BOSS'],
 
-    // BOSS - minimal (view-only home + reports)
-    '/reports': ['BOSS'],
-
-    // BUGALTERIYA pages
-    '/finance': ['BUGALTERIYA'],
+    // Finance - BUGALTERIYA + leadership
+    '/finance': ['BUGALTERIYA', 'BOSS', 'DIREKTOR'],
     '/workers': ['BUGALTERIYA'],
 
     // SNABJENIYA pages
     '/supply': ['SNABJENIYA'],
     '/suppliers': ['SNABJENIYA'],
 
-    // SKLAD pages
-    '/warehouse': ['SKLAD'],
+    // Warehouse - SKLAD + leadership
+    '/warehouse': ['SKLAD', 'BOSS', 'DIREKTOR'],
 
     // PRORAB pages
     '/foreman': ['PRORAB'],
@@ -70,7 +69,7 @@ export function canAccessRoute(userRole: string | undefined, pathname: string): 
     '/smeta-comparison': ['PTO'],
 
     // Kassa - all operational roles (not BOSS)
-    '/kassa': ['DIREKTOR', 'BUGALTERIYA', 'SNABJENIYA', 'SKLAD', 'PRORAB', 'PTO', 'HAYDOVCHI', 'MODERATOR'],
+    '/kassa': ['BOSS', 'DIREKTOR', 'BUGALTERIYA', 'SNABJENIYA', 'SKLAD', 'PRORAB', 'PTO', 'HAYDOVCHI', 'MODERATOR'],
 
     // Portal roles
     '/driver': ['HAYDOVCHI'],

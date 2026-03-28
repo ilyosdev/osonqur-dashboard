@@ -16,3 +16,4 @@ export * from './finance';
 export * from './telegram-groups';
 export * from './analytics';
 export * from './manual-purchases';
+export * from './knowledge';

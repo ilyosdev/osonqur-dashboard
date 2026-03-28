@@ -13,6 +13,7 @@ import {
   RefreshCw,
   Shield,
   Check,
+  Database,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -41,6 +42,7 @@ const ROLE_LABELS: Record<string, string> = {
   POSTAVSHIK: "Yetkazuvchi",
 };
 import { authApi, telegramGroupsApi, TelegramGroup } from "@/lib/api";
+import KnowledgeBaseTab from "@/components/dashboard/knowledge-base-tab";
 
 export default function SettingsPage() {
   const navigate = useNavigate();
@@ -197,6 +199,7 @@ export default function SettingsPage() {
   };
 
   const canSwitchRoles = allowedRoles.length > 1;
+  const canViewKnowledge = user?.role === 'SUPER_ADMIN';
 
   return (
     <div className="space-y-6 animate-fade-in">
@@ -222,6 +225,12 @@ export default function SettingsPage() {
             <TabsTrigger value="role" className="data-[state=active]:bg-white data-[state=active]:shadow-sm">
               <Shield className="h-4 w-4 mr-2" />
               Rol
+            </TabsTrigger>
+          )}
+          {canViewKnowledge && (
+            <TabsTrigger value="knowledge" className="data-[state=active]:bg-white data-[state=active]:shadow-sm">
+              <Database className="h-4 w-4 mr-2" />
+              Bilim bazasi
             </TabsTrigger>
           )}
           <TabsTrigger value="profile" className="data-[state=active]:bg-white data-[state=active]:shadow-sm">
@@ -404,6 +413,12 @@ export default function SettingsPage() {
                 </div>
               </CardContent>
             </Card>
+          </TabsContent>
+        )}
+
+        {canViewKnowledge && (
+          <TabsContent value="knowledge" className="space-y-6 mt-0">
+            <KnowledgeBaseTab />
           </TabsContent>
         )}
 
