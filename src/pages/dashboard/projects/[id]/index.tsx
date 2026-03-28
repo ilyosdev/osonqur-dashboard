@@ -46,6 +46,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { projectsApi, Project } from "@/lib/api/projects";
 import { telegramGroupsApi, TelegramGroup } from "@/lib/api/telegram-groups";
 import { smetasApi, Smeta, SmetaType, CreateSmetaRequest } from "@/lib/api/smetas";
+import { usersApi } from "@/lib/api/users";
 import { uploadApi, ParsedSmetaItem } from "@/lib/api/upload";
 import { ErrorMessage } from "@/components/ui/error-message";
 import { ProgressBar } from "@/components/dashboard/progress-bar";
@@ -110,6 +111,7 @@ export default function ProjectDetailPage() {
   const [isSmetasLoading, setIsSmetasLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState("info");
+  const [employeeCount, setEmployeeCount] = useState(0);
 
   // Create smeta dialog state
   const [createDialogOpen, setCreateDialogOpen] = useState(false);
@@ -166,6 +168,13 @@ export default function ProjectDetailPage() {
           }
         } catch {
           console.log("No telegram group found for project");
+        }
+
+        try {
+          const usersResponse = await usersApi.countByProject(id);
+          setEmployeeCount(usersResponse.count);
+        } catch {
+          // Project may have no assigned users
         }
 
         // Fetch smetas for this project
@@ -405,7 +414,7 @@ export default function ProjectDetailPage() {
                   </div>
                   <div>
                     <p className="text-sm text-muted-foreground">Xodimlar</p>
-                    <p className="text-xl font-semibold">0</p>
+                    <p className="text-xl font-semibold">{employeeCount}</p>
                   </div>
                 </div>
               </CardContent>

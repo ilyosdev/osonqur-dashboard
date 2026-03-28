@@ -6,6 +6,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { setTokens } from "@/lib/auth/tokens";
+import { useAuth } from "@/lib/auth";
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:4001';
 
@@ -20,6 +21,7 @@ interface RegisterFormData {
 
 export default function RegisterPage() {
   const navigate = useNavigate();
+  const { refreshAuth } = useAuth();
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
@@ -126,6 +128,7 @@ export default function RegisterPage() {
       }
 
       setTokens(tokens.accessToken, tokens.refreshToken);
+      await refreshAuth();
       navigate("/", { replace: true });
     } catch (err) {
       setError(err instanceof Error ? err.message : "Ro'yxatdan o'tishda xatolik");

@@ -24,8 +24,9 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { requestsApi, PurchaseRequest, GetPurchaseRequestsParams } from "@/lib/api/requests";
+import { requestsApi, GetPurchaseRequestsParams } from "@/lib/api/requests";
 import { projectsApi, Project } from "@/lib/api/projects";
+import { useApi } from "@/hooks/use-api";
 import { StatsCard } from "@/components/dashboard/stats-card";
 
 const statusOptions = [
@@ -33,7 +34,6 @@ const statusOptions = [
   { value: "PENDING", label: "Kutmoqda" },
   { value: "APPROVED", label: "Tasdiqlangan" },
   { value: "REJECTED", label: "Rad etilgan" },
-  { value: "COMPLETED", label: "Bajarilgan" },
 ];
 
 const getStatusBadge = (status: string) => {
@@ -64,7 +64,7 @@ function formatNumber(num: number): string {
 }
 
 export default function RequestsPage() {
-  const [requests, setRequests] = useState<PurchaseRequest[]>([]);
+  const [requests, setRequests] = useState<import("@/lib/api/requests").PurchaseRequest[]>([]);
   const [projects, setProjects] = useState<Project[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -75,11 +75,16 @@ export default function RequestsPage() {
   const [totalPages, setTotalPages] = useState(1);
   const [total, setTotal] = useState(0);
 
-  const [stats, setStats] = useState({
-    pending: 0,
-    approved: 0,
-    rejected: 0,
-  });
+  // Fetch stats counts from separate API calls
+  const { data: pendingCount } = useApi(() => requestsApi.getAll({ status: "PENDING", limit: 1 }), []);
+  const { data: approvedCount } = useApi(() => requestsApi.getAll({ status: "APPROVED", limit: 1 }), []);
+  const { data: rejectedCount } = useApi(() => requestsApi.getAll({ status: "REJECTED", limit: 1 }), []);
+
+  const stats = {
+    pending: pendingCount?.total ?? 0,
+    approved: approvedCount?.total ?? 0,
+    rejected: rejectedCount?.total ?? 0,
+  };
 
   // Fetch projects for filter dropdown
   useEffect(() => {
@@ -110,11 +115,6 @@ export default function RequestsPage() {
       setRequests(response.data);
       setTotalPages(response.totalPages);
       setTotal(response.total);
-
-      const pending = response.data.filter((r) => r.status === "PENDING").length;
-      const approved = response.data.filter((r) => r.status === "APPROVED").length;
-      const rejected = response.data.filter((r) => r.status === "REJECTED").length;
-      setStats({ pending, approved, rejected });
     } catch (err) {
       setError(err instanceof Error ? err.message : "So'rovlarni yuklashda xatolik");
     } finally {
@@ -147,9 +147,11 @@ export default function RequestsPage() {
               Kutayotganlar ({stats.pending})
             </Link>
           </Button>
-          <Button>
-            <Plus className="h-4 w-4 mr-2" />
-            Yangi so'rov
+          <Button asChild>
+            <Link to="/requests/pending">
+              <Plus className="h-4 w-4 mr-2" />
+              Yangi so'rov
+            </Link>
           </Button>
         </div>
       </div>

@@ -1,11 +1,21 @@
-import { Link } from "react-router-dom";
-import { UserCircle, Wallet, ClipboardList, AlertTriangle, ArrowRight } from "lucide-react";
+import { useState } from "react";
+import { UserCircle, Wallet, ClipboardList, AlertTriangle, UserPlus, Loader2 } from "lucide-react";
 import { StatsCard } from "@/components/dashboard/stats-card";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+} from "@/components/ui/dialog";
 import { useApi } from "@/hooks/use-api";
 import { workersApi } from "@/lib/api/workers";
+import { analyticsApi } from "@/lib/api/analytics";
 import { StatsSkeleton } from "@/components/ui/table-skeleton";
 import { ErrorMessage } from "@/components/ui/error-message";
 
@@ -17,6 +27,11 @@ function formatNumber(num: number): string {
 }
 
 export default function WorkersPage() {
+  const [showAddDialog, setShowAddDialog] = useState(false);
+  const [isCreating, setIsCreating] = useState(false);
+  const [createError, setCreateError] = useState<string | null>(null);
+  const [addForm, setAddForm] = useState({ firstName: "", lastName: "", phone: "", position: "" });
+
   const {
     data: workersResponse,
     loading: workersLoading,
@@ -29,6 +44,10 @@ export default function WorkersPage() {
     loading: workLogsLoading,
   } = useApi(() => workersApi.getWorkLogs({ limit: 10 }), []);
 
+  const {
+    data: workerDebtsData,
+  } = useApi(() => analyticsApi.getWorkerDebts(), []);
+
   const loading = workersLoading || workLogsLoading;
   const error = workersError;
 
@@ -37,6 +56,30 @@ export default function WorkersPage() {
 
   const todayStr = new Date().toISOString().split('T')[0];
   const todayWorkLogs = recentWorkLogs.filter((l) => l.date.startsWith(todayStr));
+
+  const handleAddWorker = async () => {
+    if (!addForm.firstName.trim() || !addForm.lastName.trim()) {
+      setCreateError("Ism va familiya kiritilishi shart");
+      return;
+    }
+    setIsCreating(true);
+    setCreateError(null);
+    try {
+      await workersApi.create({
+        firstName: addForm.firstName.trim(),
+        lastName: addForm.lastName.trim(),
+        phone: addForm.phone.trim() || undefined,
+        position: addForm.position.trim() || undefined,
+      });
+      setShowAddDialog(false);
+      setAddForm({ firstName: "", lastName: "", phone: "", position: "" });
+      refetchWorkers();
+    } catch (err) {
+      setCreateError(err instanceof Error ? err.message : "Usta qo'shishda xatolik");
+    } finally {
+      setIsCreating(false);
+    }
+  };
 
   if (error) {
     return (
@@ -71,7 +114,7 @@ export default function WorkersPage() {
           />
           <StatsCard
             title="Jami qarz"
-            value="0"
+            value={formatNumber(workerDebtsData?.totalDebt ?? 0)}
             subtitle="to'lanmagan"
             icon={Wallet}
             variant="danger"
@@ -79,7 +122,7 @@ export default function WorkersPage() {
           />
           <StatsCard
             title="Qarzdorlar"
-            value={0}
+            value={workerDebtsData?.workerCount ?? 0}
             subtitle="ta usta"
             icon={AlertTriangle}
             variant="warning"
@@ -106,10 +149,9 @@ export default function WorkersPage() {
               </CardTitle>
               <CardDescription>Barcha ustalar</CardDescription>
             </div>
-            <Button variant="ghost" size="sm" asChild>
-              <Link to="/workers/add" className="flex items-center gap-1">
-                Yangi usta <ArrowRight className="h-4 w-4" />
-              </Link>
+            <Button variant="ghost" size="sm" onClick={() => setShowAddDialog(true)}>
+              <UserPlus className="h-4 w-4 mr-2" />
+              Yangi usta
             </Button>
           </CardHeader>
           <CardContent className="space-y-4">
@@ -186,6 +228,81 @@ export default function WorkersPage() {
           </CardContent>
         </Card>
       </div>
+
+      {/* Add Worker Dialog */}
+      <Dialog open={showAddDialog} onOpenChange={setShowAddDialog}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <UserPlus className="h-5 w-5 text-primary" />
+              Yangi usta qo'shish
+            </DialogTitle>
+          </DialogHeader>
+
+          {createError && (
+            <div className="p-3 rounded-lg bg-destructive/10 text-destructive text-sm">
+              {createError}
+            </div>
+          )}
+
+          <div className="space-y-4">
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="firstName">Ism *</Label>
+                <Input
+                  id="firstName"
+                  placeholder="Ism"
+                  value={addForm.firstName}
+                  onChange={(e) => setAddForm((prev) => ({ ...prev, firstName: e.target.value }))}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="lastName">Familiya *</Label>
+                <Input
+                  id="lastName"
+                  placeholder="Familiya"
+                  value={addForm.lastName}
+                  onChange={(e) => setAddForm((prev) => ({ ...prev, lastName: e.target.value }))}
+                />
+              </div>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="workerPhone">Telefon</Label>
+              <Input
+                id="workerPhone"
+                placeholder="+998 __ ___ __ __"
+                value={addForm.phone}
+                onChange={(e) => setAddForm((prev) => ({ ...prev, phone: e.target.value }))}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="position">Lavozim</Label>
+              <Input
+                id="position"
+                placeholder="Masalan: Gʻishtchi"
+                value={addForm.position}
+                onChange={(e) => setAddForm((prev) => ({ ...prev, position: e.target.value }))}
+              />
+            </div>
+          </div>
+
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowAddDialog(false)} disabled={isCreating}>
+              Bekor qilish
+            </Button>
+            <Button onClick={handleAddWorker} disabled={isCreating}>
+              {isCreating ? (
+                <>
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  Saqlanmoqda...
+                </>
+              ) : (
+                "Qo'shish"
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

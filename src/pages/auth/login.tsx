@@ -149,12 +149,9 @@ function LoginForm() {
                 Eslab qolish
               </Label>
             </div>
-            <Link
-              to="/forgot-password"
-              className="text-sm text-primary hover:underline font-medium"
-            >
-              Parolni unutdingizmi?
-            </Link>
+            <span className="text-sm text-muted-foreground cursor-default">
+              Parolni unutdingizmi? (Tez orada)
+            </span>
           </div>
 
           <Button

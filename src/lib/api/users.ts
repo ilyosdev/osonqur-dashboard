@@ -84,6 +84,11 @@ export const usersApi = {
       method: 'DELETE',
     }),
 
+  countByProject: (projectId: string) =>
+    apiClient<{ count: number }>(`/vendor/users/project/${projectId}/count`, {
+      method: 'GET',
+    }),
+
   // User-Project assignments
   getUserProjects: (userId: string) =>
     apiClient<{ projects: UserProject[] }>(`/vendor/users/${userId}/projects`, {

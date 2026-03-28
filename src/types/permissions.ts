@@ -272,7 +272,7 @@ export function canAssignRole(
   if (assignerRole === "OPERATOR") return targetRole !== "SUPER_ADMIN" && targetRole !== "OPERATOR";
   // ADMIN cannot create other ADMINs
   if (assignerRole === "ADMIN") return targetRole !== "SUPER_ADMIN" && targetRole !== "OPERATOR" && targetRole !== "ADMIN";
-  if (assignerRole === "DIREKTOR") return true;
+  if (assignerRole === "DIREKTOR") return !["SUPER_ADMIN","OPERATOR","ADMIN","BOSS"].includes(targetRole);
   if (targetRole === "DIREKTOR") return false;
   if (targetRole === "BOSS") return false;
 

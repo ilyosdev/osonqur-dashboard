@@ -6,6 +6,7 @@ import AdminLayout from '@/layouts/AdminLayout';
 
 // Auth pages
 import LoginPage from '@/pages/auth/login';
+import RegisterPage from '@/pages/auth/register';
 
 // Dashboard pages
 import HomePage from '@/pages/dashboard/index';
@@ -49,6 +50,7 @@ function App() {
       {/* Auth routes */}
       <Route element={<AuthLayout />}>
         <Route path="/login" element={<LoginPage />} />
+        <Route path="/register" element={<RegisterPage />} />
       </Route>
 
       {/* Admin routes (SUPER_ADMIN + OPERATOR) */}

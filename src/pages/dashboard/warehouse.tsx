@@ -126,7 +126,7 @@ export default function WarehousePage() {
   const {
     data: inTransitRequestsResponse,
     loading: inTransitRequestsLoading,
-  } = useApi(() => requestsApi.getAll({ status: "IN_DELIVERY", limit: 50 }), []);
+  } = useApi(() => requestsApi.getAll({ status: "IN_TRANSIT", limit: 50 }), []);
 
   // Fetch warehouse items for inventory
   const {
@@ -190,6 +190,10 @@ export default function WarehousePage() {
   const totalInventoryPages = Math.ceil(totalInventoryItems / ITEMS_PER_PAGE);
 
   // Filter smeta items by search
+  const todayDeliveries = (deliveredRequestsResponse?.data || []).filter(
+    (r) => new Date(r.updatedAt).toDateString() === new Date().toDateString()
+  ).length;
+
   const filteredSmetaItems = smetaItems.filter((item: SmetaItem) =>
     item.name.toLowerCase().includes(searchQuery.toLowerCase())
   );
@@ -347,7 +351,7 @@ export default function WarehousePage() {
           />
           <StatsCard
             title="Bugun kirim"
-            value={0}
+            value={todayDeliveries}
             subtitle="ta yetkazma"
             icon={ArrowDownToLine}
             variant="success"

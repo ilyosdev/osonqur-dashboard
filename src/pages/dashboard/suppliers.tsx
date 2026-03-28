@@ -1,11 +1,21 @@
-import { Link } from "react-router-dom";
-import { Truck, Package, AlertTriangle, Wallet, ArrowRight, Clock } from "lucide-react";
+import { useState } from "react";
+import { Truck, Package, AlertTriangle, Wallet, Plus, Clock, Loader2 } from "lucide-react";
 import { StatsCard } from "@/components/dashboard/stats-card";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+} from "@/components/ui/dialog";
 import { useApi } from "@/hooks/use-api";
 import { suppliersApi } from "@/lib/api/suppliers";
+import { analyticsApi } from "@/lib/api/analytics";
 import { StatsSkeleton } from "@/components/ui/table-skeleton";
 import { ErrorMessage } from "@/components/ui/error-message";
 
@@ -17,6 +27,11 @@ function formatNumber(num: number): string {
 }
 
 export default function SuppliersPage() {
+  const [showAddDialog, setShowAddDialog] = useState(false);
+  const [isCreating, setIsCreating] = useState(false);
+  const [createError, setCreateError] = useState<string | null>(null);
+  const [addForm, setAddForm] = useState({ name: "", phone: "", contactPerson: "", address: "" });
+
   const {
     data: suppliersResponse,
     loading: suppliersLoading,
@@ -34,12 +49,40 @@ export default function SuppliersPage() {
     loading: deliveredLoading,
   } = useApi(() => suppliersApi.getOrders({ status: "DELIVERED", limit: 5 }), []);
 
+  const {
+    data: supplierDebtsData,
+  } = useApi(() => analyticsApi.getSupplierDebts(), []);
+
   const loading = suppliersLoading || ordersLoading || deliveredLoading;
   const error = suppliersError;
 
   const suppliers = suppliersResponse?.data || [];
   const pendingOrders = ordersResponse?.data || [];
   const recentDeliveries = deliveredOrdersResponse?.data || [];
+
+  const handleAddSupplier = async () => {
+    if (!addForm.name.trim()) {
+      setCreateError("Yetkazuvchi nomini kiriting");
+      return;
+    }
+    setIsCreating(true);
+    setCreateError(null);
+    try {
+      await suppliersApi.create({
+        name: addForm.name.trim(),
+        phone: addForm.phone.trim() || undefined,
+        contactPerson: addForm.contactPerson.trim() || undefined,
+        address: addForm.address.trim() || undefined,
+      });
+      setShowAddDialog(false);
+      setAddForm({ name: "", phone: "", contactPerson: "", address: "" });
+      refetchSuppliers();
+    } catch (err) {
+      setCreateError(err instanceof Error ? err.message : "Yetkazuvchi qo'shishda xatolik");
+    } finally {
+      setIsCreating(false);
+    }
+  };
 
   if (error) {
     return (
@@ -74,7 +117,7 @@ export default function SuppliersPage() {
           />
           <StatsCard
             title="Jami qarz"
-            value="0"
+            value={formatNumber(supplierDebtsData?.totalDebt ?? 0)}
             subtitle="to'lanmagan"
             icon={Wallet}
             variant="danger"
@@ -82,7 +125,7 @@ export default function SuppliersPage() {
           />
           <StatsCard
             title="Qarzdorlar"
-            value={0}
+            value={supplierDebtsData?.supplierCount ?? 0}
             subtitle="ta yetkazuvchi"
             icon={AlertTriangle}
             variant="warning"
@@ -109,10 +152,9 @@ export default function SuppliersPage() {
               </CardTitle>
               <CardDescription>Qarzlar va buyurtmalar</CardDescription>
             </div>
-            <Button variant="ghost" size="sm" asChild>
-              <Link to="/suppliers/add" className="flex items-center gap-1">
-                Yangi <ArrowRight className="h-4 w-4" />
-              </Link>
+            <Button variant="ghost" size="sm" onClick={() => setShowAddDialog(true)}>
+              <Plus className="h-4 w-4 mr-2" />
+              Yangi
             </Button>
           </CardHeader>
           <CardContent className="space-y-3">
@@ -222,6 +264,79 @@ export default function SuppliersPage() {
           </Card>
         </div>
       </div>
+
+      {/* Add Supplier Dialog */}
+      <Dialog open={showAddDialog} onOpenChange={setShowAddDialog}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Plus className="h-5 w-5 text-primary" />
+              Yangi yetkazuvchi qo'shish
+            </DialogTitle>
+          </DialogHeader>
+
+          {createError && (
+            <div className="p-3 rounded-lg bg-destructive/10 text-destructive text-sm">
+              {createError}
+            </div>
+          )}
+
+          <div className="space-y-4">
+            <div className="space-y-2">
+              <Label htmlFor="supplierName">Nomi *</Label>
+              <Input
+                id="supplierName"
+                placeholder="Yetkazuvchi nomi"
+                value={addForm.name}
+                onChange={(e) => setAddForm((prev) => ({ ...prev, name: e.target.value }))}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="supplierPhone">Telefon</Label>
+              <Input
+                id="supplierPhone"
+                placeholder="+998 __ ___ __ __"
+                value={addForm.phone}
+                onChange={(e) => setAddForm((prev) => ({ ...prev, phone: e.target.value }))}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="contactPerson">Kontakt shaxs</Label>
+              <Input
+                id="contactPerson"
+                placeholder="Mas'ul shaxs ismi"
+                value={addForm.contactPerson}
+                onChange={(e) => setAddForm((prev) => ({ ...prev, contactPerson: e.target.value }))}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="supplierAddress">Manzil</Label>
+              <Input
+                id="supplierAddress"
+                placeholder="Manzil"
+                value={addForm.address}
+                onChange={(e) => setAddForm((prev) => ({ ...prev, address: e.target.value }))}
+              />
+            </div>
+          </div>
+
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowAddDialog(false)} disabled={isCreating}>
+              Bekor qilish
+            </Button>
+            <Button onClick={handleAddSupplier} disabled={isCreating}>
+              {isCreating ? (
+                <>
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  Saqlanmoqda...
+                </>
+              ) : (
+                "Qo'shish"
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
