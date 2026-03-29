@@ -137,6 +137,10 @@ export default function OrgUsersPage() {
       setFormError("Ism, telefon va parol kiritilishi kerak");
       return;
     }
+    if (formData.password.length < 6) {
+      setFormError("Parol kamida 6 ta belgi bo'lishi kerak");
+      return;
+    }
     setIsSubmitting(true);
     setFormError("");
     try {
@@ -187,7 +191,10 @@ export default function OrgUsersPage() {
       await adminApi.deleteOrgUser(orgId, selectedUser.id);
       setDeleteDialogOpen(false);
       fetchUsers();
-    } catch {} finally {
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "O'chirishda xatolik yuz berdi");
+      setDeleteDialogOpen(false);
+    } finally {
       setIsSubmitting(false);
     }
   };
@@ -199,7 +206,9 @@ export default function OrgUsersPage() {
       const assigned = await adminApi.getUserProjects(orgId, selectedUser.id);
       setUserProjects(assigned);
       setSelectedProjectId("");
-    } catch {}
+    } catch (err) {
+      setFormError(err instanceof Error ? err.message : "Tayinlashda xatolik");
+    }
   };
 
   const handleUnassignProject = async (projectId: string) => {
@@ -208,11 +217,13 @@ export default function OrgUsersPage() {
       await adminApi.unassignUserFromProject(orgId, selectedUser.id, projectId);
       const assigned = await adminApi.getUserProjects(orgId, selectedUser.id);
       setUserProjects(assigned);
-    } catch {}
+    } catch (err) {
+      setFormError(err instanceof Error ? err.message : "Bekor qilishda xatolik");
+    }
   };
 
   const formatPhone = (value: string) => {
-    const digits = value.replace(/\D/g, "");
+    const digits = value.replace(/\D/g, "").slice(0, 9);
     if (digits.length <= 2) return digits;
     if (digits.length <= 5) return `${digits.slice(0, 2)} ${digits.slice(2)}`;
     if (digits.length <= 7) return `${digits.slice(0, 2)} ${digits.slice(2, 5)} ${digits.slice(5)}`;

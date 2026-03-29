@@ -146,7 +146,10 @@ export default function OrgProjectsPage() {
       await adminApi.deleteOrgProject(orgId, selectedProject.id);
       setDeleteDialogOpen(false);
       fetchProjects();
-    } catch {} finally {
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "O'chirishda xatolik yuz berdi");
+      setDeleteDialogOpen(false);
+    } finally {
       setIsSubmitting(false);
     }
   };

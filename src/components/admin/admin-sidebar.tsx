@@ -3,7 +3,6 @@ import {
   Building2,
   FolderOpen,
   Home,
-  Settings,
   UserCog,
   Users,
   HardHat,
@@ -191,18 +190,7 @@ export function AdminSidebar() {
         )}
       </SidebarContent>
 
-      <SidebarFooter className="border-t border-sidebar-border p-3">
-        <SidebarMenu>
-          <SidebarMenuItem>
-            <SidebarMenuButton asChild tooltip="Sozlamalar">
-              <Link to="/admin/settings">
-                <Settings className="h-4 w-4" />
-                <span>Sozlamalar</span>
-              </Link>
-            </SidebarMenuButton>
-          </SidebarMenuItem>
-        </SidebarMenu>
-      </SidebarFooter>
+      <SidebarFooter className="border-t border-sidebar-border p-3" />
     </Sidebar>
   );
 }

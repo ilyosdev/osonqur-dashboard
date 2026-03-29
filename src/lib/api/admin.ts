@@ -180,7 +180,7 @@ export const adminApi = {
       body: JSON.stringify(data),
     }),
 
-  updateOrganization: (id: string, data: { name?: string; phone?: string; inn?: string; address?: string; responsiblePerson?: string; isActive?: boolean }) =>
+  updateOrganization: (id: string, data: { name?: string; phone?: string; inn?: string; address?: string; responsiblePerson?: string; isActive?: boolean; subscriptionTier?: SubscriptionTier }) =>
     apiClient<AdminOrganization>(`/admin/organizations/${id}`, {
       method: 'PATCH',
       body: JSON.stringify(data),

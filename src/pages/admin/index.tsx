@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Link } from "react-router-dom";
+import { Link, Navigate } from "react-router-dom";
 import { Building2, FolderOpen, Users, UserCog, Plus, Loader2 } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -26,6 +26,11 @@ export default function AdminHomePage() {
   }, []);
 
   const isSuperAdmin = user?.role === "SUPER_ADMIN";
+
+  // ADMIN users can't use the admin dashboard - redirect to their org
+  if (user?.role === "ADMIN" && user?.orgId) {
+    return <Navigate to={`/admin/organizations/${user.orgId}/users`} replace />;
+  }
 
   const statCards = [
     {

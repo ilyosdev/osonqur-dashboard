@@ -69,6 +69,10 @@ export async function apiClient<T>(
         throw new Error(error.message || 'Request failed');
       }
 
+      if (retryResponse.status === 204 || retryResponse.headers.get('content-length') === '0') {
+        return {} as T;
+      }
+
       return retryResponse.json();
     }
 
@@ -82,6 +86,10 @@ export async function apiClient<T>(
   if (!response.ok) {
     const error = await response.json().catch(() => ({ message: 'Request failed' }));
     throw new Error(error.message || 'Request failed');
+  }
+
+  if (response.status === 204 || response.headers.get('content-length') === '0') {
+    return {} as T;
   }
 
   return response.json();

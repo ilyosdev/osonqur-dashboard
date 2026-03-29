@@ -202,7 +202,10 @@ export default function ProjectDetailPage() {
       setDeleteSmetaDialogOpen(false);
       fetchSmetas();
       fetchProject();
-    } catch {} finally {
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "O'chirishda xatolik");
+      setDeleteSmetaDialogOpen(false);
+    } finally {
       setIsSubmitting(false);
     }
   };
@@ -214,7 +217,9 @@ export default function ProjectDetailPage() {
     try {
       const result = await adminApi.getOrgUsers(orgId, { limit: 100 });
       setAllOrgUsers(result.data);
-    } catch {}
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Xodimlarni yuklashda xatolik");
+    }
   };
 
   const handleAssignUser = async () => {
@@ -223,7 +228,9 @@ export default function ProjectDetailPage() {
       await adminApi.assignUserToProject(orgId, selectedUserId, projectId);
       setSelectedUserId("");
       fetchUsers();
-    } catch {}
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Tayinlashda xatolik");
+    }
   };
 
   const handleUnassignUser = async (userId: string) => {
@@ -231,7 +238,9 @@ export default function ProjectDetailPage() {
     try {
       await adminApi.unassignUserFromProject(orgId, userId, projectId);
       fetchUsers();
-    } catch {}
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Bekor qilishda xatolik");
+    }
   };
 
   const formatMoney = (val: number) => {
