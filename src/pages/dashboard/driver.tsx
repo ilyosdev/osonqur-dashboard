@@ -35,7 +35,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { useApi, useMutation } from "@/hooks/use-api";
-import { requestsApi, PurchaseRequest } from "@/lib/api/requests";
+import { driversApi, DriverDelivery } from "@/lib/api/drivers";
 import { StatsSkeleton } from "@/components/ui/table-skeleton";
 import { ErrorMessage } from "@/components/ui/error-message";
 
@@ -52,27 +52,15 @@ function formatDate(dateStr: string): string {
   });
 }
 
-type DeliveryStatus = "APPROVED" | "IN_TRANSIT" | "DELIVERED" | "RECEIVED" | "FINALIZED";
-
-interface DeliveryRequest extends PurchaseRequest {
-  driverId?: string;
-  collectedQty?: number;
-  collectedAt?: string;
-  deliveredQty?: number;
-  deliveredAt?: string;
-  receivedQty?: number;
-  receivedAt?: string;
-}
-
 // Batch grouping for requests created together
 interface RequestBatch {
   batchId: string | null;
-  requests: DeliveryRequest[];
+  requests: DriverDelivery[];
   prorabName: string;
   totalQty: number;
 }
 
-function groupRequestsByBatch(requests: DeliveryRequest[]): RequestBatch[] {
+function groupRequestsByBatch(requests: DriverDelivery[]): RequestBatch[] {
   const batchMap = new Map<string, RequestBatch>();
   for (const req of requests) {
     const key = req.batchId || `single_${req.id}`;
@@ -93,50 +81,50 @@ function groupRequestsByBatch(requests: DeliveryRequest[]): RequestBatch[] {
 
 export default function DriverPage() {
   const [activeTab, setActiveTab] = useState("assigned");
-  const [collectDialog, setCollectDialog] = useState<DeliveryRequest | null>(null);
-  const [deliverDialog, setDeliverDialog] = useState<DeliveryRequest | null>(null);
+  const [collectDialog, setCollectDialog] = useState<DriverDelivery | null>(null);
+  const [deliverDialog, setDeliverDialog] = useState<DriverDelivery | null>(null);
   const [collectedQty, setCollectedQty] = useState("");
   const [deliveredQty, setDeliveredQty] = useState("");
   const [note, setNote] = useState("");
 
-  // Fetch assigned requests (APPROVED status, assigned to driver)
+  // Fetch assigned deliveries (APPROVED status, assigned to this driver)
   const {
     data: assignedResponse,
     loading: assignedLoading,
     error: assignedError,
     refetch: refetchAssigned,
-  } = useApi(() => requestsApi.getAll({ status: "APPROVED", limit: 50 }), []);
+  } = useApi(() => driversApi.getMyDeliveries({ status: "APPROVED" }), []);
 
-  // Fetch in-transit requests
+  // Fetch in-transit deliveries
   const {
     data: inTransitResponse,
     loading: inTransitLoading,
     refetch: refetchInTransit,
-  } = useApi(() => requestsApi.getAll({ status: "IN_TRANSIT", limit: 50 }), []);
+  } = useApi(() => driversApi.getMyDeliveries({ status: "IN_TRANSIT" }), []);
 
-  // Fetch completed deliveries
+  // Fetch completed deliveries (history)
   const {
     data: completedResponse,
     loading: completedLoading,
-  } = useApi(() => requestsApi.getAll({ status: "DELIVERED", limit: 50 }), []);
+  } = useApi(() => driversApi.getHistory(), []);
 
   // Mutations for marking collected/delivered
   const { mutate: markCollected, loading: collectingId } = useMutation(
     (data: { id: string; collectedQty: number; note?: string }) =>
-      requestsApi.update(data.id, { requestedQty: data.collectedQty })
+      driversApi.collectDelivery(data.id, { collectedQty: data.collectedQty, note: data.note })
   );
 
   const { mutate: markDelivered, loading: deliveringId } = useMutation(
     (data: { id: string; deliveredQty: number; note?: string }) =>
-      requestsApi.update(data.id, { requestedQty: data.deliveredQty })
+      driversApi.deliverDelivery(data.id, { deliveredQty: data.deliveredQty, note: data.note })
   );
 
   const loading = assignedLoading || inTransitLoading || completedLoading;
   const error = assignedError;
 
-  const assignedRequests = (assignedResponse?.data || []) as DeliveryRequest[];
-  const inTransitRequests = (inTransitResponse?.data || []) as DeliveryRequest[];
-  const completedRequests = (completedResponse?.data || []) as DeliveryRequest[];
+  const assignedRequests = assignedResponse?.data || [];
+  const inTransitRequests = inTransitResponse?.data || [];
+  const completedRequests = completedResponse?.data || [];
 
   // Group requests by batchId
   const assignedBatches = useMemo(() => groupRequestsByBatch(assignedRequests), [assignedRequests]);
@@ -508,7 +496,7 @@ export default function DriverPage() {
                             Yetkazildi
                           </Badge>
                           <p className="text-xs text-muted-foreground mt-1">
-                            {request.deliveredAt ? formatDate(request.deliveredAt) : formatDate(request.updatedAt)}
+                            {request.deliveredAt ? formatDate(request.deliveredAt) : formatDate(request.createdAt)}
                           </p>
                         </div>
                       </div>
