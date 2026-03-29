@@ -71,11 +71,6 @@ export default function OrganizationsPage() {
   const isAdminRole = user?.role === "ADMIN";
   const canAddOrg = isSuperAdmin || isOperator;
 
-  // ADMIN users should be redirected to their own org
-  if (isAdminRole && user?.orgId) {
-    return <Navigate to={`/admin/organizations/${user.orgId}/users`} replace />;
-  }
-
   const fetchOrgs = useCallback(async () => {
     setIsLoading(true);
     setError("");
@@ -164,17 +159,27 @@ export default function OrganizationsPage() {
     }
   };
 
+  const handleToggleActive = async (org: AdminOrganization) => {
+    try {
+      await adminApi.updateOrganization(org.id, { isActive: !org.isActive });
+      fetchOrgs();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Xatolik yuz berdi");
+    }
+  };
+
   const handleEdit = async () => {
     if (!selectedOrg) return;
     setIsSubmitting(true);
     setFormError("");
     try {
-      const data: { name?: string; phone?: string; inn?: string; address?: string; responsiblePerson?: string } = {};
+      const data: { name?: string; phone?: string; inn?: string; address?: string; responsiblePerson?: string; subscriptionTier?: SubscriptionTier } = {};
       if (formData.name.trim()) data.name = formData.name;
       if (formData.phone.trim()) data.phone = "+998" + formData.phone.replace(/\s/g, "");
       data.inn = formData.inn.trim() || undefined;
       data.address = formData.address.trim() || undefined;
       data.responsiblePerson = formData.responsiblePerson.trim() || undefined;
+      if (formData.subscriptionTier) data.subscriptionTier = formData.subscriptionTier;
       await adminApi.updateOrganization(selectedOrg.id, data);
       setEditDialogOpen(false);
       fetchOrgs();
@@ -196,15 +201,16 @@ export default function OrganizationsPage() {
       await adminApi.deleteOrganization(selectedOrg.id);
       setDeleteDialogOpen(false);
       fetchOrgs();
-    } catch {
-      // ignore
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "O'chirishda xatolik yuz berdi");
+      setDeleteDialogOpen(false);
     } finally {
       setIsSubmitting(false);
     }
   };
 
   const formatPhone = (value: string) => {
-    const digits = value.replace(/\D/g, "");
+    const digits = value.replace(/\D/g, "").slice(0, 9);
     if (digits.length <= 2) return digits;
     if (digits.length <= 5) return `${digits.slice(0, 2)} ${digits.slice(2)}`;
     if (digits.length <= 7) return `${digits.slice(0, 2)} ${digits.slice(2, 5)} ${digits.slice(5)}`;
@@ -212,6 +218,11 @@ export default function OrganizationsPage() {
   };
 
   const totalPages = Math.ceil(total / 20);
+
+  // ADMIN users should be redirected to their own org
+  if (isAdminRole && user?.orgId) {
+    return <Navigate to={`/admin/organizations/${user.orgId}/users`} replace />;
+  }
 
   return (
     <div className="space-y-6">
@@ -261,7 +272,7 @@ export default function OrganizationsPage() {
         <div className="flex items-center justify-center py-12">
           <Loader2 className="h-8 w-8 animate-spin text-primary" />
         </div>
-      ) : organizations.length === 0 ? (
+      ) : !error && organizations.length === 0 ? (
         <Card className="p-8 text-center">
           <Building2 className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
           <h3 className="text-lg font-semibold mb-2">Kompaniyalar topilmadi</h3>
@@ -294,6 +305,9 @@ export default function OrganizationsPage() {
                       <DropdownMenuItem onClick={() => openEditDialog(org)}>
                         <Edit className="h-4 w-4 mr-2" />
                         Tahrirlash
+                      </DropdownMenuItem>
+                      <DropdownMenuItem onClick={() => handleToggleActive(org)}>
+                        {org.isActive ? "Nofaol qilish" : "Faol qilish"}
                       </DropdownMenuItem>
                       {isSuperAdmin && (
                         <>
@@ -495,6 +509,19 @@ export default function OrganizationsPage() {
                     onChange={(e) => setFormData(p => ({ ...p, phone: formatPhone(e.target.value) }))} />
                 </div>
               </div>
+            </div>
+            <div className="space-y-2">
+              <Label>Tarif</Label>
+              <Select value={formData.subscriptionTier} onValueChange={(v) => setFormData(p => ({ ...p, subscriptionTier: v as SubscriptionTier }))}>
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="ODDIY">{TIER_LABELS.ODDIY}</SelectItem>
+                  <SelectItem value="PRO">{TIER_LABELS.PRO}</SelectItem>
+                  <SelectItem value="ENTERPRISE">{TIER_LABELS.ENTERPRISE}</SelectItem>
+                </SelectContent>
+              </Select>
             </div>
             <div className="space-y-2">
               <Label>Manzil</Label>

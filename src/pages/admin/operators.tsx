@@ -97,6 +97,10 @@ export default function OperatorsPage() {
       setFormError("Barcha maydonlarni to'ldiring");
       return;
     }
+    if (formData.password.length < 6) {
+      setFormError("Parol kamida 6 ta belgi bo'lishi kerak");
+      return;
+    }
     setIsSubmitting(true);
     setFormError("");
     try {
@@ -141,8 +145,9 @@ export default function OperatorsPage() {
       await adminApi.deleteOperator(selectedOperator.id);
       setDeleteDialogOpen(false);
       fetchOperators();
-    } catch {
-      // ignore
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "O'chirishda xatolik yuz berdi");
+      setDeleteDialogOpen(false);
     } finally {
       setIsSubmitting(false);
     }
@@ -152,13 +157,13 @@ export default function OperatorsPage() {
     try {
       await adminApi.updateOperator(op.id, { isActive: !op.isActive });
       fetchOperators();
-    } catch {
-      // ignore
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Xatolik yuz berdi");
     }
   };
 
   const formatPhone = (value: string) => {
-    const digits = value.replace(/\D/g, "");
+    const digits = value.replace(/\D/g, "").slice(0, 9);
     if (digits.length <= 2) return digits;
     if (digits.length <= 5) return `${digits.slice(0, 2)} ${digits.slice(2)}`;
     if (digits.length <= 7) return `${digits.slice(0, 2)} ${digits.slice(2, 5)} ${digits.slice(5)}`;
@@ -213,7 +218,7 @@ export default function OperatorsPage() {
         <div className="flex items-center justify-center py-12">
           <Loader2 className="h-8 w-8 animate-spin text-primary" />
         </div>
-      ) : operators.length === 0 ? (
+      ) : !error && operators.length === 0 ? (
         <Card className="p-8 text-center">
           <UserCog className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
           <h3 className="text-lg font-semibold mb-2">Operatorlar topilmadi</h3>

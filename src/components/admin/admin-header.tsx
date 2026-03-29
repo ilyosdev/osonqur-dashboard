@@ -1,5 +1,5 @@
 import { useNavigate } from "react-router-dom";
-import { ChevronDown, LogOut, User, Shield } from "lucide-react";
+import { ChevronDown, LogOut, User, Shield, LayoutDashboard } from "lucide-react";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -27,10 +27,12 @@ export function AdminHeader() {
     return name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2);
   };
 
-  const roleBadge = user?.role === 'SUPER_ADMIN' ? 'Super Admin' : 'Operator';
+  const roleBadge = user?.role === 'SUPER_ADMIN' ? 'Super Admin' : user?.role === 'ADMIN' ? 'Admin' : 'Operator';
   const roleBadgeColor = user?.role === 'SUPER_ADMIN'
     ? 'bg-destructive/10 text-destructive'
-    : 'bg-primary/10 text-primary';
+    : user?.role === 'ADMIN'
+      ? 'bg-orange-500/10 text-orange-600'
+      : 'bg-primary/10 text-primary';
 
   return (
     <header className="sticky top-0 z-40 flex h-16 items-center justify-between gap-4 border-b border-border bg-card/80 backdrop-blur-sm px-4 md:px-6">
@@ -75,9 +77,9 @@ export function AdminHeader() {
               </div>
             </DropdownMenuLabel>
             <DropdownMenuSeparator />
-            <DropdownMenuItem>
-              <User className="mr-2 h-4 w-4" />
-              Profil
+            <DropdownMenuItem onClick={() => navigate('/')}>
+              <LayoutDashboard className="mr-2 h-4 w-4" />
+              Asosiy panel
             </DropdownMenuItem>
             <DropdownMenuSeparator />
             <DropdownMenuItem

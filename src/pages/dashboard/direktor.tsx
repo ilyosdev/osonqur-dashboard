@@ -244,7 +244,7 @@ export default function DirektorPage() {
       await createDebt({
         supplierId: selectedSupplierId,
         amount: Number(debtAmount),
-        description: debtDescription || selectedBatchId ? `Batch: ${selectedBatchId}` : undefined,
+        description: debtDescription || (selectedBatchId ? `Batch: ${selectedBatchId}` : undefined),
       });
       setAddDebtDialogOpen(false);
       setSelectedBatchId(null);
