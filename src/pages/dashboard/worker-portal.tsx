@@ -51,19 +51,19 @@ interface WorkerBalance {
 export default function WorkerPortalPage() {
   const [activeTab, setActiveTab] = useState("work-logs");
 
-  // Fetch work logs for this worker
+  // Fetch work logs for this worker (user-specific)
   const {
     data: workLogsResponse,
     loading: workLogsLoading,
     error: workLogsError,
     refetch: refetchWorkLogs,
-  } = useApi(() => workersApi.getWorkLogs({ limit: 100 }), []);
+  } = useApi(() => workersApi.getMyWorkLogs({ limit: 100 }), []);
 
-  // Fetch payments
+  // Fetch payments (user-specific)
   const {
     data: paymentsResponse,
     loading: paymentsLoading,
-  } = useApi(() => workersApi.getPayments({ limit: 100 }), []);
+  } = useApi(() => workersApi.getMyPayments({ limit: 100 }), []);
 
   const loading = workLogsLoading || paymentsLoading;
   const error = workLogsError;

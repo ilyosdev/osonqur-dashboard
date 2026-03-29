@@ -9,6 +9,7 @@ export * from './smetas';
 export * from './smeta-items';
 export * from './users';
 export * from './requests';
+export * from './drivers';
 export * from './suppliers';
 export * from './warehouses';
 export * from './workers';

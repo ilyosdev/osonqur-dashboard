@@ -46,35 +46,39 @@ function formatDate(dateStr: string): string {
 export default function SupplierPortalPage() {
   const [activeTab, setActiveTab] = useState("orders");
 
-  // Fetch orders for this supplier
+  // Fetch orders for this supplier (user-specific)
   const {
     data: ordersResponse,
     loading: ordersLoading,
     error: ordersError,
     refetch: refetchOrders,
-  } = useApi(() => suppliersApi.getOrders({ limit: 100 }), []);
+  } = useApi(() => suppliersApi.getMyOrders({ limit: 100 }), []);
 
-  // Fetch suppliers to get debts
+  // Fetch unpaid debts for this supplier
   const {
-    data: suppliersResponse,
-    loading: suppliersLoading,
-  } = useApi(() => suppliersApi.getAll({ limit: 10 }), []);
+    data: debtsResponse,
+    loading: debtsLoading,
+  } = useApi(() => suppliersApi.getMyDebts({ isPaid: false, limit: 100 }), []);
 
-  const loading = ordersLoading || suppliersLoading;
+  // Fetch payments (paid debts) for this supplier
+  const {
+    data: paymentsResponse,
+    loading: paymentsLoading,
+  } = useApi(() => suppliersApi.getMyPayments({ limit: 100 }), []);
+
+  const loading = ordersLoading || debtsLoading || paymentsLoading;
   const error = ordersError;
 
   const orders = ordersResponse?.data || [];
-  const suppliers = suppliersResponse?.data || [];
 
   // Calculate totals
   const totalSupplied = orders.reduce((sum, order) => sum + order.totalPrice, 0);
   const pendingOrders = orders.filter((order) => order.status === "PENDING").length;
   const completedOrders = orders.filter((order) => order.status === "DELIVERED").length;
 
-  // For demo purposes, we'll simulate debts based on orders
-  // In real app, this would come from supplier-specific debt API
-  const unpaidDebts: SupplierDebt[] = [];
-  const paidDebts: SupplierDebt[] = [];
+  // Real debts and payments from API
+  const unpaidDebts: SupplierDebt[] = debtsResponse?.data || [];
+  const paidDebts: SupplierDebt[] = paymentsResponse?.data || [];
 
   if (error) {
     return (
