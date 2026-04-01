@@ -77,9 +77,9 @@ export default function RoleTemplatesPage() {
         adminApi.getPermissionGroups(),
         adminApi.getPermissions(),
       ]);
-      setTemplates(templatesData);
-      setPermissionGroups(groupsData);
-      setAllPermissions(permsData);
+      setTemplates(templatesData || []);
+      setPermissionGroups(groupsData || []);
+      setAllPermissions(permsData || []);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Xatolik yuz berdi");
     } finally {
@@ -115,10 +115,10 @@ export default function RoleTemplatesPage() {
 
   const openManageDialog = (t: AdminRoleTemplate) => {
     setSelectedTemplate(t);
-    setSelectedPermIds(new Set(t.permissions.map((p) => p.id)));
+    setSelectedPermIds(new Set((t.permissions || []).map((p) => p.id)));
     setSelectedAuthorityIds(new Set(t.canManageTemplateIds || []));
     // Expand all groups by default
-    setExpandedGroups(new Set(permissionGroups.map((g) => g.id)));
+    setExpandedGroups(new Set((permissionGroups || []).map((g) => g.id)));
     setManageDialogOpen(true);
   };
 
@@ -128,7 +128,7 @@ export default function RoleTemplatesPage() {
     setSelectedOrgIds(new Set());
     try {
       const orgsData = await adminApi.getOrganizations({ limit: 1000 });
-      setOrganizations(orgsData.data);
+      setOrganizations(orgsData?.data || []);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Tashkilotlarni yuklashda xatolik");
     }
@@ -246,7 +246,7 @@ export default function RoleTemplatesPage() {
   };
 
   const toggleGroupAll = (group: AdminPermissionGroup) => {
-    const groupPermIds = group.permissions.map((p) => p.id);
+    const groupPermIds = (group.permissions || []).map((p) => p.id);
     const allSelected = groupPermIds.every((id) => selectedPermIds.has(id));
     setSelectedPermIds((prev) => {
       const next = new Set(prev);
@@ -285,8 +285,8 @@ export default function RoleTemplatesPage() {
   );
 
   // Permissions not in any group — show as "Boshqa" (Other) section
-  const groupedPermIds = new Set(permissionGroups.flatMap((g) => g.permissions.map((p) => p.id)));
-  const ungroupedPermissions = allPermissions.filter((p) => !groupedPermIds.has(p.id));
+  const groupedPermIds = new Set((permissionGroups || []).flatMap((g) => (g.permissions || []).map((p) => p.id)));
+  const ungroupedPermissions = (allPermissions || []).filter((p) => !groupedPermIds.has(p.id));
 
   return (
     <div className="space-y-6">
@@ -394,7 +394,7 @@ export default function RoleTemplatesPage() {
                     </div>
                   </TableCell>
                   <TableCell>
-                    <Badge variant="secondary">{t.permissions.length} ta</Badge>
+                    <Badge variant="secondary">{(t.permissions || []).length} ta</Badge>
                   </TableCell>
                   <TableCell className="text-muted-foreground text-sm">
                     {new Date(t.createdAt).toLocaleDateString("uz-UZ")}
@@ -596,11 +596,11 @@ export default function RoleTemplatesPage() {
 
             <TabsContent value="permissions">
               <div className="overflow-y-auto max-h-[50vh] space-y-2 pr-2">
-                {permissionGroups
+                {(permissionGroups || [])
                   .sort((a, b) => a.sortOrder - b.sortOrder)
                   .map((group) => {
                     const isExpanded = expandedGroups.has(group.id);
-                    const groupPermIds2 = group.permissions.map((p) => p.id);
+                    const groupPermIds2 = (group.permissions || []).map((p) => p.id);
                     const selectedCount = groupPermIds2.filter((id) => selectedPermIds.has(id)).length;
                     const allSelected = groupPermIds2.length > 0 && selectedCount === groupPermIds2.length;
 
@@ -633,9 +633,9 @@ export default function RoleTemplatesPage() {
                             {selectedCount}/{groupPermIds2.length}
                           </Badge>
                         </div>
-                        {isExpanded && group.permissions.length > 0 && (
+                        {isExpanded && (group.permissions || []).length > 0 && (
                           <div className="border-t px-3 pb-3 pt-2 space-y-1">
-                            {group.permissions.map((perm) => (
+                            {(group.permissions || []).map((perm) => (
                               <div
                                 key={perm.id}
                                 className="flex items-center gap-3 py-1.5 px-2 rounded hover:bg-muted/30 transition-colors"

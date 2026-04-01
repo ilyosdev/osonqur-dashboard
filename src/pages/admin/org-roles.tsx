@@ -90,10 +90,10 @@ export default function OrgRolesPage() {
         adminApi.getPermissionGroups(),
         adminApi.getPermissions(),
       ]);
-      setOrganizations(orgsData.data);
-      setTemplates(templatesData);
-      setPermissionGroups(groupsData);
-      setAllPermissions(permsData);
+      setOrganizations(orgsData?.data || []);
+      setTemplates(templatesData || []);
+      setPermissionGroups(groupsData || []);
+      setAllPermissions(permsData || []);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Xatolik yuz berdi");
     } finally {
@@ -115,7 +115,7 @@ export default function OrgRolesPage() {
     setError("");
     try {
       const rolesData = await adminApi.getOrgRoles(selectedOrgId);
-      setRoles(rolesData);
+      setRoles(rolesData || []);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Rollarni yuklashda xatolik");
     } finally {
@@ -151,9 +151,9 @@ export default function OrgRolesPage() {
 
   const openManageDialog = (role: AdminOrgRole) => {
     setSelectedRole(role);
-    setSelectedPermIds(new Set(role.permissions.map((p) => p.id)));
+    setSelectedPermIds(new Set((role.permissions || []).map((p) => p.id)));
     setSelectedAuthorityIds(new Set(role.canManageRoleIds || []));
-    setExpandedGroups(new Set(permissionGroups.map((g) => g.id)));
+    setExpandedGroups(new Set((permissionGroups || []).map((g) => g.id)));
     setManageDialogOpen(true);
   };
 
@@ -295,7 +295,7 @@ export default function OrgRolesPage() {
   };
 
   const toggleGroupAll = (group: AdminPermissionGroup) => {
-    const groupPermIds = group.permissions.map((p) => p.id);
+    const groupPermIds = (group.permissions || []).map((p) => p.id);
     const allSelected = groupPermIds.every((id) => selectedPermIds.has(id));
     setSelectedPermIds((prev) => {
       const next = new Set(prev);
@@ -327,8 +327,8 @@ export default function OrgRolesPage() {
   const selectedOrg = organizations.find((o) => o.id === selectedOrgId);
 
   // Permissions not in any group
-  const groupedPermIds = new Set(permissionGroups.flatMap((g) => g.permissions.map((p) => p.id)));
-  const ungroupedPermissions = allPermissions.filter((p) => !groupedPermIds.has(p.id));
+  const groupedPermIds = new Set((permissionGroups || []).flatMap((g) => (g.permissions || []).map((p) => p.id)));
+  const ungroupedPermissions = (allPermissions || []).filter((p) => !groupedPermIds.has(p.id));
 
   return (
     <div className="space-y-6">
@@ -502,7 +502,7 @@ export default function OrgRolesPage() {
                     </div>
                   </TableCell>
                   <TableCell>
-                    <Badge variant="secondary">{role.permissions.length} ta</Badge>
+                    <Badge variant="secondary">{(role.permissions || []).length} ta</Badge>
                   </TableCell>
                   <TableCell>
                     <DropdownMenu>
@@ -703,11 +703,11 @@ export default function OrgRolesPage() {
 
             <TabsContent value="permissions">
               <div className="overflow-y-auto max-h-[50vh] space-y-2 pr-2">
-                {permissionGroups
+                {(permissionGroups || [])
                   .sort((a, b) => a.sortOrder - b.sortOrder)
                   .map((group) => {
                     const isExpanded = expandedGroups.has(group.id);
-                    const groupPermIdsList = group.permissions.map((p) => p.id);
+                    const groupPermIdsList = (group.permissions || []).map((p) => p.id);
                     const selectedCount = groupPermIdsList.filter((id) => selectedPermIds.has(id)).length;
                     const allSelected = groupPermIdsList.length > 0 && selectedCount === groupPermIdsList.length;
 
@@ -737,9 +737,9 @@ export default function OrgRolesPage() {
                             {selectedCount}/{groupPermIdsList.length}
                           </Badge>
                         </div>
-                        {isExpanded && group.permissions.length > 0 && (
+                        {isExpanded && (group.permissions || []).length > 0 && (
                           <div className="border-t px-3 pb-3 pt-2 space-y-1">
-                            {group.permissions.map((perm) => (
+                            {(group.permissions || []).map((perm) => (
                               <div
                                 key={perm.id}
                                 className="flex items-center gap-3 py-1.5 px-2 rounded hover:bg-muted/30 transition-colors"
@@ -887,7 +887,7 @@ export default function OrgRolesPage() {
                             <Badge className="bg-blue-500/10 text-blue-600 text-xs">Tizimli</Badge>
                           )}
                           <span className="text-xs text-muted-foreground">
-                            ({t.permissions.length} ruxsat)
+                            ({(t.permissions || []).length} ruxsat)
                           </span>
                         </div>
                       </SelectItem>
