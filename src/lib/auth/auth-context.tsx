@@ -1,4 +1,4 @@
-import { createContext, useContext, useEffect, useState, ReactNode } from 'react';
+import { createContext, useContext, useEffect, useState, useCallback, useRef, ReactNode } from 'react';
 import { getAccessToken, getRefreshToken, setTokens, clearTokens, isTokenExpired } from './tokens';
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:4001';
@@ -8,7 +8,8 @@ interface User {
   name: string;
   phone: string;
   role: string;
-  allowedRoles?: string[];
+  platformRole?: string;
+  orgRoleId?: string;
   orgId: string;
 }
 
@@ -18,10 +19,15 @@ interface AuthContextType {
   isAuthenticated: boolean;
   isAdmin: boolean;
   currentRole: string | null;
+  permissions: string[];
+  pageRoutes: string[];
+  hasPermission: (key: string) => boolean;
+  /** @deprecated Use hasPermission() or PermissionRoute instead */
   allowedRoles: string[];
   login: (phone: string, password: string) => Promise<void>;
   logout: () => void;
   refreshAuth: () => Promise<void>;
+  /** @deprecated No longer needed -- 1 user = 1 role */
   switchRole: (role: string) => Promise<void>;
 }
 
@@ -29,7 +35,10 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
+  const [permissions, setPermissions] = useState<string[]>([]);
+  const [pageRoutes, setPageRoutes] = useState<string[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const permissionsRefreshRef = useRef<Promise<void> | null>(null);
 
   const fetchUserProfile = async (token: string): Promise<User> => {
     const response = await fetch(`${API_URL}/vendor/auth/profile`, {
@@ -45,6 +54,56 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const data = await response.json();
     return data.user || data;
   };
+
+  /**
+   * Fetch permissions from /vendor/auth/me.
+   * Returns { permissions: string[], pageRoutes: string[], user? }
+   */
+  const fetchPermissions = useCallback(async (token: string) => {
+    try {
+      const response = await fetch(`${API_URL}/vendor/auth/me`, {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      });
+
+      if (!response.ok) {
+        // Non-fatal: keep old permissions, log warning
+        console.warn('Failed to fetch permissions from /auth/me:', response.status);
+        return;
+      }
+
+      const data = await response.json();
+      if (Array.isArray(data.permissions)) {
+        setPermissions(data.permissions);
+      }
+      if (Array.isArray(data.pageRoutes)) {
+        setPageRoutes(data.pageRoutes);
+      }
+      // If /auth/me returns updated user fields, merge them
+      if (data.user) {
+        setUser(prev => prev ? { ...prev, ...data.user } : data.user);
+      }
+    } catch (err) {
+      console.warn('Error fetching permissions:', err);
+    }
+  }, []);
+
+  /**
+   * Refresh permissions (deduplicated -- concurrent calls share one promise).
+   * Called automatically on 403 responses.
+   */
+  const refreshPermissions = useCallback(async () => {
+    const token = getAccessToken();
+    if (!token) return;
+
+    if (!permissionsRefreshRef.current) {
+      permissionsRefreshRef.current = fetchPermissions(token).finally(() => {
+        permissionsRefreshRef.current = null;
+      });
+    }
+    return permissionsRefreshRef.current;
+  }, [fetchPermissions]);
 
   const refreshToken = async (): Promise<string | null> => {
     const refresh = getRefreshToken();
@@ -82,6 +141,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
       if (!token) {
         setUser(null);
+        setPermissions([]);
+        setPageRoutes([]);
         return;
       }
 
@@ -92,15 +153,23 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         if (!token) {
           clearTokens();
           setUser(null);
+          setPermissions([]);
+          setPageRoutes([]);
           return;
         }
       }
 
-      const userData = await fetchUserProfile(token);
+      // Fetch profile and permissions in parallel
+      const [userData] = await Promise.all([
+        fetchUserProfile(token),
+        fetchPermissions(token),
+      ]);
       setUser(userData);
     } catch {
       clearTokens();
       setUser(null);
+      setPermissions([]);
+      setPageRoutes([]);
     } finally {
       setIsLoading(false);
     }
@@ -129,6 +198,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     setTokens(tokens.accessToken, tokens.refreshToken);
 
+    // Fetch permissions immediately after login
+    await fetchPermissions(tokens.accessToken);
+
     if (data.user) {
       setUser(data.user);
     } else {
@@ -140,43 +212,43 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const logout = () => {
     clearTokens();
     setUser(null);
+    setPermissions([]);
+    setPageRoutes([]);
   };
 
   const refreshAuth = async () => {
     await loadUser();
   };
 
-  const switchRole = async (role: string) => {
-    const token = getAccessToken();
-    if (!token) {
-      throw new Error('Not authenticated');
-    }
-
-    const response = await fetch(`${API_URL}/vendor/auth/switch-role`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        Authorization: `Bearer ${token}`,
-      },
-      body: JSON.stringify({ role }),
-    });
-
-    if (!response.ok) {
-      const error = await response.json().catch(() => ({ message: 'Failed to switch role' }));
-      throw new Error(error.message || 'Failed to switch role');
-    }
-
-    const data = await response.json();
-    const tokens = data.tokens;
-
-    if (tokens?.accessToken && tokens?.refreshToken) {
-      setTokens(tokens.accessToken, tokens.refreshToken);
-    }
-
-    if (data.user) {
-      setUser(data.user);
-    }
+  /**
+   * @deprecated No longer needed -- 1 user = 1 role. Kept for backward compatibility.
+   */
+  const switchRole = async (_role: string) => {
+    console.warn('switchRole() is deprecated. Each user now has a single role.');
+    // Refresh permissions to stay in sync
+    await refreshPermissions();
   };
+
+  const hasPermission = useCallback((key: string): boolean => {
+    return permissions.includes(key);
+  }, [permissions]);
+
+  // Listen for 403 responses globally to auto-refresh permissions.
+  // We patch window.fetch once, on mount.
+  useEffect(() => {
+    const originalFetch = window.fetch;
+    window.fetch = async (...args: Parameters<typeof fetch>) => {
+      const response = await originalFetch(...args);
+      if (response.status === 403) {
+        // Auto-refresh permissions on 403 (fire-and-forget)
+        refreshPermissions();
+      }
+      return response;
+    };
+    return () => {
+      window.fetch = originalFetch;
+    };
+  }, [refreshPermissions]);
 
   useEffect(() => {
     loadUser();
@@ -184,7 +256,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const isAdmin = !!user && (user.role === 'SUPER_ADMIN' || user.role === 'OPERATOR' || user.role === 'ADMIN');
   const currentRole = user?.role ?? null;
-  const allowedRoles = user?.allowedRoles ?? (user?.role ? [user.role] : []);
+  // Backward compatibility: derive allowedRoles from current role
+  const allowedRoles = user?.role ? [user.role] : [];
 
   const value: AuthContextType = {
     user,
@@ -192,6 +265,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     isAuthenticated: !!user,
     isAdmin,
     currentRole,
+    permissions,
+    pageRoutes,
+    hasPermission,
     allowedRoles,
     login,
     logout,
