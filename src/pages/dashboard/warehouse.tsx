@@ -59,7 +59,8 @@ import { requestsApi, PurchaseRequest } from "@/lib/api/requests";
 import { smetaItemsApi, SmetaItem } from "@/lib/api/smeta-items";
 import { StatsSkeleton } from "@/components/ui/table-skeleton";
 import { ErrorMessage } from "@/components/ui/error-message";
-import { useAuth, hasRole } from "@/lib/auth";
+import { useAuth } from "@/lib/auth";
+import { usePermission } from "@/hooks";
 
 function formatNumber(num: number): string {
   return num.toLocaleString("uz-UZ");
@@ -79,7 +80,7 @@ const ITEMS_PER_PAGE = 30;
 
 export default function WarehousePage() {
   const { user } = useAuth();
-  const isSklad = hasRole(user?.role, ["SKLAD", "DIREKTOR"]);
+  const isSklad = usePermission('warehouse:view');
 
   const [activeTab, setActiveTab] = useState("warehouses");
   const [activeDialog, setActiveDialog] = useState<DialogType>(null);

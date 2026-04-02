@@ -121,6 +121,52 @@ export interface AdminProjectUser {
   projectId: string;
 }
 
+export interface AdminPermission {
+  id: string;
+  key: string;
+  name: string;
+  description?: string;
+  category?: string;
+  groupId?: string;
+}
+
+export interface AdminPermissionGroup {
+  id: string;
+  name: string;
+  description?: string;
+  sortOrder: number;
+  permissions: AdminPermission[];
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface AdminRoleTemplate {
+  id: string;
+  name: string;
+  description?: string;
+  isSystem: boolean;
+  isActive: boolean;
+  permissions: AdminPermission[];
+  canManageTemplateIds: string[];
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface AdminOrgRole {
+  id: string;
+  name: string;
+  description?: string;
+  orgId: string;
+  templateId?: string;
+  templateName?: string;
+  isActive: boolean;
+  userCount: number;
+  permissions: AdminPermission[];
+  canManageRoleIds: string[];
+  createdAt: string;
+  updatedAt: string;
+}
+
 interface PaginatedResponse<T> {
   data: T[];
   total: number;
@@ -296,4 +342,115 @@ export const adminApi = {
   // Project Users (assigned)
   getProjectUsers: (orgId: string, projectId: string) =>
     apiClient<AdminProjectUser[]>(`/admin/organizations/${orgId}/projects/${projectId}/users`, { method: 'GET' }),
+
+  // ─── Permissions & Permission Groups ───────────────
+  getPermissions: () =>
+    apiClient<AdminPermission[]>('/admin/permissions', { method: 'GET' }),
+
+  getPermissionGroups: () =>
+    apiClient<AdminPermissionGroup[]>('/admin/permission-groups', { method: 'GET' }),
+
+  createPermissionGroup: (data: { name: string; description?: string; sortOrder?: number }) =>
+    apiClient<AdminPermissionGroup>('/admin/permission-groups', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    }),
+
+  updatePermissionGroup: (id: string, data: { name?: string; description?: string; sortOrder?: number }) =>
+    apiClient<AdminPermissionGroup>(`/admin/permission-groups/${id}`, {
+      method: 'PATCH',
+      body: JSON.stringify(data),
+    }),
+
+  deletePermissionGroup: (id: string) =>
+    apiClient<{ success: boolean }>(`/admin/permission-groups/${id}`, { method: 'DELETE' }),
+
+  addPermissionToGroup: (groupId: string, permissionId: string) =>
+    apiClient<{ success: boolean }>(`/admin/permission-groups/${groupId}/permissions`, {
+      method: 'POST',
+      body: JSON.stringify({ permissionId }),
+    }),
+
+  removePermissionFromGroup: (groupId: string, permissionId: string) =>
+    apiClient<{ success: boolean }>(`/admin/permission-groups/${groupId}/permissions/${permissionId}`, { method: 'DELETE' }),
+
+  // ─── Role Templates ────────────────────────────────
+  getRoleTemplates: () =>
+    apiClient<AdminRoleTemplate[]>('/admin/role-templates', { method: 'GET' }),
+
+  createRoleTemplate: (data: { name: string; description?: string }) =>
+    apiClient<AdminRoleTemplate>('/admin/role-templates', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    }),
+
+  updateRoleTemplate: (id: string, data: { name?: string; description?: string; isActive?: boolean }) =>
+    apiClient<AdminRoleTemplate>(`/admin/role-templates/${id}`, {
+      method: 'PATCH',
+      body: JSON.stringify(data),
+    }),
+
+  deleteRoleTemplate: (id: string) =>
+    apiClient<{ success: boolean }>(`/admin/role-templates/${id}`, { method: 'DELETE' }),
+
+  updateRoleTemplatePermissions: (id: string, permissionIds: string[]) =>
+    apiClient<{ success: boolean }>(`/admin/role-templates/${id}/permissions`, {
+      method: 'PUT',
+      body: JSON.stringify({ permissionIds }),
+    }),
+
+  updateRoleTemplateAuthority: (id: string, canManageTemplateIds: string[]) =>
+    apiClient<{ success: boolean }>(`/admin/role-templates/${id}/authority`, {
+      method: 'PUT',
+      body: JSON.stringify({ canManageTemplateIds }),
+    }),
+
+  syncRoleTemplate: (id: string, orgIds: string[]) =>
+    apiClient<{ success: boolean; synced: number }>(`/admin/role-templates/${id}/sync`, {
+      method: 'POST',
+      body: JSON.stringify({ orgIds }),
+    }),
+
+  // ─── Org Roles ─────────────────────────────────────
+  getOrgRoles: (orgId: string) =>
+    apiClient<AdminOrgRole[]>(`/admin/orgs/${orgId}/roles`, { method: 'GET' }),
+
+  createOrgRole: (orgId: string, data: { name: string; description?: string }) =>
+    apiClient<AdminOrgRole>(`/admin/orgs/${orgId}/roles`, {
+      method: 'POST',
+      body: JSON.stringify(data),
+    }),
+
+  updateOrgRole: (orgId: string, roleId: string, data: { name?: string; description?: string; isActive?: boolean }) =>
+    apiClient<AdminOrgRole>(`/admin/orgs/${orgId}/roles/${roleId}`, {
+      method: 'PATCH',
+      body: JSON.stringify(data),
+    }),
+
+  deleteOrgRole: (orgId: string, roleId: string) =>
+    apiClient<{ success: boolean }>(`/admin/orgs/${orgId}/roles/${roleId}`, { method: 'DELETE' }),
+
+  updateOrgRolePermissions: (orgId: string, roleId: string, permissionIds: string[]) =>
+    apiClient<{ success: boolean }>(`/admin/orgs/${orgId}/roles/${roleId}/permissions`, {
+      method: 'PUT',
+      body: JSON.stringify({ permissionIds }),
+    }),
+
+  updateOrgRoleAuthority: (orgId: string, roleId: string, canManageRoleIds: string[]) =>
+    apiClient<{ success: boolean }>(`/admin/orgs/${orgId}/roles/${roleId}/authority`, {
+      method: 'PUT',
+      body: JSON.stringify({ canManageRoleIds }),
+    }),
+
+  applyTemplateToOrg: (orgId: string, templateId: string) =>
+    apiClient<AdminOrgRole>(`/admin/orgs/${orgId}/apply-template`, {
+      method: 'POST',
+      body: JSON.stringify({ templateId }),
+    }),
+
+  reassignOrgRoleUsers: (orgId: string, roleId: string, targetRoleId: string) =>
+    apiClient<{ success: boolean; reassigned: number }>(`/admin/orgs/${orgId}/roles/${roleId}/reassign`, {
+      method: 'POST',
+      body: JSON.stringify({ targetRoleId }),
+    }),
 };

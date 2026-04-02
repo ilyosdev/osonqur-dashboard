@@ -1,5 +1,6 @@
 import { Routes, Route, Navigate } from 'react-router-dom';
-import { AuthGuard, AdminGuard } from '@/lib/auth';
+import { AuthGuard } from '@/lib/auth';
+import { PlatformRoute } from '@/components/guards/PlatformRoute';
 import AuthLayout from '@/layouts/AuthLayout';
 import DashboardLayout from '@/layouts/DashboardLayout';
 import AdminLayout from '@/layouts/AdminLayout';
@@ -43,6 +44,9 @@ import OrganizationsPage from '@/pages/admin/organizations/index';
 import OrgUsersPage from '@/pages/admin/organizations/users';
 import OrgProjectsPage from '@/pages/admin/organizations/projects';
 import OrgProjectDetailPage from '@/pages/admin/organizations/project-detail';
+import PermissionGroupsPage from '@/pages/admin/permission-groups';
+import RoleTemplatesPage from '@/pages/admin/role-templates';
+import OrgRolesPage from '@/pages/admin/org-roles';
 
 function App() {
   return (
@@ -56,9 +60,9 @@ function App() {
       {/* Admin routes (SUPER_ADMIN + OPERATOR) */}
       <Route
         element={
-          <AdminGuard>
+          <PlatformRoute roles={['SUPER_ADMIN', 'OPERATOR']}>
             <AdminLayout />
-          </AdminGuard>
+          </PlatformRoute>
         }
       >
         <Route path="/admin" element={<AdminHomePage />} />
@@ -67,6 +71,9 @@ function App() {
         <Route path="/admin/organizations/:orgId/users" element={<OrgUsersPage />} />
         <Route path="/admin/organizations/:orgId/projects" element={<OrgProjectsPage />} />
         <Route path="/admin/organizations/:orgId/projects/:projectId" element={<OrgProjectDetailPage />} />
+        <Route path="/admin/permission-groups" element={<PermissionGroupsPage />} />
+        <Route path="/admin/role-templates" element={<RoleTemplatesPage />} />
+        <Route path="/admin/org-roles" element={<OrgRolesPage />} />
       </Route>
 
       {/* Dashboard routes (protected) */}
