@@ -24,7 +24,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { useAuth, hasRole } from "@/lib/auth";
+import { useAuth } from "@/lib/auth";
 
 type NavItem = {
   icon: React.ComponentType<{ className?: string }>;
@@ -60,7 +60,7 @@ const secondaryNavItems: NavItem[] = [
 export function MobileNav() {
   const location = useLocation();
   const pathname = location.pathname;
-  const { user } = useAuth();
+  const { user, pageRoutes } = useAuth();
 
   const isActive = (href: string) => {
     if (href === "/") return pathname === "/";
@@ -69,7 +69,7 @@ export function MobileNav() {
 
   const canSeeItem = (item: NavItem) => {
     if (!item.roles || item.roles.length === 0) return true;
-    return hasRole(user?.role, item.roles);
+    return pageRoutes.includes(item.href);
   };
 
   const visiblePrimaryItems = primaryNavItems.filter(canSeeItem);

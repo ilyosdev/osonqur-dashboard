@@ -43,7 +43,8 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { useApi, useMutation } from "@/hooks/use-api";
-import { useAuth, hasRole } from "@/lib/auth";
+import { useAuth } from "@/lib/auth";
+import { usePermission } from "@/hooks";
 import { Badge } from "@/components/ui/badge";
 import {
   cashRegistersApi,
@@ -68,7 +69,7 @@ export default function KassaPage() {
   const role = user?.role;
   const isReadOnly = role === "BOSS";
   const canRequestMoney = role !== "BUGALTERIYA" && !isReadOnly;
-  const isBugalteriya = hasRole(role, ["BUGALTERIYA", "DIREKTOR", "BOSS"]);
+  const isBugalteriya = usePermission('income:view');
 
   const [activeView, setActiveView] = useState<ActiveView>("balance");
   const [requestDialogOpen, setRequestDialogOpen] = useState(false);

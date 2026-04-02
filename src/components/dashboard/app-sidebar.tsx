@@ -37,7 +37,7 @@ import {
   SidebarSeparator,
 } from "@/components/ui/sidebar";
 import { Badge } from "@/components/ui/badge";
-import { useAuth, hasRole } from "@/lib/auth";
+import { useAuth } from "@/lib/auth";
 
 type NavItem = {
   title: string;
@@ -198,7 +198,7 @@ const settingsNavItems: NavItem[] = [
 export function AppSidebar() {
   const location = useLocation();
   const pathname = location.pathname;
-  const { user } = useAuth();
+  const { user, pageRoutes } = useAuth();
 
   const isActive = (url: string) => {
     if (url === "/") return pathname === "/";
@@ -207,7 +207,7 @@ export function AppSidebar() {
 
   const canSeeItem = (item: NavItem) => {
     if (!item.roles || item.roles.length === 0) return true;
-    return hasRole(user?.role, item.roles);
+    return pageRoutes.includes(item.url);
   };
 
   const visibleMainItems = mainNavItems.filter(canSeeItem);

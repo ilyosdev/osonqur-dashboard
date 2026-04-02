@@ -19,7 +19,8 @@ import { WarehouseSection } from "@/components/dashboard/warehouse-section";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { useAuth, RoleGuard, useRoleAccess } from "@/lib/auth";
+import { useAuth } from "@/lib/auth";
+import { usePermission } from "@/hooks";
 import { useApi } from "@/hooks/use-api";
 import { projectsApi, requestsApi, analyticsApi } from "@/lib/api";
 import { StatsSkeleton } from "@/components/ui/table-skeleton";
@@ -75,7 +76,10 @@ const PERIOD_LABELS: Record<Period, string> = {
 
 export default function HomePage() {
   const { user } = useAuth();
-  const canSeeActions = useRoleAccess(['DIREKTOR', 'BUGALTERIYA', 'PTO', 'SNABJENIYA', 'SKLAD', 'PRORAB']);
+  const canSeeActions = usePermission('dashboard:view');
+  const canViewFinance = usePermission('income:view');
+  const canViewStats = usePermission('statistics:view');
+  const canViewWarehouse = usePermission('warehouse:view');
   const [period, setPeriod] = useState<Period>("all");
 
   const dateRange = useMemo(() => getDateRange(period), [period]);
@@ -219,8 +223,7 @@ export default function HomePage() {
       )}
 
       {/* Debt + Koshelok Summary Cards */}
-      <RoleGuard allowedRoles={["BOSS", "DIREKTOR", "BUGALTERIYA"]}>
-        {!summaryLoading && summary && (
+      {canViewFinance && !summaryLoading && summary && (
           <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
             <Card className="animate-slide-up" style={{ animationDelay: "0.3s" }}>
               <CardContent className="pt-6">
@@ -269,7 +272,6 @@ export default function HomePage() {
             </Card>
           </div>
         )}
-      </RoleGuard>
 
       {/* Main Content Grid */}
       <div className="grid gap-6 lg:grid-cols-2">
@@ -322,8 +324,8 @@ export default function HomePage() {
           </CardContent>
         </Card>
 
-        {/* Pending Requests Section - visible to BOSS + DIREKTOR */}
-        <RoleGuard allowedRoles={["BOSS", "DIREKTOR"]}>
+        {/* Pending Requests Section - visible to those with statistics:view */}
+        {canViewStats && (
           <Card className="animate-slide-up" style={{ animationDelay: "0.3s" }}>
             <CardHeader className="flex flex-row items-center justify-between pb-2">
               <div>
@@ -372,18 +374,14 @@ export default function HomePage() {
               )}
             </CardContent>
           </Card>
-        </RoleGuard>
+        )}
       </div>
 
-      {/* Debts Section - Full width for BOSS/DIREKTOR/BUGALTERIYA */}
-      <RoleGuard allowedRoles={["BOSS", "DIREKTOR", "BUGALTERIYA"]}>
-        <DebtsSection className="animate-slide-up" />
-      </RoleGuard>
+      {/* Debts Section - Full width for finance viewers */}
+      {canViewFinance && <DebtsSection className="animate-slide-up" />}
 
-      {/* Warehouse Section - Full width for BOSS/DIREKTOR/SKLAD */}
-      <RoleGuard allowedRoles={["BOSS", "DIREKTOR", "SKLAD", "SNABJENIYA"]}>
-        <WarehouseSection className="animate-slide-up" />
-      </RoleGuard>
+      {/* Warehouse Section - Full width for warehouse viewers */}
+      {canViewWarehouse && <WarehouseSection className="animate-slide-up" />}
     </div>
   );
 }

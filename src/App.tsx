@@ -1,5 +1,6 @@
 import { Routes, Route, Navigate } from 'react-router-dom';
-import { AuthGuard, AdminGuard } from '@/lib/auth';
+import { AuthGuard } from '@/lib/auth';
+import { PlatformRoute } from '@/components/guards/PlatformRoute';
 import AuthLayout from '@/layouts/AuthLayout';
 import DashboardLayout from '@/layouts/DashboardLayout';
 import AdminLayout from '@/layouts/AdminLayout';
@@ -59,9 +60,9 @@ function App() {
       {/* Admin routes (SUPER_ADMIN + OPERATOR) */}
       <Route
         element={
-          <AdminGuard>
+          <PlatformRoute roles={['SUPER_ADMIN', 'OPERATOR']}>
             <AdminLayout />
-          </AdminGuard>
+          </PlatformRoute>
         }
       >
         <Route path="/admin" element={<AdminHomePage />} />

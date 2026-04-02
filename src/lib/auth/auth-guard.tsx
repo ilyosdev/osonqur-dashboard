@@ -1,10 +1,16 @@
 import { useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from './auth-context';
-import { canAccessRoute } from './role-guard';
+
+function canAccessByPageRoutes(pageRoutes: string[], pathname: string): boolean {
+  // Home page is always accessible
+  if (pathname === '/') return true;
+  // Check if any pageRoute is a prefix of the current pathname
+  return pageRoutes.some(route => pathname === route || pathname.startsWith(route + '/'));
+}
 
 export function AuthGuard({ children }: { children: React.ReactNode }) {
-  const { user, isAuthenticated, isLoading, isAdmin } = useAuth();
+  const { user, isAuthenticated, isLoading, isAdmin, pageRoutes } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
 
@@ -16,13 +22,13 @@ export function AuthGuard({ children }: { children: React.ReactNode }) {
     if (!isLoading && isAuthenticated && isAdmin && !location.pathname.startsWith('/admin')) {
       navigate('/admin', { replace: true });
     }
-    // Check role-based route access and redirect unauthorized users to home
+    // Check permission-based route access and redirect unauthorized users to home
     if (!isLoading && isAuthenticated && user && !isAdmin) {
-      if (!canAccessRoute(user.role, location.pathname)) {
+      if (!canAccessByPageRoutes(pageRoutes, location.pathname)) {
         navigate('/', { replace: true });
       }
     }
-  }, [isLoading, isAuthenticated, isAdmin, user, navigate, location]);
+  }, [isLoading, isAuthenticated, isAdmin, user, pageRoutes, navigate, location]);
 
   if (isLoading) {
     return (
@@ -40,7 +46,7 @@ export function AuthGuard({ children }: { children: React.ReactNode }) {
   }
 
   // Block access to unauthorized routes
-  if (user && !isAdmin && !canAccessRoute(user.role, location.pathname)) {
+  if (user && !isAdmin && !canAccessByPageRoutes(pageRoutes, location.pathname)) {
     return null;
   }
 
