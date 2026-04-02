@@ -1,4 +1,4 @@
-import { createContext, useContext, useEffect, useState, useCallback, useRef, ReactNode } from 'react';
+import { createContext, useContext, useEffect, useState, useCallback, useRef, useMemo, ReactNode } from 'react';
 import { getAccessToken, getRefreshToken, setTokens, clearTokens, isTokenExpired } from './tokens';
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:4001';
@@ -33,96 +33,72 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [permissions, setPermissions] = useState<string[]>([]);
   const [pageRoutes, setPageRoutes] = useState<string[]>([]);
   const [isLoading, setIsLoading] = useState(true);
-  const permissionsRefreshRef = useRef<Promise<void> | null>(null);
+  const permissionsLoadedRef = useRef(false);
 
   const fetchUserProfile = async (token: string): Promise<User> => {
     const response = await fetch(`${API_URL}/vendor/auth/profile`, {
-      headers: {
-        Authorization: `Bearer ${token}`,
-      },
+      headers: { Authorization: `Bearer ${token}` },
     });
-
-    if (!response.ok) {
-      throw new Error('Failed to fetch user profile');
-    }
-
+    if (!response.ok) throw new Error('Failed to fetch user profile');
     const data = await response.json();
     return data.user || data;
   };
 
   /**
-   * Fetch permissions from /vendor/auth/me.
-   * Returns { permissions: string[], pageRoutes: string[], user? }
+   * Fetch permissions from /vendor/auth/me — called ONCE on login/load.
+   * No auto-retry, no monkey-patching.
    */
   const fetchPermissions = useCallback(async (token: string) => {
     try {
       const response = await fetch(`${API_URL}/vendor/auth/me`, {
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
+        headers: { Authorization: `Bearer ${token}` },
       });
 
       if (!response.ok) {
-        // Non-fatal: keep old permissions, log warning
         console.warn('Failed to fetch permissions from /auth/me:', response.status);
         return;
       }
 
       const data = await response.json();
       if (Array.isArray(data.permissions)) {
-        setPermissions(data.permissions);
+        setPermissions(prev => {
+          const newPerms = data.permissions as string[];
+          // Only update if actually different (prevents re-render cascade)
+          if (prev.length === newPerms.length && prev.every((p, i) => p === newPerms[i])) return prev;
+          return newPerms;
+        });
       }
       if (Array.isArray(data.pageRoutes)) {
-        setPageRoutes(data.pageRoutes);
+        setPageRoutes(prev => {
+          const newRoutes = data.pageRoutes as string[];
+          if (prev.length === newRoutes.length && prev.every((r, i) => r === newRoutes[i])) return prev;
+          return newRoutes;
+        });
       }
-      // If /auth/me returns updated user fields, merge them
       if (data.user) {
         setUser(prev => prev ? { ...prev, ...data.user } : data.user);
       }
+      permissionsLoadedRef.current = true;
     } catch (err) {
       console.warn('Error fetching permissions:', err);
     }
   }, []);
 
-  /**
-   * Refresh permissions (deduplicated -- concurrent calls share one promise).
-   * Called automatically on 403 responses.
-   */
-  const refreshPermissions = useCallback(async () => {
-    const token = getAccessToken();
-    if (!token) return;
-
-    if (!permissionsRefreshRef.current) {
-      permissionsRefreshRef.current = fetchPermissions(token).finally(() => {
-        permissionsRefreshRef.current = null;
-      });
-    }
-    return permissionsRefreshRef.current;
-  }, [fetchPermissions]);
-
   const refreshToken = async (): Promise<string | null> => {
     const refresh = getRefreshToken();
     if (!refresh) return null;
-
     try {
       const response = await fetch(`${API_URL}/vendor/auth/refresh`, {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ refreshToken: refresh }),
       });
-
-      if (!response.ok) {
-        return null;
-      }
-
+      if (!response.ok) return null;
       const data = await response.json();
       if (data.accessToken && data.refreshToken) {
         setTokens(data.accessToken, data.refreshToken);
         return data.accessToken;
       }
-
       return null;
     } catch {
       return null;
@@ -133,7 +109,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setIsLoading(true);
     try {
       let token = getAccessToken();
-
       if (!token) {
         setUser(null);
         setPermissions([]);
@@ -141,9 +116,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         return;
       }
 
-      const expired = isTokenExpired(token);
-
-      if (expired) {
+      if (isTokenExpired(token)) {
         token = await refreshToken();
         if (!token) {
           clearTokens();
@@ -154,7 +127,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         }
       }
 
-      // Fetch profile and permissions in parallel
       const [userData] = await Promise.all([
         fetchUserProfile(token),
         fetchPermissions(token),
@@ -173,9 +145,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const login = async (phone: string, password: string) => {
     const response = await fetch(`${API_URL}/vendor/auth/login`, {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
+      headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ login: phone, password }),
     });
 
@@ -192,8 +162,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
 
     setTokens(tokens.accessToken, tokens.refreshToken);
-
-    // Fetch permissions immediately after login
     await fetchPermissions(tokens.accessToken);
 
     if (data.user) {
@@ -209,6 +177,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setUser(null);
     setPermissions([]);
     setPageRoutes([]);
+    permissionsLoadedRef.current = false;
   };
 
   const refreshAuth = async () => {
@@ -219,41 +188,19 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return permissions.includes(key);
   }, [permissions]);
 
-  // Listen for 403 responses globally to auto-refresh permissions.
-  // We patch window.fetch once, on mount.
-  // Includes cooldown to prevent infinite retry loops.
-  useEffect(() => {
-    const originalFetch = window.fetch;
-    let lastRefreshTime = 0;
-    const REFRESH_COOLDOWN_MS = 10_000; // 10 seconds between refreshes
-
-    window.fetch = async (...args: Parameters<typeof fetch>) => {
-      const response = await originalFetch(...args);
-      if (response.status === 403) {
-        const url = typeof args[0] === 'string' ? args[0] : (args[0] as Request)?.url || '';
-        // Don't retry on /auth/me itself (prevents infinite loop)
-        if (!url.includes('/auth/me')) {
-          const now = Date.now();
-          if (now - lastRefreshTime > REFRESH_COOLDOWN_MS) {
-            lastRefreshTime = now;
-            refreshPermissions();
-          }
-        }
-      }
-      return response;
-    };
-    return () => {
-      window.fetch = originalFetch;
-    };
-  }, [refreshPermissions]);
+  // NO window.fetch monkey-patching. Permissions are loaded once on login/page load.
+  // If permissions change, user must re-login or manually refresh.
 
   useEffect(() => {
     loadUser();
   }, []);
 
-  const isAdmin = !!user && (user.role === 'SUPER_ADMIN' || user.role === 'OPERATOR' || user.role === 'ADMIN');
+  const isAdmin = !!user && (
+    user.role === 'SUPER_ADMIN' || user.role === 'OPERATOR' || user.role === 'ADMIN' ||
+    user.platformRole === 'SUPER_ADMIN' || user.platformRole === 'OPERATOR'
+  );
 
-  const value: AuthContextType = {
+  const value = useMemo<AuthContextType>(() => ({
     user,
     isLoading,
     isAuthenticated: !!user,
@@ -264,7 +211,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     login,
     logout,
     refreshAuth,
-  };
+  }), [user, isLoading, isAdmin, permissions, pageRoutes, hasPermission]);
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }
