@@ -64,7 +64,7 @@ const SMETA_TYPE_LABELS: Record<SmetaType, string> = {
 export default function SmetaDetailPage() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
-  const { currentRole, user } = useAuth();
+  const { user } = useAuth();
   const [smeta, setSmeta] = useState<Smeta | null>(null);
   const [items, setItems] = useState<SmetaItem[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -87,8 +87,8 @@ export default function SmetaDetailPage() {
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
 
-  const canEditProgress = ["PRORAB", "DIREKTOR", "BOSS"].includes(currentRole ?? user?.role ?? "");
-  const canUpload = ["DIREKTOR", "BOSS", "PTO", "OPERATOR", "ADMIN"].includes(currentRole ?? user?.role ?? "");
+  const canEditProgress = ["PRORAB", "DIREKTOR", "BOSS"].includes(user?.role ?? "");
+  const canUpload = ["DIREKTOR", "BOSS", "PTO", "OPERATOR", "ADMIN"].includes(user?.role ?? "");
 
   const fetchData = useCallback(async () => {
     if (!id) return;

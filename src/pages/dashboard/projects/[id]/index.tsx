@@ -103,7 +103,7 @@ function formatNumberInput(value: number): string {
 export default function ProjectDetailPage() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
-  const { currentRole, user } = useAuth();
+  const { user } = useAuth();
   const [project, setProject] = useState<Project | null>(null);
   const [telegramGroup, setTelegramGroup] = useState<TelegramGroup | null>(null);
   const [smetas, setSmetas] = useState<Smeta[]>([]);
@@ -135,8 +135,8 @@ export default function ProjectDetailPage() {
   const [isImporting, setIsImporting] = useState(false);
   const [importError, setImportError] = useState<string | null>(null);
 
-  const canUpload = ["DIREKTOR", "BOSS", "PTO", "OPERATOR"].includes(currentRole ?? user?.role ?? "");
-  const canCreate = ["DIREKTOR", "PTO"].includes(currentRole ?? user?.role ?? "");
+  const canUpload = ["DIREKTOR", "BOSS", "PTO", "OPERATOR"].includes(user?.role ?? "");
+  const canCreate = ["DIREKTOR", "PTO"].includes(user?.role ?? "");
 
   const fetchSmetas = useCallback(async () => {
     if (!id) return;

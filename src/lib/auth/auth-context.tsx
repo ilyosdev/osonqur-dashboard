@@ -18,17 +18,12 @@ interface AuthContextType {
   isLoading: boolean;
   isAuthenticated: boolean;
   isAdmin: boolean;
-  currentRole: string | null;
   permissions: string[];
   pageRoutes: string[];
   hasPermission: (key: string) => boolean;
-  /** @deprecated Use hasPermission() or PermissionRoute instead */
-  allowedRoles: string[];
   login: (phone: string, password: string) => Promise<void>;
   logout: () => void;
   refreshAuth: () => Promise<void>;
-  /** @deprecated No longer needed -- 1 user = 1 role */
-  switchRole: (role: string) => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -220,15 +215,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     await loadUser();
   };
 
-  /**
-   * @deprecated No longer needed -- 1 user = 1 role. Kept for backward compatibility.
-   */
-  const switchRole = async (_role: string) => {
-    console.warn('switchRole() is deprecated. Each user now has a single role.');
-    // Refresh permissions to stay in sync
-    await refreshPermissions();
-  };
-
   const hasPermission = useCallback((key: string): boolean => {
     return permissions.includes(key);
   }, [permissions]);
@@ -255,24 +241,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const isAdmin = !!user && (user.role === 'SUPER_ADMIN' || user.role === 'OPERATOR' || user.role === 'ADMIN');
-  const currentRole = user?.role ?? null;
-  // Backward compatibility: derive allowedRoles from current role
-  const allowedRoles = user?.role ? [user.role] : [];
 
   const value: AuthContextType = {
     user,
     isLoading,
     isAuthenticated: !!user,
     isAdmin,
-    currentRole,
     permissions,
     pageRoutes,
     hasPermission,
-    allowedRoles,
     login,
     logout,
     refreshAuth,
-    switchRole,
   };
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

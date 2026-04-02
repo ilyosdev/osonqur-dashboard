@@ -198,7 +198,7 @@ const settingsNavItems: NavItem[] = [
 export function AppSidebar() {
   const location = useLocation();
   const pathname = location.pathname;
-  const { user, currentRole } = useAuth();
+  const { user } = useAuth();
 
   const isActive = (url: string) => {
     if (url === "/") return pathname === "/";
@@ -207,8 +207,7 @@ export function AppSidebar() {
 
   const canSeeItem = (item: NavItem) => {
     if (!item.roles || item.roles.length === 0) return true;
-    // Use currentRole for visibility - this respects role switching
-    return hasRole(currentRole ?? user?.role, item.roles);
+    return hasRole(user?.role, item.roles);
   };
 
   const visibleMainItems = mainNavItems.filter(canSeeItem);
