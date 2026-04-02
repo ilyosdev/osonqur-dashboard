@@ -1,34 +1,14 @@
-import { useEffect } from 'react';
-import { useNavigate, useLocation } from 'react-router-dom';
+import { Navigate, useLocation } from 'react-router-dom';
 import { useAuth } from './auth-context';
 
 function canAccessByPageRoutes(pageRoutes: string[], pathname: string): boolean {
-  // Home page is always accessible
   if (pathname === '/') return true;
-  // Check if any pageRoute is a prefix of the current pathname
   return pageRoutes.some(route => pathname === route || pathname.startsWith(route + '/'));
 }
 
 export function AuthGuard({ children }: { children: React.ReactNode }) {
   const { user, isAuthenticated, isLoading, isAdmin, pageRoutes } = useAuth();
-  const navigate = useNavigate();
   const location = useLocation();
-
-  useEffect(() => {
-    if (!isLoading && !isAuthenticated) {
-      navigate('/login', { state: { from: location }, replace: true });
-    }
-    // Redirect admin users to /admin if they try to access vendor routes
-    if (!isLoading && isAuthenticated && isAdmin && !location.pathname.startsWith('/admin')) {
-      navigate('/admin', { replace: true });
-    }
-    // Check permission-based route access and redirect unauthorized users to home
-    if (!isLoading && isAuthenticated && user && !isAdmin) {
-      if (!canAccessByPageRoutes(pageRoutes, location.pathname)) {
-        navigate('/', { replace: true });
-      }
-    }
-  }, [isLoading, isAuthenticated, isAdmin, user, pageRoutes, navigate, location]);
 
   if (isLoading) {
     return (
@@ -42,17 +22,17 @@ export function AuthGuard({ children }: { children: React.ReactNode }) {
   }
 
   if (!isAuthenticated) {
-    return null;
+    return <Navigate to="/login" state={{ from: location }} replace />;
   }
 
-  // Block admin users from rendering vendor pages (redirect happens in useEffect)
+  // Admin users go to /admin, not vendor dashboard
   if (isAdmin && !location.pathname.startsWith('/admin')) {
-    return null;
+    return <Navigate to="/admin" replace />;
   }
 
-  // Block access to unauthorized routes
+  // Non-admin: block unauthorized routes
   if (user && !isAdmin && !canAccessByPageRoutes(pageRoutes, location.pathname)) {
-    return null;
+    return <Navigate to="/" replace />;
   }
 
   return <>{children}</>;
