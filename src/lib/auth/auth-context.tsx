@@ -221,13 +221,24 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   // Listen for 403 responses globally to auto-refresh permissions.
   // We patch window.fetch once, on mount.
+  // Includes cooldown to prevent infinite retry loops.
   useEffect(() => {
     const originalFetch = window.fetch;
+    let lastRefreshTime = 0;
+    const REFRESH_COOLDOWN_MS = 10_000; // 10 seconds between refreshes
+
     window.fetch = async (...args: Parameters<typeof fetch>) => {
       const response = await originalFetch(...args);
       if (response.status === 403) {
-        // Auto-refresh permissions on 403 (fire-and-forget)
-        refreshPermissions();
+        const url = typeof args[0] === 'string' ? args[0] : (args[0] as Request)?.url || '';
+        // Don't retry on /auth/me itself (prevents infinite loop)
+        if (!url.includes('/auth/me')) {
+          const now = Date.now();
+          if (now - lastRefreshTime > REFRESH_COOLDOWN_MS) {
+            lastRefreshTime = now;
+            refreshPermissions();
+          }
+        }
       }
       return response;
     };
