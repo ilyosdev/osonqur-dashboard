@@ -85,7 +85,7 @@ export default function OrgRolesPage() {
     setError("");
     try {
       const [orgsData, templatesData, groupsData, permsData] = await Promise.all([
-        adminApi.getOrganizations({ limit: 1000 }),
+        adminApi.getOrganizations({ limit: 100 }),
         adminApi.getRoleTemplates(),
         adminApi.getPermissionGroups(),
         adminApi.getPermissions(),

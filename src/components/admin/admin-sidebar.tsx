@@ -6,6 +6,9 @@ import {
   UserCog,
   Users,
   HardHat,
+  Shield,
+  Layers,
+  KeyRound,
 } from "lucide-react";
 import {
   Sidebar,
@@ -52,6 +55,27 @@ const managementNavItems: NavItem[] = [
   },
 ];
 
+const rolePermissionNavItems: NavItem[] = [
+  {
+    title: "Permission guruhlar",
+    url: "/admin/permission-groups",
+    icon: KeyRound,
+    roles: ["SUPER_ADMIN"],
+  },
+  {
+    title: "Rol shablonlar",
+    url: "/admin/role-templates",
+    icon: Shield,
+    roles: ["SUPER_ADMIN"],
+  },
+  {
+    title: "Tashkilot rollari",
+    url: "/admin/org-roles",
+    icon: Layers,
+    roles: ["SUPER_ADMIN", "OPERATOR"],
+  },
+];
+
 export function AdminSidebar() {
   const location = useLocation();
   const pathname = location.pathname;
@@ -65,10 +89,12 @@ export function AdminSidebar() {
 
   const canSeeItem = (item: NavItem) => {
     if (!item.roles || item.roles.length === 0) return true;
-    return item.roles.includes(user?.role || "");
+    const userRole = user?.platformRole || user?.role || "";
+    return item.roles.includes(userRole);
   };
 
   const visibleManagement = managementNavItems.filter(canSeeItem);
+  const visibleRolePermission = rolePermissionNavItems.filter(canSeeItem);
 
   // Detect active org from URL
   const activeOrgId = orgId || pathname.match(/\/admin\/organizations\/([^/]+)/)?.[1];
@@ -147,6 +173,36 @@ export function AdminSidebar() {
             </SidebarMenu>
           </SidebarGroupContent>
         </SidebarGroup>
+
+        {visibleRolePermission.length > 0 && (
+          <>
+            <SidebarSeparator className="my-2" />
+            <SidebarGroup>
+              <SidebarGroupLabel className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
+                Rollar va ruxsatlar
+              </SidebarGroupLabel>
+              <SidebarGroupContent>
+                <SidebarMenu>
+                  {visibleRolePermission.map((item) => (
+                    <SidebarMenuItem key={item.title}>
+                      <SidebarMenuButton
+                        asChild
+                        isActive={isActive(item.url)}
+                        tooltip={item.title}
+                        className="transition-all duration-200"
+                      >
+                        <Link to={item.url}>
+                          <item.icon className="h-4 w-4" />
+                          <span>{item.title}</span>
+                        </Link>
+                      </SidebarMenuButton>
+                    </SidebarMenuItem>
+                  ))}
+                </SidebarMenu>
+              </SidebarGroupContent>
+            </SidebarGroup>
+          </>
+        )}
 
         {(activeOrgId || (isAdminRole && adminOrgId)) && (
           <>
