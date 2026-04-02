@@ -24,14 +24,16 @@ export function useApi<T>(
   });
 
   const mountedRef = useRef(true);
+  const fetcherRef = useRef(fetcher);
+  fetcherRef.current = fetcher; // Always keep latest fetcher without triggering re-renders
 
   const refetch = useCallback(async () => {
     if (!mountedRef.current) return;
-    
+
     setState((prev) => ({ ...prev, loading: true, error: null }));
-    
+
     try {
-      const result = await fetcher();
+      const result = await fetcherRef.current();
       if (mountedRef.current) {
         setState({ data: result, loading: false, error: null });
       }
@@ -40,7 +42,7 @@ export function useApi<T>(
         setState({ data: null, loading: false, error: err as Error });
       }
     }
-  }, [fetcher]);
+  }, []); // No dependencies — uses ref
 
   useEffect(() => {
     mountedRef.current = true;
@@ -50,6 +52,7 @@ export function useApi<T>(
     return () => {
       mountedRef.current = false;
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [...deps, enabled]);
 
   return { ...state, refetch };
@@ -68,12 +71,15 @@ export function useMutation<TData, TVariables>(
     error: null,
   });
 
+  const mutationFnRef = useRef(mutationFn);
+  mutationFnRef.current = mutationFn;
+
   const mutate = useCallback(
     async (variables: TVariables) => {
       setState({ data: null, loading: true, error: null });
-      
+
       try {
-        const result = await mutationFn(variables);
+        const result = await mutationFnRef.current(variables);
         setState({ data: result, loading: false, error: null });
         return result;
       } catch (err) {
@@ -81,7 +87,7 @@ export function useMutation<TData, TVariables>(
         throw err;
       }
     },
-    [mutationFn]
+    []
   );
 
   return { ...state, mutate };
