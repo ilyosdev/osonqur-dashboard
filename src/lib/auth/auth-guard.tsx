@@ -45,6 +45,11 @@ export function AuthGuard({ children }: { children: React.ReactNode }) {
     return null;
   }
 
+  // Block admin users from rendering vendor pages (redirect happens in useEffect)
+  if (isAdmin && !location.pathname.startsWith('/admin')) {
+    return null;
+  }
+
   // Block access to unauthorized routes
   if (user && !isAdmin && !canAccessByPageRoutes(pageRoutes, location.pathname)) {
     return null;
