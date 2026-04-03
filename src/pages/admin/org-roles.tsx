@@ -151,7 +151,7 @@ export default function OrgRolesPage() {
 
   const openManageDialog = (role: AdminOrgRole) => {
     setSelectedRole(role);
-    setSelectedPermIds(new Set((role.permissions || []).map((p) => p.id)));
+    setSelectedPermIds(new Set((role.permissions || []).map((p) => p.permissionId || p.permission?.id || p.id)));
     setSelectedAuthorityIds(new Set(role.canManageRoleIds || []));
     setExpandedGroups(new Set((permissionGroups || []).map((g) => g.id)));
     setManageDialogOpen(true);
@@ -295,7 +295,7 @@ export default function OrgRolesPage() {
   };
 
   const toggleGroupAll = (group: AdminPermissionGroup) => {
-    const groupPermIds = (group.permissions || []).map((p) => p.id);
+    const groupPermIds = (group.permissions || []).map((p) => p.permissionId || p.permission?.id || p.id);
     const allSelected = groupPermIds.every((id) => selectedPermIds.has(id));
     setSelectedPermIds((prev) => {
       const next = new Set(prev);
@@ -327,7 +327,7 @@ export default function OrgRolesPage() {
   const selectedOrg = organizations.find((o) => o.id === selectedOrgId);
 
   // Permissions not in any group
-  const groupedPermIds = new Set((permissionGroups || []).flatMap((g) => (g.permissions || []).map((p) => p.id)));
+  const groupedPermIds = new Set((permissionGroups || []).flatMap((g) => (g.permissions || []).map((p) => p.permissionId || p.permission?.id || p.id)));
   const ungroupedPermissions = (allPermissions || []).filter((p) => !groupedPermIds.has(p.id));
 
   return (
@@ -707,7 +707,7 @@ export default function OrgRolesPage() {
                   .sort((a, b) => a.sortOrder - b.sortOrder)
                   .map((group) => {
                     const isExpanded = expandedGroups.has(group.id);
-                    const groupPermIdsList = (group.permissions || []).map((p) => p.id);
+                    const groupPermIdsList = (group.permissions || []).map((p) => p.permissionId || p.permission?.id || p.id);
                     const selectedCount = groupPermIdsList.filter((id) => selectedPermIds.has(id)).length;
                     const allSelected = groupPermIdsList.length > 0 && selectedCount === groupPermIdsList.length;
 
@@ -739,26 +739,29 @@ export default function OrgRolesPage() {
                         </div>
                         {isExpanded && (group.permissions || []).length > 0 && (
                           <div className="border-t px-3 pb-3 pt-2 space-y-1">
-                            {(group.permissions || []).map((perm) => (
+                            {(group.permissions || []).map((perm) => {
+                              const permId = perm.permissionId || perm.permission?.id || perm.id;
+                              return (
                               <div
-                                key={perm.id}
+                                key={permId}
                                 className="flex items-center gap-3 py-1.5 px-2 rounded hover:bg-muted/30 transition-colors"
                               >
                                 <Checkbox
-                                  checked={selectedPermIds.has(perm.id)}
-                                  onCheckedChange={() => togglePermission(perm.id)}
+                                  checked={selectedPermIds.has(permId)}
+                                  onCheckedChange={() => togglePermission(permId)}
                                 />
                                 <div className="flex-1 min-w-0">
-                                  <span className="text-sm">{perm.name}</span>
+                                  <span className="text-sm">{perm.permission?.name || perm.name}</span>
                                   <Badge variant="outline" className="text-xs font-mono ml-2">
-                                    {perm.key}
+                                    {perm.permission?.key || perm.key}
                                   </Badge>
-                                  {perm.description && (
-                                    <p className="text-xs text-muted-foreground">{perm.description}</p>
+                                  {(perm.permission?.description || perm.description) && (
+                                    <p className="text-xs text-muted-foreground">{perm.permission?.description || perm.description}</p>
                                   )}
                                 </div>
                               </div>
-                            ))}
+                              );
+                            })}
                           </div>
                         )}
                       </div>

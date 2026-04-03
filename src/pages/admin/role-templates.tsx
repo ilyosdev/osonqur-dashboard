@@ -115,7 +115,7 @@ export default function RoleTemplatesPage() {
 
   const openManageDialog = (t: AdminRoleTemplate) => {
     setSelectedTemplate(t);
-    setSelectedPermIds(new Set((t.permissions || []).map((p) => p.id)));
+    setSelectedPermIds(new Set((t.permissions || []).map((p) => p.permissionId || p.permission?.id || p.id)));
     setSelectedAuthorityIds(new Set(t.canManageTemplateIds || []));
     // Expand all groups by default
     setExpandedGroups(new Set((permissionGroups || []).map((g) => g.id)));
@@ -246,7 +246,7 @@ export default function RoleTemplatesPage() {
   };
 
   const toggleGroupAll = (group: AdminPermissionGroup) => {
-    const groupPermIds = (group.permissions || []).map((p) => p.id);
+    const groupPermIds = (group.permissions || []).map((p) => p.permissionId || p.permission?.id || p.id);
     const allSelected = groupPermIds.every((id) => selectedPermIds.has(id));
     setSelectedPermIds((prev) => {
       const next = new Set(prev);
@@ -285,7 +285,7 @@ export default function RoleTemplatesPage() {
   );
 
   // Permissions not in any group — show as "Boshqa" (Other) section
-  const groupedPermIds = new Set((permissionGroups || []).flatMap((g) => (g.permissions || []).map((p) => p.id)));
+  const groupedPermIds = new Set((permissionGroups || []).flatMap((g) => (g.permissions || []).map((p) => p.permissionId || p.permission?.id || p.id)));
   const ungroupedPermissions = (allPermissions || []).filter((p) => !groupedPermIds.has(p.id));
 
   return (
@@ -600,7 +600,7 @@ export default function RoleTemplatesPage() {
                   .sort((a, b) => a.sortOrder - b.sortOrder)
                   .map((group) => {
                     const isExpanded = expandedGroups.has(group.id);
-                    const groupPermIds2 = (group.permissions || []).map((p) => p.id);
+                    const groupPermIds2 = (group.permissions || []).map((p) => p.permissionId || p.permission?.id || p.id);
                     const selectedCount = groupPermIds2.filter((id) => selectedPermIds.has(id)).length;
                     const allSelected = groupPermIds2.length > 0 && selectedCount === groupPermIds2.length;
 
@@ -635,26 +635,29 @@ export default function RoleTemplatesPage() {
                         </div>
                         {isExpanded && (group.permissions || []).length > 0 && (
                           <div className="border-t px-3 pb-3 pt-2 space-y-1">
-                            {(group.permissions || []).map((perm) => (
+                            {(group.permissions || []).map((perm) => {
+                              const permId = perm.permissionId || perm.permission?.id || perm.id;
+                              return (
                               <div
-                                key={perm.id}
+                                key={permId}
                                 className="flex items-center gap-3 py-1.5 px-2 rounded hover:bg-muted/30 transition-colors"
                               >
                                 <Checkbox
-                                  checked={selectedPermIds.has(perm.id)}
-                                  onCheckedChange={() => togglePermission(perm.id)}
+                                  checked={selectedPermIds.has(permId)}
+                                  onCheckedChange={() => togglePermission(permId)}
                                 />
                                 <div className="flex-1 min-w-0">
-                                  <span className="text-sm">{perm.name}</span>
+                                  <span className="text-sm">{perm.permission?.name || perm.name}</span>
                                   <Badge variant="outline" className="text-xs font-mono ml-2">
-                                    {perm.key}
+                                    {perm.permission?.key || perm.key}
                                   </Badge>
-                                  {perm.description && (
-                                    <p className="text-xs text-muted-foreground">{perm.description}</p>
+                                  {(perm.permission?.description || perm.description) && (
+                                    <p className="text-xs text-muted-foreground">{perm.permission?.description || perm.description}</p>
                                   )}
                                 </div>
                               </div>
-                            ))}
+                              );
+                            })}
                           </div>
                         )}
                       </div>
