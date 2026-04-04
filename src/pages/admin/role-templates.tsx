@@ -116,7 +116,7 @@ export default function RoleTemplatesPage() {
   const openManageDialog = (t: AdminRoleTemplate) => {
     setSelectedTemplate(t);
     setSelectedPermIds(new Set((t.permissions || []).map((p) => p.permissionId || p.permission?.id || p.id)));
-    setSelectedAuthorityIds(new Set(t.canManageTemplateIds || []));
+    setSelectedAuthorityIds(new Set((t.canManage || []).map((a) => a.canManageId || a.managed?.id || '')));
     // Expand all groups by default
     setExpandedGroups(new Set((permissionGroups || []).map((g) => g.id)));
     setManageDialogOpen(true);

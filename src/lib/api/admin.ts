@@ -147,7 +147,7 @@ export interface AdminRoleTemplate {
   isSystem: boolean;
   isActive: boolean;
   permissions: AdminPermission[];
-  canManageTemplateIds: string[];
+  canManage?: { canManageId: string; managed?: { id: string; name: string } }[];
   createdAt: string;
   updatedAt: string;
 }
@@ -399,10 +399,10 @@ export const adminApi = {
       body: JSON.stringify({ permissionIds }),
     }),
 
-  updateRoleTemplateAuthority: (id: string, canManageTemplateIds: string[]) =>
+  updateRoleTemplateAuthority: (id: string, canManageIds: string[]) =>
     apiClient<{ success: boolean }>(`/admin/role-templates/${id}/authority`, {
       method: 'PUT',
-      body: JSON.stringify({ canManageTemplateIds }),
+      body: JSON.stringify({ canManageIds }),
     }),
 
   syncRoleTemplate: (id: string, orgIds: string[]) =>
