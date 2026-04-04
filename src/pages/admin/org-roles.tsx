@@ -149,12 +149,18 @@ export default function OrgRolesPage() {
     setDeleteDialogOpen(true);
   };
 
-  const openManageDialog = (role: AdminOrgRole) => {
+  const openManageDialog = async (role: AdminOrgRole) => {
     setSelectedRole(role);
-    setSelectedPermIds(new Set((role.permissions || []).map((p) => p.permissionId || p.permission?.id || p.id)));
-    setSelectedAuthorityIds(new Set((role.canManage || []).map((a) => a.canManageId || a.managed?.id || '')));
     setExpandedGroups(new Set((permissionGroups || []).map((g) => g.id)));
     setManageDialogOpen(true);
+    try {
+      const details = await adminApi.getOrgRoleDetails(selectedOrgId, role.id);
+      setSelectedPermIds(new Set((details.permissions || []).map((p) => p.permissionId || p.permission?.id || p.id)));
+      setSelectedAuthorityIds(new Set((details.canManage || []).map((a) => a.canManageId || a.managed?.id || '')));
+    } catch {
+      setSelectedPermIds(new Set());
+      setSelectedAuthorityIds(new Set());
+    }
   };
 
   const openApplyTemplateDialog = () => {

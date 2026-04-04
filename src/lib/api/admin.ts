@@ -378,6 +378,9 @@ export const adminApi = {
   getRoleTemplates: () =>
     apiClient<AdminRoleTemplate[]>('/admin/role-templates', { method: 'GET' }),
 
+  getRoleTemplateDetails: (id: string) =>
+    apiClient<AdminRoleTemplate>(`/admin/role-templates/${id}`, { method: 'GET' }),
+
   createRoleTemplate: (data: { name: string; description?: string }) =>
     apiClient<AdminRoleTemplate>('/admin/role-templates', {
       method: 'POST',
@@ -414,6 +417,9 @@ export const adminApi = {
   // ─── Org Roles ─────────────────────────────────────
   getOrgRoles: (orgId: string) =>
     apiClient<AdminOrgRole[]>(`/admin/orgs/${orgId}/roles`, { method: 'GET' }),
+
+  getOrgRoleDetails: (orgId: string, roleId: string) =>
+    apiClient<AdminOrgRole>(`/admin/orgs/${orgId}/roles/${roleId}`, { method: 'GET' }),
 
   createOrgRole: (orgId: string, data: { name: string; description?: string }) =>
     apiClient<AdminOrgRole>(`/admin/orgs/${orgId}/roles`, {

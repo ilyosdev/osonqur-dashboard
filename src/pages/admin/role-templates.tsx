@@ -113,13 +113,18 @@ export default function RoleTemplatesPage() {
     setDeleteDialogOpen(true);
   };
 
-  const openManageDialog = (t: AdminRoleTemplate) => {
+  const openManageDialog = async (t: AdminRoleTemplate) => {
     setSelectedTemplate(t);
-    setSelectedPermIds(new Set((t.permissions || []).map((p) => p.permissionId || p.permission?.id || p.id)));
-    setSelectedAuthorityIds(new Set((t.canManage || []).map((a) => a.canManageId || a.managed?.id || '')));
-    // Expand all groups by default
     setExpandedGroups(new Set((permissionGroups || []).map((g) => g.id)));
     setManageDialogOpen(true);
+    try {
+      const details = await adminApi.getRoleTemplateDetails(t.id);
+      setSelectedPermIds(new Set((details.permissions || []).map((p) => p.permissionId || p.permission?.id || p.id)));
+      setSelectedAuthorityIds(new Set((details.canManage || []).map((a) => a.canManageId || a.managed?.id || '')));
+    } catch {
+      setSelectedPermIds(new Set());
+      setSelectedAuthorityIds(new Set());
+    }
   };
 
   const openSyncDialog = async (t: AdminRoleTemplate) => {
