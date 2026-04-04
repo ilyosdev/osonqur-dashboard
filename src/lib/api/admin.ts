@@ -162,7 +162,7 @@ export interface AdminOrgRole {
   isActive: boolean;
   userCount: number;
   permissions: AdminPermission[];
-  canManageRoleIds: string[];
+  canManage?: { canManageId: string; managed?: { id: string; name: string } }[];
   createdAt: string;
   updatedAt: string;
 }
@@ -436,10 +436,10 @@ export const adminApi = {
       body: JSON.stringify({ permissionIds }),
     }),
 
-  updateOrgRoleAuthority: (orgId: string, roleId: string, canManageRoleIds: string[]) =>
+  updateOrgRoleAuthority: (orgId: string, roleId: string, canManageIds: string[]) =>
     apiClient<{ success: boolean }>(`/admin/orgs/${orgId}/roles/${roleId}/authority`, {
       method: 'PUT',
-      body: JSON.stringify({ canManageRoleIds }),
+      body: JSON.stringify({ canManageIds }),
     }),
 
   applyTemplateToOrg: (orgId: string, templateId: string) =>

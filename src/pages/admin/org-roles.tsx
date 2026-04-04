@@ -152,7 +152,7 @@ export default function OrgRolesPage() {
   const openManageDialog = (role: AdminOrgRole) => {
     setSelectedRole(role);
     setSelectedPermIds(new Set((role.permissions || []).map((p) => p.permissionId || p.permission?.id || p.id)));
-    setSelectedAuthorityIds(new Set(role.canManageRoleIds || []));
+    setSelectedAuthorityIds(new Set((role.canManage || []).map((a) => a.canManageId || a.managed?.id || '')));
     setExpandedGroups(new Set((permissionGroups || []).map((g) => g.id)));
     setManageDialogOpen(true);
   };
