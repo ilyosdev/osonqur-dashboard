@@ -207,7 +207,8 @@ export function AppSidebar() {
 
   const canSeeItem = (item: NavItem) => {
     if (!item.roles || item.roles.length === 0) return true;
-    return pageRoutes.includes(item.url);
+    // Match both /projects and /dashboard/projects formats
+    return pageRoutes.includes(item.url) || pageRoutes.includes('/dashboard' + item.url);
   };
 
   const visibleMainItems = mainNavItems.filter(canSeeItem);
