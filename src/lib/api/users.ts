@@ -7,6 +7,14 @@ export interface UserProject {
   budget: number;
 }
 
+export interface OrgRole {
+  id: string;
+  name: string;
+  description?: string;
+  isActive: boolean;
+  sortOrder: number;
+}
+
 export interface User {
   id: string;
   name: string;
@@ -15,6 +23,7 @@ export interface User {
   telegramId?: string;
   role: string;
   allowedRoles?: string[];
+  orgRoleId?: string;
   isActive: boolean;
   createdAt: string;
   updatedAt: string;
@@ -29,14 +38,17 @@ export interface CreateUserRequest {
   telegramId?: string;
   role?: string;
   allowedRoles?: string[];
+  orgRoleId?: string;
 }
 
 export interface UpdateUserRequest {
   name?: string;
   phone?: string;
   email?: string;
+  password?: string;
   role?: string;
   allowedRoles?: string[];
+  orgRoleId?: string;
   isActive?: boolean;
 }
 
@@ -103,5 +115,10 @@ export const usersApi = {
   removeFromProject: (userId: string, projectId: string) =>
     apiClient<{ success: boolean }>(`/vendor/users/${userId}/projects/${projectId}`, {
       method: 'DELETE',
+    }),
+
+  getOrgRoles: () =>
+    apiClient<OrgRole[]>('/vendor/users/roles', {
+      method: 'GET',
     }),
 };

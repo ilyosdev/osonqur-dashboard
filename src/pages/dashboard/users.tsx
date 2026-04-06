@@ -7,7 +7,7 @@ import {
   Phone,
   MessageCircle,
   UserPlus,
-  Shield,
+
   Loader2,
   AlertCircle,
   RefreshCw,
@@ -62,36 +62,21 @@ import {
 } from "@/components/ui/tooltip";
 import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
-import { usersApi, User, UserProject, CreateUserRequest, UpdateUserRequest, GetUsersParams } from "@/lib/api/users";
+import { usersApi, User, UserProject, CreateUserRequest, UpdateUserRequest, GetUsersParams, OrgRole } from "@/lib/api/users";
 import { projectsApi, Project } from "@/lib/api/projects";
 
-const roles = [
-  { value: "ADMIN", label: "Admin", description: "Kompaniya admini" },
-  { value: "DIREKTOR", label: "Direktor", description: "Loyihalarni kuzatish va tasdiqlash" },
-  { value: "PRORAB", label: "Prorab", description: "Zayavka berish va ishlarni boshqarish" },
-  { value: "SNABJENIYA", label: "Snabjenets", description: "Material sotib olish va yetkazish" },
-  { value: "SKLAD", label: "Skladchi", description: "Ombor va materiallarni boshqarish" },
-  { value: "BUGALTERIYA", label: "Buxgalter", description: "Moliyaviy hisobotlar va tahlillar" },
-  { value: "PTO", label: "PTO", description: "Texnik nazorat va tekshirish" },
+const roleBadgeColors = [
+  "bg-red-100 text-red-700",
+  "bg-purple-100 text-purple-700",
+  "bg-blue-100 text-blue-700",
+  "bg-warning/10 text-warning",
+  "bg-success/10 text-success",
+  "bg-primary/10 text-primary",
+  "bg-muted text-muted-foreground",
+  "bg-orange-100 text-orange-700",
+  "bg-teal-100 text-teal-700",
+  "bg-pink-100 text-pink-700",
 ];
-
-const getRoleBadge = (role: string) => {
-  const roleInfo = roles.find((r) => r.value === role);
-  const colors: Record<string, string> = {
-    ADMIN: "bg-red-100 text-red-700",
-    DIREKTOR: "bg-purple-100 text-purple-700",
-    PRORAB: "bg-blue-100 text-blue-700",
-    SNABJENIYA: "bg-warning/10 text-warning",
-    SKLAD: "bg-success/10 text-success",
-    BUGALTERIYA: "bg-primary/10 text-primary",
-    PTO: "bg-muted text-muted-foreground",
-  };
-  return (
-    <Badge className={colors[role] || "bg-muted text-muted-foreground"}>
-      {roleInfo?.label || role}
-    </Badge>
-  );
-};
 
 const formatPhoneDisplay = (phone: string) => {
   if (!phone) return "";
@@ -113,8 +98,7 @@ const formatPhoneInput = (value: string) => {
 interface UserFormData {
   name: string;
   phone: string;
-  role: string;
-  allowedRoles: string[];
+  orgRoleId: string;
   password: string;
   projectIds: string[];
 }
@@ -122,8 +106,7 @@ interface UserFormData {
 const initialFormData: UserFormData = {
   name: "",
   phone: "",
-  role: "PRORAB",
-  allowedRoles: ["PRORAB"],
+  orgRoleId: "",
   password: "",
   projectIds: [],
 };
@@ -141,6 +124,8 @@ export default function UsersPage() {
   const [totalPages, setTotalPages] = useState(1);
   const [total, setTotal] = useState(0);
 
+  const [orgRoles, setOrgRoles] = useState<OrgRole[]>([]);
+
   const [addDialogOpen, setAddDialogOpen] = useState(false);
   const [editDialogOpen, setEditDialogOpen] = useState(false);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
@@ -150,7 +135,7 @@ export default function UsersPage() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
 
-  // Fetch projects for assignment dropdown
+  // Fetch projects and org roles
   useEffect(() => {
     const fetchProjects = async () => {
       try {
@@ -160,7 +145,16 @@ export default function UsersPage() {
         console.error("Error fetching projects:", err);
       }
     };
+    const fetchOrgRoles = async () => {
+      try {
+        const roles = await usersApi.getOrgRoles();
+        setOrgRoles(roles);
+      } catch (err) {
+        console.error("Error fetching org roles:", err);
+      }
+    };
     fetchProjects();
+    fetchOrgRoles();
   }, []);
 
   const fetchUserProjects = useCallback(async (userIds: string[]) => {
@@ -220,6 +214,11 @@ export default function UsersPage() {
       return;
     }
 
+    if (!formData.orgRoleId) {
+      setFormError("Rol tanlash shart");
+      return;
+    }
+
     if (formData.projectIds.length === 0) {
       setFormError("Kamida bitta loyiha tanlash shart");
       return;
@@ -232,8 +231,7 @@ export default function UsersPage() {
       const payload: CreateUserRequest = {
         name: formData.name.trim(),
         phone: "+998" + formData.phone.replace(/\s/g, ""),
-        role: formData.role,
-        allowedRoles: formData.allowedRoles.length > 0 ? formData.allowedRoles : [formData.role],
+        orgRoleId: formData.orgRoleId,
         password: formData.password,
       };
 
@@ -263,12 +261,15 @@ export default function UsersPage() {
     try {
       const payload: UpdateUserRequest = {
         name: formData.name.trim() || undefined,
-        role: formData.role,
-        allowedRoles: formData.allowedRoles.length > 0 ? formData.allowedRoles : [formData.role],
+        orgRoleId: formData.orgRoleId || undefined,
       };
 
       if (formData.phone.trim()) {
         payload.phone = "+998" + formData.phone.replace(/\s/g, "");
+      }
+
+      if (formData.password.trim()) {
+        payload.password = formData.password;
       }
 
       await usersApi.update(selectedUser.id, payload);
@@ -346,8 +347,7 @@ export default function UsersPage() {
     setFormData({
       name: user.name || "",
       phone: formatPhoneInput(phoneDigits),
-      role: user.role,
-      allowedRoles: user.allowedRoles || [user.role],
+      orgRoleId: user.orgRoleId || "",
       password: "",
       projectIds: [],
     });
@@ -423,9 +423,9 @@ export default function UsersPage() {
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">Barcha rollar</SelectItem>
-                {roles.map((role) => (
-                  <SelectItem key={role.value} value={role.value}>
-                    {role.label}
+                {orgRoles.map((role) => (
+                  <SelectItem key={role.id} value={role.id}>
+                    {role.name}
                   </SelectItem>
                 ))}
               </SelectContent>
@@ -507,14 +507,12 @@ export default function UsersPage() {
                       {formatPhoneDisplay(user.phone || "")}
                     </TableCell>
                     <TableCell>
-                      <div className="flex items-center gap-1 flex-wrap">
-                        {getRoleBadge(user.role)}
-                        {user.allowedRoles && user.allowedRoles.length > 1 && (
-                          <Badge variant="outline" className="text-xs">
-                            +{user.allowedRoles.length - 1}
-                          </Badge>
-                        )}
-                      </div>
+                      {(() => {
+                        const roleIndex = orgRoles.findIndex((r) => r.id === user.orgRoleId);
+                        const roleName = roleIndex >= 0 ? orgRoles[roleIndex].name : user.role;
+                        const color = roleBadgeColors[roleIndex >= 0 ? roleIndex % roleBadgeColors.length : 0];
+                        return <Badge className={color}>{roleName}</Badge>;
+                      })()}
                     </TableCell>
                     <TableCell>
                       <div className="flex items-center gap-2">
@@ -699,41 +697,22 @@ export default function UsersPage() {
             </div>
 
             <div className="space-y-2">
-              <Label>Rollar (bir nechta tanlash mumkin)</Label>
-              <Card className="p-3 bg-muted/50">
-                <div className="grid grid-cols-2 gap-2">
-                  {roles.map((role) => (
-                    <label
-                      key={role.value}
-                      className="flex items-center space-x-2 cursor-pointer hover:bg-muted rounded p-1"
-                    >
-                      <Checkbox
-                        checked={formData.allowedRoles.includes(role.value)}
-                        onCheckedChange={(checked) => {
-                          if (checked) {
-                            const newRoles = [...formData.allowedRoles, role.value];
-                            setFormData((prev) => ({
-                              ...prev,
-                              allowedRoles: newRoles,
-                              role: newRoles[0],
-                            }));
-                          } else {
-                            const newRoles = formData.allowedRoles.filter((r) => r !== role.value);
-                            if (newRoles.length > 0) {
-                              setFormData((prev) => ({
-                                ...prev,
-                                allowedRoles: newRoles,
-                                role: newRoles[0],
-                              }));
-                            }
-                          }
-                        }}
-                      />
-                      <span className="text-sm">{role.label}</span>
-                    </label>
+              <Label>Rol *</Label>
+              <Select
+                value={formData.orgRoleId}
+                onValueChange={(value) => setFormData((prev) => ({ ...prev, orgRoleId: value }))}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Rolni tanlang..." />
+                </SelectTrigger>
+                <SelectContent>
+                  {orgRoles.map((role) => (
+                    <SelectItem key={role.id} value={role.id}>
+                      {role.name}
+                    </SelectItem>
                   ))}
-                </div>
-              </Card>
+                </SelectContent>
+              </Select>
             </div>
 
             <div className="space-y-2">
@@ -837,41 +816,32 @@ export default function UsersPage() {
             </div>
 
             <div className="space-y-2">
-              <Label>Rollar (bir nechta tanlash mumkin)</Label>
-              <Card className="p-3 bg-muted/50">
-                <div className="grid grid-cols-2 gap-2">
-                  {roles.map((role) => (
-                    <label
-                      key={role.value}
-                      className="flex items-center space-x-2 cursor-pointer hover:bg-muted rounded p-1"
-                    >
-                      <Checkbox
-                        checked={formData.allowedRoles.includes(role.value)}
-                        onCheckedChange={(checked) => {
-                          if (checked) {
-                            const newRoles = [...formData.allowedRoles, role.value];
-                            setFormData((prev) => ({
-                              ...prev,
-                              allowedRoles: newRoles,
-                              role: newRoles[0],
-                            }));
-                          } else {
-                            const newRoles = formData.allowedRoles.filter((r) => r !== role.value);
-                            if (newRoles.length > 0) {
-                              setFormData((prev) => ({
-                                ...prev,
-                                allowedRoles: newRoles,
-                                role: newRoles[0],
-                              }));
-                            }
-                          }
-                        }}
-                      />
-                      <span className="text-sm">{role.label}</span>
-                    </label>
+              <Label>Yangi parol (ixtiyoriy)</Label>
+              <Input
+                type="password"
+                placeholder="O'zgartirish uchun kiriting"
+                value={formData.password}
+                onChange={(e) => setFormData((prev) => ({ ...prev, password: e.target.value }))}
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label>Rol</Label>
+              <Select
+                value={formData.orgRoleId}
+                onValueChange={(value) => setFormData((prev) => ({ ...prev, orgRoleId: value }))}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Rolni tanlang..." />
+                </SelectTrigger>
+                <SelectContent>
+                  {orgRoles.map((role) => (
+                    <SelectItem key={role.id} value={role.id}>
+                      {role.name}
+                    </SelectItem>
                   ))}
-                </div>
-              </Card>
+                </SelectContent>
+              </Select>
             </div>
           </div>
 
