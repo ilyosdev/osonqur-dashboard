@@ -42,7 +42,7 @@ export default function SuppliersPage() {
   const {
     data: ordersResponse,
     loading: ordersLoading,
-  } = useApi(() => suppliersApi.getOrders({ status: "PENDING", limit: 10 }), []);
+  } = useApi(() => suppliersApi.getOrders({ status: "ORDERED", limit: 10 }), []);
 
   const {
     data: deliveredOrdersResponse,
