@@ -3,7 +3,12 @@ import { useAuth } from './auth-context';
 
 function canAccessByPageRoutes(pageRoutes: string[], pathname: string): boolean {
   if (pathname === '/') return true;
-  return pageRoutes.some(route => pathname === route || pathname.startsWith(route + '/'));
+  return pageRoutes.some(route => {
+    // Match both /projects and /dashboard/projects formats
+    const normalizedRoute = route.replace('/dashboard', '');
+    return pathname === route || pathname.startsWith(route + '/')
+      || pathname === normalizedRoute || pathname.startsWith(normalizedRoute + '/');
+  });
 }
 
 export function AuthGuard({ children }: { children: React.ReactNode }) {
