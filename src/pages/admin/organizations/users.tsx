@@ -2,14 +2,13 @@ import { useEffect, useState, useCallback } from "react";
 import { useParams, Link } from "react-router-dom";
 import {
   Users, Plus, Search, RefreshCw, Loader2, MoreVertical,
-  Edit, Trash2, AlertCircle, ArrowLeft, Eye, EyeOff, FolderOpen, Shield,
+  Edit, Trash2, AlertCircle, ArrowLeft, Eye, EyeOff, FolderOpen,
 } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
-import { Checkbox } from "@/components/ui/checkbox";
 import {
   Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle,
 } from "@/components/ui/dialog";
@@ -27,17 +26,7 @@ import {
 import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from "@/components/ui/table";
-import { adminApi, AdminOrgUser, AdminOrganization, UserProjectAssignment, AdminOrgProject } from "@/lib/api/admin";
-
-const ORG_ROLES = [
-  { value: "BOSS", label: "Boss" },
-  { value: "DIREKTOR", label: "Direktor" },
-  { value: "BUGALTERIYA", label: "Bugalteriya" },
-  { value: "PTO", label: "PTO" },
-  { value: "SNABJENIYA", label: "Snabjeniya" },
-  { value: "SKLAD", label: "Sklad" },
-  { value: "PRORAB", label: "Prorab" },
-];
+import { adminApi, AdminOrgUser, AdminOrganization, AdminOrgRole, UserProjectAssignment, AdminOrgProject } from "@/lib/api/admin";
 
 export default function OrgUsersPage() {
   const { orgId } = useParams<{ orgId: string }>();
@@ -48,6 +37,8 @@ export default function OrgUsersPage() {
   const [searchQuery, setSearchQuery] = useState("");
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState("");
+
+  const [orgRoles, setOrgRoles] = useState<AdminOrgRole[]>([]);
 
   const [addDialogOpen, setAddDialogOpen] = useState(false);
   const [editDialogOpen, setEditDialogOpen] = useState(false);
@@ -64,7 +55,7 @@ export default function OrgUsersPage() {
   const [selectedProjectId, setSelectedProjectId] = useState("");
 
   const [formData, setFormData] = useState({
-    name: "", phone: "", password: "", role: "PRORAB", telegramId: "", allowedRoles: [] as string[],
+    name: "", phone: "", password: "", role: "PRORAB", telegramId: "", allowedRoles: [] as string[], orgRoleId: "",
   });
 
   const fetchOrg = useCallback(async () => {
@@ -90,11 +81,19 @@ export default function OrgUsersPage() {
     }
   }, [orgId, page, searchQuery]);
 
-  useEffect(() => { fetchOrg(); }, [fetchOrg]);
+  const fetchOrgRoles = useCallback(async () => {
+    if (!orgId) return;
+    try {
+      const roles = await adminApi.getOrgRoles(orgId);
+      setOrgRoles(roles);
+    } catch {}
+  }, [orgId]);
+
+  useEffect(() => { fetchOrg(); fetchOrgRoles(); }, [fetchOrg, fetchOrgRoles]);
   useEffect(() => { fetchUsers(); }, [fetchUsers]);
 
   const resetForm = () => {
-    setFormData({ name: "", phone: "", password: "", role: "PRORAB", telegramId: "", allowedRoles: [] });
+    setFormData({ name: "", phone: "", password: "", role: "PRORAB", telegramId: "", allowedRoles: [], orgRoleId: "" });
     setFormError("");
     setShowPassword(false);
   };
@@ -110,6 +109,7 @@ export default function OrgUsersPage() {
       role: u.role,
       telegramId: u.telegramId || "",
       allowedRoles: u.allowedRoles || [],
+      orgRoleId: u.orgRoleId || "",
     });
     setFormError("");
     setEditDialogOpen(true);
@@ -151,6 +151,7 @@ export default function OrgUsersPage() {
         role: formData.role,
         telegramId: formData.telegramId || undefined,
         allowedRoles: formData.allowedRoles.length > 0 ? formData.allowedRoles : undefined,
+        orgRoleId: formData.orgRoleId || undefined,
       });
       setAddDialogOpen(false);
       fetchUsers();
@@ -172,6 +173,7 @@ export default function OrgUsersPage() {
       if (formData.password.trim()) data.password = formData.password;
       if (formData.role) data.role = formData.role;
       if (formData.telegramId !== undefined) data.telegramId = formData.telegramId || undefined;
+      if (formData.orgRoleId) data.orgRoleId = formData.orgRoleId;
       // Always send allowedRoles (empty array clears them)
       data.allowedRoles = formData.allowedRoles;
       await adminApi.updateOrgUser(orgId, selectedUser.id, data);
@@ -228,15 +230,6 @@ export default function OrgUsersPage() {
     if (digits.length <= 5) return `${digits.slice(0, 2)} ${digits.slice(2)}`;
     if (digits.length <= 7) return `${digits.slice(0, 2)} ${digits.slice(2, 5)} ${digits.slice(5)}`;
     return `${digits.slice(0, 2)} ${digits.slice(2, 5)} ${digits.slice(5, 7)} ${digits.slice(7, 9)}`;
-  };
-
-  const toggleAllowedRole = (role: string) => {
-    setFormData(prev => {
-      const roles = prev.allowedRoles.includes(role)
-        ? prev.allowedRoles.filter(r => r !== role)
-        : [...prev.allowedRoles, role];
-      return { ...prev, allowedRoles: roles };
-    });
   };
 
   const totalPages = Math.ceil(total / 20);
@@ -394,10 +387,13 @@ export default function OrgUsersPage() {
             </div>
             <div className="space-y-2">
               <Label>Rol *</Label>
-              <Select value={formData.role} onValueChange={(v) => setFormData(p => ({ ...p, role: v }))}>
-                <SelectTrigger><SelectValue /></SelectTrigger>
+              <Select value={formData.orgRoleId} onValueChange={(v) => {
+                const role = orgRoles.find(r => r.id === v);
+                setFormData(p => ({ ...p, orgRoleId: v, role: role?.name || p.role }));
+              }}>
+                <SelectTrigger><SelectValue placeholder="Rolni tanlang..." /></SelectTrigger>
                 <SelectContent>
-                  {ORG_ROLES.map((r) => <SelectItem key={r.value} value={r.value}>{r.label}</SelectItem>)}
+                  {orgRoles.map((r) => <SelectItem key={r.id} value={r.id}>{r.name}</SelectItem>)}
                 </SelectContent>
               </Select>
             </div>
@@ -405,29 +401,6 @@ export default function OrgUsersPage() {
               <Label>Telegram ID (ixtiyoriy)</Label>
               <Input placeholder="123456789" value={formData.telegramId}
                 onChange={(e) => setFormData(p => ({ ...p, telegramId: e.target.value }))} />
-            </div>
-            <div className="space-y-2">
-              <Label className="flex items-center gap-2">
-                <Shield className="h-4 w-4" />
-                Qo'shimcha rollar (ixtiyoriy)
-              </Label>
-              <p className="text-xs text-muted-foreground mb-2">
-                Foydalanuvchi ushbu rollar o'rtasida almashtira oladi
-              </p>
-              <div className="grid grid-cols-2 gap-2">
-                {ORG_ROLES.filter(r => r.value !== formData.role).map(r => (
-                  <div key={r.value} className="flex items-center space-x-2">
-                    <Checkbox
-                      id={`add-role-${r.value}`}
-                      checked={formData.allowedRoles.includes(r.value)}
-                      onCheckedChange={() => toggleAllowedRole(r.value)}
-                    />
-                    <label htmlFor={`add-role-${r.value}`} className="text-sm cursor-pointer">
-                      {r.label}
-                    </label>
-                  </div>
-                ))}
-              </div>
             </div>
           </div>
           <DialogFooter>
@@ -467,39 +440,19 @@ export default function OrgUsersPage() {
             </div>
             <div className="space-y-2">
               <Label>Rol</Label>
-              <Select value={formData.role} onValueChange={(v) => setFormData(p => ({ ...p, role: v }))}>
-                <SelectTrigger><SelectValue /></SelectTrigger>
+              <Select value={formData.orgRoleId} onValueChange={(v) => {
+                const role = orgRoles.find(r => r.id === v);
+                setFormData(p => ({ ...p, orgRoleId: v, role: role?.name || p.role }));
+              }}>
+                <SelectTrigger><SelectValue placeholder="Rolni tanlang..." /></SelectTrigger>
                 <SelectContent>
-                  {ORG_ROLES.map((r) => <SelectItem key={r.value} value={r.value}>{r.label}</SelectItem>)}
+                  {orgRoles.map((r) => <SelectItem key={r.id} value={r.id}>{r.name}</SelectItem>)}
                 </SelectContent>
               </Select>
             </div>
             <div className="space-y-2">
               <Label>Telegram ID</Label>
               <Input value={formData.telegramId} onChange={(e) => setFormData(p => ({ ...p, telegramId: e.target.value }))} />
-            </div>
-            <div className="space-y-2">
-              <Label className="flex items-center gap-2">
-                <Shield className="h-4 w-4" />
-                Qo'shimcha rollar
-              </Label>
-              <p className="text-xs text-muted-foreground mb-2">
-                Foydalanuvchi ushbu rollar o'rtasida almashtira oladi
-              </p>
-              <div className="grid grid-cols-2 gap-2">
-                {ORG_ROLES.filter(r => r.value !== formData.role).map(r => (
-                  <div key={r.value} className="flex items-center space-x-2">
-                    <Checkbox
-                      id={`edit-role-${r.value}`}
-                      checked={formData.allowedRoles.includes(r.value)}
-                      onCheckedChange={() => toggleAllowedRole(r.value)}
-                    />
-                    <label htmlFor={`edit-role-${r.value}`} className="text-sm cursor-pointer">
-                      {r.label}
-                    </label>
-                  </div>
-                ))}
-              </div>
             </div>
           </div>
           <DialogFooter>
