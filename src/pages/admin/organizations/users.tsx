@@ -148,9 +148,7 @@ export default function OrgUsersPage() {
         name: formData.name,
         phone: "+998" + formData.phone.replace(/\s/g, ""),
         password: formData.password,
-        role: formData.role,
         telegramId: formData.telegramId || undefined,
-        allowedRoles: formData.allowedRoles.length > 0 ? formData.allowedRoles : undefined,
         orgRoleId: formData.orgRoleId || undefined,
       });
       setAddDialogOpen(false);
@@ -171,7 +169,6 @@ export default function OrgUsersPage() {
       if (formData.name.trim()) data.name = formData.name;
       if (formData.phone.trim()) data.phone = "+998" + formData.phone.replace(/\s/g, "");
       if (formData.password.trim()) data.password = formData.password;
-      if (formData.role) data.role = formData.role;
       if (formData.telegramId !== undefined) data.telegramId = formData.telegramId || undefined;
       if (formData.orgRoleId) data.orgRoleId = formData.orgRoleId;
       // Always send allowedRoles (empty array clears them)
@@ -389,7 +386,7 @@ export default function OrgUsersPage() {
               <Label>Rol *</Label>
               <Select value={formData.orgRoleId} onValueChange={(v) => {
                 const role = orgRoles.find(r => r.id === v);
-                setFormData(p => ({ ...p, orgRoleId: v, role: role?.name || p.role }));
+                setFormData(p => ({ ...p, orgRoleId: v }));
               }}>
                 <SelectTrigger><SelectValue placeholder="Rolni tanlang..." /></SelectTrigger>
                 <SelectContent>
@@ -442,7 +439,7 @@ export default function OrgUsersPage() {
               <Label>Rol</Label>
               <Select value={formData.orgRoleId} onValueChange={(v) => {
                 const role = orgRoles.find(r => r.id === v);
-                setFormData(p => ({ ...p, orgRoleId: v, role: role?.name || p.role }));
+                setFormData(p => ({ ...p, orgRoleId: v }));
               }}>
                 <SelectTrigger><SelectValue placeholder="Rolni tanlang..." /></SelectTrigger>
                 <SelectContent>
