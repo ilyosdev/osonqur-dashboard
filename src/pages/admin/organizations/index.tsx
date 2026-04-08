@@ -146,7 +146,7 @@ export default function OrganizationsPage() {
         inn: formData.inn.trim() || undefined,
         address: formData.address.trim() || undefined,
       });
-      setCreatedAdmin({ name: result.adminUser.name, phone: result.adminUser.phone });
+      setCreatedAdmin(result.adminUser ? { name: result.adminUser.name, phone: result.adminUser.phone } : { name: formData.responsiblePerson, phone: "+998" + formData.phone.replace(/\s/g, "") });
       fetchOrgs();
     } catch (err) {
       if (err instanceof Error && err.message.includes("PHONE_ALREADY_EXISTS")) {
