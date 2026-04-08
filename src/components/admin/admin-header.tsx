@@ -27,10 +27,10 @@ export function AdminHeader() {
     return name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2);
   };
 
-  const roleBadge = user?.role === 'SUPER_ADMIN' ? 'Super Admin' : user?.role === 'ADMIN' ? 'Admin' : 'Operator';
-  const roleBadgeColor = user?.role === 'SUPER_ADMIN'
+  const roleBadge = user?.platformRole === 'SUPER_ADMIN' ? 'Super Admin' : user?.platformRole === 'OPERATOR' ? 'Operator' : 'User';
+  const roleBadgeColor = user?.platformRole === 'SUPER_ADMIN'
     ? 'bg-destructive/10 text-destructive'
-    : user?.role === 'ADMIN'
+    : user?.platformRole === 'OPERATOR'
       ? 'bg-orange-500/10 text-orange-600'
       : 'bg-primary/10 text-primary';
 

@@ -244,8 +244,8 @@ export default function FinancePage() {
                 <div key={kassa.id} className="p-4 rounded-lg border bg-card">
                   <div className="flex items-center justify-between mb-2">
                     <p className="font-medium">{kassa.user?.name || kassa.name}</p>
-                    {kassa.user?.role ? (
-                      <Badge variant="secondary">{kassa.user.role}</Badge>
+                    {kassa.user?.orgRoleName ? (
+                      <Badge variant="secondary">{kassa.user.orgRoleName}</Badge>
                     ) : kassa.location ? (
                       <Badge variant="secondary">{kassa.location}</Badge>
                     ) : null}

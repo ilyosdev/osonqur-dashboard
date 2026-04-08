@@ -66,9 +66,8 @@ type ActiveView = "balance" | "history" | "expenses" | "requests" | "incomes" | 
 
 export default function KassaPage() {
   const { user } = useAuth();
-  const role = user?.role;
-  const isReadOnly = role === "BOSS";
-  const canRequestMoney = role !== "BUGALTERIYA" && !isReadOnly;
+  const isReadOnly = !usePermission('cash-register:create');
+  const canRequestMoney = usePermission('cash-request:create');
   const isBugalteriya = usePermission('income:view');
 
   const [activeView, setActiveView] = useState<ActiveView>("balance");
@@ -529,9 +528,9 @@ export default function KassaPage() {
                         <User className="h-4 w-4 text-muted-foreground" />
                         <p className="font-medium">{k.user?.name || k.name}</p>
                       </div>
-                      {k.user?.role && (
+                      {k.user?.orgRoleName && (
                         <Badge variant="secondary" className="text-xs">
-                          {k.user.role}
+                          {k.user.orgRoleName}
                         </Badge>
                       )}
                     </div>

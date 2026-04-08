@@ -117,7 +117,7 @@ export interface CashRegister {
   userId?: string;
   createdAt: string;
   updatedAt: string;
-  user?: { id: string; name: string; role?: string };
+  user?: { id: string; name: string; orgRoleName?: string };
 }
 
 export interface CreateCashRegisterRequest {
@@ -269,7 +269,7 @@ export interface CashRegisterDetailed {
   totalOut: number;
   createdAt: string;
   updatedAt: string;
-  user?: { id: string; name: string };
+  user?: { id: string; name: string; orgRoleName?: string };
 }
 
 // Cash Register Transactions
