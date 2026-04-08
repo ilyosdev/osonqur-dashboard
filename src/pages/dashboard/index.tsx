@@ -25,6 +25,7 @@ import { useApi } from "@/hooks/use-api";
 import { projectsApi, requestsApi, analyticsApi } from "@/lib/api";
 import { StatsSkeleton } from "@/components/ui/table-skeleton";
 import { ErrorMessage } from "@/components/ui/error-message";
+import { useProject } from "@/lib/project-context";
 
 function formatNumber(num: number): string {
   if (num >= 1000000000) {
@@ -76,6 +77,7 @@ const PERIOD_LABELS: Record<Period, string> = {
 
 export default function HomePage() {
   const { user } = useAuth();
+  const { projects: allProjects, selectedProject, selectedProjectId, selectProject } = useProject();
   const canSeeActions = usePermission('dashboard:view');
   const canViewFinance = usePermission('income:view');
   const canViewStats = usePermission('statistics:view');
@@ -165,6 +167,37 @@ export default function HomePage() {
           ))}
         </div>
       </div>
+
+      {/* Project Selection Prompt */}
+      {!selectedProjectId && allProjects.length > 0 && (
+        <Card className="border-dashed border-2 border-primary/30 bg-primary/5">
+          <CardContent className="py-6">
+            <div className="text-center space-y-3">
+              <FolderKanban className="h-10 w-10 mx-auto text-primary/60" />
+              <div>
+                <h3 className="font-semibold text-lg">Loyihani tanlang</h3>
+                <p className="text-sm text-muted-foreground">
+                  Ishlash uchun loyihani tanlang — barcha ma'lumotlar tanlangan loyiha bo'yicha ko'rsatiladi
+                </p>
+              </div>
+              <div className="flex flex-wrap gap-2 justify-center pt-2">
+                {allProjects.map((project) => (
+                  <Button
+                    key={project.id}
+                    variant="outline"
+                    size="sm"
+                    onClick={() => selectProject(project.id)}
+                    className="gap-2"
+                  >
+                    <FolderKanban className="h-3.5 w-3.5" />
+                    {project.name}
+                  </Button>
+                ))}
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       {/* Main Stats */}
       {loading || summaryLoading ? (

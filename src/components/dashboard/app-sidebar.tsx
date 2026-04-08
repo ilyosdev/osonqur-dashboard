@@ -21,6 +21,8 @@ import {
   BarChart3,
   Crown,
   ShoppingCart,
+  ChevronsUpDown,
+  FolderOpen,
 } from "lucide-react";
 import {
   Sidebar,
@@ -37,7 +39,15 @@ import {
   SidebarSeparator,
 } from "@/components/ui/sidebar";
 import { Badge } from "@/components/ui/badge";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { useAuth } from "@/lib/auth";
+import { useProject } from "@/lib/project-context";
 
 type NavItem = {
   title: string;
@@ -45,6 +55,7 @@ type NavItem = {
   icon: React.ComponentType<{ className?: string }>;
   badge?: number;
   roles?: string[];
+  requiresProject?: boolean;
 };
 
 const mainNavItems: NavItem[] = [
@@ -64,18 +75,21 @@ const mainNavItems: NavItem[] = [
     url: "/smetas",
     icon: FileText,
     roles: ["BOSS", "DIREKTOR", "PTO", "PRORAB"],
+    requiresProject: true,
   },
   {
     title: "So'rovlar",
     url: "/requests",
     icon: ClipboardList,
     roles: ["DIREKTOR", "BOSS"],
+    requiresProject: true,
   },
   {
     title: "Hisobotlar",
     url: "/reports",
     icon: ChartBar,
     roles: ["BOSS"],
+    requiresProject: true,
   },
   {
     title: "Xodimlar",
@@ -86,103 +100,103 @@ const mainNavItems: NavItem[] = [
 ];
 
 const roleNavItems: NavItem[] = [
-  // DIREKTOR only
   {
     title: "Direktor",
     url: "/direktor",
     icon: Crown,
     roles: ["DIREKTOR"],
+    requiresProject: true,
   },
-  // SNABJENIYA only
   {
     title: "Ta'minot",
     url: "/supply",
     icon: ShoppingCart,
     roles: ["SNABJENIYA"],
+    requiresProject: true,
   },
-  // PRORAB only
   {
     title: "Prorab",
     url: "/foreman",
     icon: HardHat,
     roles: ["PRORAB"],
+    requiresProject: true,
   },
-  // Kassa - all roles
   {
     title: "Kassa",
     url: "/kassa",
     icon: Banknote,
     roles: ["BOSS", "DIREKTOR", "BUGALTERIYA", "SNABJENIYA", "SKLAD", "PRORAB", "PTO", "HAYDOVCHI", "MODERATOR"],
+    requiresProject: true,
   },
-  // BUGALTERIYA + BOSS + DIREKTOR
   {
     title: "Moliya",
     url: "/finance",
     icon: Wallet,
     roles: ["BUGALTERIYA", "BOSS", "DIREKTOR"],
+    requiresProject: true,
   },
-  // SKLAD + BOSS + DIREKTOR
   {
     title: "Ombor",
     url: "/warehouse",
     icon: Package,
     roles: ["SKLAD", "BOSS", "DIREKTOR"],
+    requiresProject: true,
   },
-  // SNABJENIYA + DIREKTOR
   {
     title: "Yetkazuvchilar",
     url: "/suppliers",
     icon: Truck,
     roles: ["SNABJENIYA", "DIREKTOR"],
+    requiresProject: true,
   },
-  // BUGALTERIYA + DIREKTOR
   {
     title: "Ustalar",
     url: "/workers",
     icon: UserCircle,
     roles: ["BUGALTERIYA", "DIREKTOR"],
+    requiresProject: true,
   },
-  // DIREKTOR + PTO + BOSS
   {
     title: "Tekshirish",
     url: "/validation",
     icon: CheckSquare,
     roles: ["DIREKTOR", "PTO", "BOSS"],
+    requiresProject: true,
   },
-  // HAYDOVCHI only
   {
     title: "Yetkazish",
     url: "/driver",
     icon: Car,
     roles: ["HAYDOVCHI"],
+    requiresProject: true,
   },
-  // MODERATOR only
   {
     title: "Moderatsiya",
     url: "/moderator",
     icon: Shield,
     roles: ["MODERATOR"],
+    requiresProject: true,
   },
-  // WORKER only
   {
     title: "Mening ishlarim",
     url: "/worker-portal",
     icon: Briefcase,
     roles: ["WORKER"],
+    requiresProject: true,
   },
-  // POSTAVSHIK only
   {
     title: "Ta'minotchi",
     url: "/supplier-portal",
     icon: Store,
     roles: ["POSTAVSHIK"],
+    requiresProject: true,
   },
-  // PTO only
   {
     title: "Smeta taqqoslash",
     url: "/smeta-comparison",
     icon: BarChart3,
     roles: ["PTO"],
+    requiresProject: true,
   },
 ];
 
@@ -199,6 +213,7 @@ export function AppSidebar() {
   const location = useLocation();
   const pathname = location.pathname;
   const { user, pageRoutes } = useAuth();
+  const { projects, selectedProject, selectedProjectId, selectProject } = useProject();
 
   const isActive = (url: string) => {
     if (url === "/") return pathname === "/";
@@ -214,6 +229,9 @@ export function AppSidebar() {
   const visibleMainItems = mainNavItems.filter(canSeeItem);
   const visibleRoleItems = roleNavItems.filter(canSeeItem);
   const visibleSettingsItems = settingsNavItems.filter(canSeeItem);
+
+  // Items that require project selection are dimmed when no project is selected
+  const hasProject = !!selectedProjectId;
 
   return (
     <Sidebar collapsible="icon" className="border-r border-sidebar-border">
@@ -234,37 +252,93 @@ export function AppSidebar() {
       </SidebarHeader>
 
       <SidebarContent className="px-2">
+        {/* Project Selector */}
+        {projects.length > 0 && (
+          <div className="px-2 pt-3 pb-1 group-data-[collapsible=icon]:px-0 group-data-[collapsible=icon]:pt-2">
+            <div className="group-data-[collapsible=icon]:hidden">
+              <Select
+                value={selectedProjectId || ""}
+                onValueChange={(v) => selectProject(v || null)}
+              >
+                <SelectTrigger className="w-full h-9 text-sm bg-muted/50 border-dashed">
+                  <div className="flex items-center gap-2 truncate">
+                    <FolderOpen className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
+                    <SelectValue placeholder="Loyihani tanlang..." />
+                  </div>
+                </SelectTrigger>
+                <SelectContent>
+                  {projects.map((project) => (
+                    <SelectItem key={project.id} value={project.id}>
+                      {project.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="hidden group-data-[collapsible=icon]:flex justify-center">
+              <div
+                className={`flex h-8 w-8 items-center justify-center rounded-lg cursor-pointer transition-colors ${
+                  selectedProject
+                    ? "bg-primary/10 text-primary"
+                    : "bg-muted text-muted-foreground"
+                }`}
+                title={selectedProject?.name || "Loyihani tanlang"}
+              >
+                <FolderOpen className="h-4 w-4" />
+              </div>
+            </div>
+          </div>
+        )}
+
+        {!hasProject && projects.length > 0 && (
+          <div className="px-3 py-2 group-data-[collapsible=icon]:hidden">
+            <p className="text-xs text-amber-600 bg-amber-50 dark:bg-amber-950/30 rounded-md px-2.5 py-1.5">
+              Avval loyihani tanlang
+            </p>
+          </div>
+        )}
+
         <SidebarGroup>
           <SidebarGroupLabel className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
             Asosiy
           </SidebarGroupLabel>
           <SidebarGroupContent>
             <SidebarMenu>
-              {visibleMainItems.map((item) => (
-                <SidebarMenuItem key={item.title}>
-                  <SidebarMenuButton
-                    asChild
-                    isActive={isActive(item.url)}
-                    tooltip={item.title}
-                    className="transition-all duration-200"
-                  >
-                    <Link to={item.url}>
-                      <item.icon className="h-4 w-4" />
-                      <span>{item.title}</span>
-                    </Link>
-                  </SidebarMenuButton>
-                  {item.badge && (
-                    <SidebarMenuBadge>
-                      <Badge 
-                        variant="secondary" 
-                        className="h-5 min-w-5 rounded-full bg-primary/10 text-primary text-[10px] font-semibold"
-                      >
-                        {item.badge}
-                      </Badge>
-                    </SidebarMenuBadge>
-                  )}
-                </SidebarMenuItem>
-              ))}
+              {visibleMainItems.map((item) => {
+                const disabled = item.requiresProject && !hasProject;
+                return (
+                  <SidebarMenuItem key={item.title}>
+                    <SidebarMenuButton
+                      asChild={!disabled}
+                      isActive={isActive(item.url)}
+                      tooltip={item.title + (disabled ? " (loyihani tanlang)" : "")}
+                      className={`transition-all duration-200 ${disabled ? "opacity-40 pointer-events-none" : ""}`}
+                    >
+                      {disabled ? (
+                        <span className="flex items-center gap-2">
+                          <item.icon className="h-4 w-4" />
+                          <span>{item.title}</span>
+                        </span>
+                      ) : (
+                        <Link to={item.url}>
+                          <item.icon className="h-4 w-4" />
+                          <span>{item.title}</span>
+                        </Link>
+                      )}
+                    </SidebarMenuButton>
+                    {item.badge && (
+                      <SidebarMenuBadge>
+                        <Badge
+                          variant="secondary"
+                          className="h-5 min-w-5 rounded-full bg-primary/10 text-primary text-[10px] font-semibold"
+                        >
+                          {item.badge}
+                        </Badge>
+                      </SidebarMenuBadge>
+                    )}
+                  </SidebarMenuItem>
+                );
+              })}
             </SidebarMenu>
           </SidebarGroupContent>
         </SidebarGroup>
@@ -278,21 +352,31 @@ export function AppSidebar() {
               </SidebarGroupLabel>
               <SidebarGroupContent>
                 <SidebarMenu>
-                  {visibleRoleItems.map((item) => (
-                    <SidebarMenuItem key={item.title}>
-                      <SidebarMenuButton
-                        asChild
-                        isActive={isActive(item.url)}
-                        tooltip={item.title}
-                        className="transition-all duration-200"
-                      >
-                        <Link to={item.url}>
-                          <item.icon className="h-4 w-4" />
-                          <span>{item.title}</span>
-                        </Link>
-                      </SidebarMenuButton>
-                    </SidebarMenuItem>
-                  ))}
+                  {visibleRoleItems.map((item) => {
+                    const disabled = item.requiresProject && !hasProject;
+                    return (
+                      <SidebarMenuItem key={item.title}>
+                        <SidebarMenuButton
+                          asChild={!disabled}
+                          isActive={isActive(item.url)}
+                          tooltip={item.title + (disabled ? " (loyihani tanlang)" : "")}
+                          className={`transition-all duration-200 ${disabled ? "opacity-40 pointer-events-none" : ""}`}
+                        >
+                          {disabled ? (
+                            <span className="flex items-center gap-2">
+                              <item.icon className="h-4 w-4" />
+                              <span>{item.title}</span>
+                            </span>
+                          ) : (
+                            <Link to={item.url}>
+                              <item.icon className="h-4 w-4" />
+                              <span>{item.title}</span>
+                            </Link>
+                          )}
+                        </SidebarMenuButton>
+                      </SidebarMenuItem>
+                    );
+                  })}
                 </SidebarMenu>
               </SidebarGroupContent>
             </SidebarGroup>

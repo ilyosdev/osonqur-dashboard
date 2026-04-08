@@ -24,6 +24,7 @@ import {
 import { Input } from "@/components/ui/input";
 import { StatsCard } from "@/components/dashboard/stats-card";
 import { projectsApi, requestsApi, PurchaseRequest } from "@/lib/api";
+import { useProject } from "@/lib/project-context";
 
 const formatCurrency = (value: number) => {
   if (value >= 1000000000) {
@@ -111,6 +112,7 @@ function calculateStats(requests: PurchaseRequest[]): ReportStats {
 }
 
 export default function ReportsPage() {
+  const { selectedProjectId } = useProject();
   const [activeTab, setActiveTab] = useState<TabType>("daily");
   const [selectedProject, setSelectedProject] = useState("all");
   const [selectedDate, setSelectedDate] = useState(() => {
@@ -120,6 +122,13 @@ export default function ReportsPage() {
   const [projects, setProjects] = useState<Project[]>([]);
   const [allRequests, setAllRequests] = useState<PurchaseRequest[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+
+  // Sync project filter with global project context
+  useEffect(() => {
+    if (selectedProjectId) {
+      setSelectedProject(selectedProjectId);
+    }
+  }, [selectedProjectId]);
 
   const fetchProjects = useCallback(async () => {
     try {

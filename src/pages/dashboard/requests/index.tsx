@@ -28,6 +28,7 @@ import { requestsApi, GetPurchaseRequestsParams } from "@/lib/api/requests";
 import { projectsApi, Project } from "@/lib/api/projects";
 import { useApi } from "@/hooks/use-api";
 import { StatsCard } from "@/components/dashboard/stats-card";
+import { useProject } from "@/lib/project-context";
 
 const statusOptions = [
   { value: "all", label: "Barcha holatlar" },
@@ -64,6 +65,7 @@ function formatNumber(num: number): string {
 }
 
 export default function RequestsPage() {
+  const { selectedProjectId } = useProject();
   const [requests, setRequests] = useState<import("@/lib/api/requests").PurchaseRequest[]>([]);
   const [projects, setProjects] = useState<Project[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -85,6 +87,13 @@ export default function RequestsPage() {
     approved: approvedCount?.total ?? 0,
     rejected: rejectedCount?.total ?? 0,
   };
+
+  // Sync project filter with global project context
+  useEffect(() => {
+    if (selectedProjectId) {
+      setProjectFilter(selectedProjectId);
+    }
+  }, [selectedProjectId]);
 
   // Fetch projects for filter dropdown
   useEffect(() => {

@@ -26,6 +26,7 @@ import {
 import { smetasApi, Smeta, SmetaType, GetSmetasParams } from "@/lib/api/smetas";
 import { projectsApi, Project } from "@/lib/api/projects";
 import { ProgressBar } from "@/components/dashboard/progress-bar";
+import { useProject } from "@/lib/project-context";
 
 const SMETA_TYPE_LABELS: Record<SmetaType, string> = {
   CONSTRUCTION: "Qurilish",
@@ -55,6 +56,7 @@ function formatDate(dateStr: string): string {
 
 export default function SmetasPage() {
   const navigate = useNavigate();
+  const { selectedProjectId } = useProject();
   const [smetas, setSmetas] = useState<Smeta[]>([]);
   const [projects, setProjects] = useState<Project[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -65,6 +67,13 @@ export default function SmetasPage() {
   const [page, setPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
   const [total, setTotal] = useState(0);
+
+  // Sync project filter with global project context
+  useEffect(() => {
+    if (selectedProjectId) {
+      setProjectFilter(selectedProjectId);
+    }
+  }, [selectedProjectId]);
 
   useEffect(() => {
     const fetchProjects = async () => {

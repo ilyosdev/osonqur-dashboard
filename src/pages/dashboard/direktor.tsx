@@ -53,6 +53,7 @@ import { analyticsApi } from "@/lib/api/analytics";
 import { projectsApi, Project } from "@/lib/api/projects";
 import { StatsSkeleton } from "@/components/ui/table-skeleton";
 import { ErrorMessage } from "@/components/ui/error-message";
+import { useProject } from "@/lib/project-context";
 
 function formatMoney(num: number): string {
   return num.toLocaleString("uz-UZ");
@@ -71,16 +72,27 @@ const STORAGE_KEY = "direktor_selected_project";
 
 export default function DirektorPage() {
   const { user } = useAuth();
+  const { selectedProjectId: globalProjectId, selectProject: globalSelectProject } = useProject();
   const [activeView, setActiveView] = useState<ActiveView>("requests");
 
-  // Project selection state
+  // Project selection state - synced with global context
   const [selectedProjectId, setSelectedProjectId] = useState<string>(() =>
-    localStorage.getItem(STORAGE_KEY) || "all"
+    globalProjectId || localStorage.getItem(STORAGE_KEY) || "all"
   );
 
-  // Persist project selection
+  // Sync from global context
+  useEffect(() => {
+    if (globalProjectId) {
+      setSelectedProjectId(globalProjectId);
+    }
+  }, [globalProjectId]);
+
+  // Persist project selection and sync back to global context
   useEffect(() => {
     localStorage.setItem(STORAGE_KEY, selectedProjectId);
+    if (selectedProjectId !== "all") {
+      globalSelectProject(selectedProjectId);
+    }
   }, [selectedProjectId]);
 
   // Dialog states
