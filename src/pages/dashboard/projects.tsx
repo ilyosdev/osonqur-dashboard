@@ -53,6 +53,10 @@ import {
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { projectsApi, Project, CreateProjectRequest, UpdateProjectRequest, GetProjectsParams } from "@/lib/api/projects";
+import { smetasApi } from "@/lib/api/smetas";
+import { uploadApi } from "@/lib/api/upload";
+import { useProject } from "@/lib/project-context";
+import { FileSpreadsheet } from "lucide-react";
 
 const statusOptions = [
   { value: "all", label: "Barcha holatlar" },
@@ -101,6 +105,7 @@ export default function ProjectsPage() {
   const [totalPages, setTotalPages] = useState(1);
   const [total, setTotal] = useState(0);
 
+  const { refreshProjects: refreshProjectContext } = useProject();
   const [addDialogOpen, setAddDialogOpen] = useState(false);
   const [editDialogOpen, setEditDialogOpen] = useState(false);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
@@ -108,6 +113,8 @@ export default function ProjectsPage() {
   const [formData, setFormData] = useState<ProjectFormData>(initialFormData);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
+  const [smetaFile, setSmetaFile] = useState<File | null>(null);
+  const [uploadProgress, setUploadProgress] = useState("");
 
   const fetchProjects = useCallback(async () => {
     setIsLoading(true);
@@ -147,6 +154,7 @@ export default function ProjectsPage() {
 
     setIsSubmitting(true);
     setFormError(null);
+    setUploadProgress("");
 
     try {
       const payload: CreateProjectRequest = {
@@ -155,14 +163,43 @@ export default function ProjectsPage() {
         description: formData.description.trim() || undefined,
       };
 
-      await projectsApi.create(payload);
+      setUploadProgress("Loyiha yaratilmoqda...");
+      const project = await projectsApi.create(payload);
+
+      // If smeta file was provided, create smeta and import items
+      if (smetaFile && project?.id) {
+        try {
+          setUploadProgress("Smeta yaratilmoqda...");
+          const smeta = await smetasApi.create({
+            projectId: project.id,
+            name: smetaFile.name.replace(/\.(xlsx|xls|csv)$/i, ''),
+            type: 'CONSTRUCTION',
+          });
+
+          setUploadProgress("Smeta fayldan yuklanmoqda...");
+          await uploadApi.directImport(smeta.id, smetaFile, 'auto');
+        } catch (uploadErr) {
+          console.error("Smeta upload failed:", uploadErr);
+          setFormError("Loyiha yaratildi, lekin smeta yuklanmadi: " + (uploadErr instanceof Error ? uploadErr.message : "Xatolik"));
+          fetchProjects();
+          refreshProjectContext();
+          setIsSubmitting(false);
+          setUploadProgress("");
+          return;
+        }
+      }
+
       setAddDialogOpen(false);
       setFormData(initialFormData);
+      setSmetaFile(null);
+      setUploadProgress("");
       fetchProjects();
+      refreshProjectContext();
     } catch (err) {
       setFormError(err instanceof Error ? err.message : "Loyiha qo'shishda xatolik");
     } finally {
       setIsSubmitting(false);
+      setUploadProgress("");
     }
   };
 
@@ -226,6 +263,8 @@ export default function ProjectsPage() {
   const openAddDialog = () => {
     setFormData(initialFormData);
     setFormError(null);
+    setSmetaFile(null);
+    setUploadProgress("");
     setAddDialogOpen(true);
   };
 
@@ -451,6 +490,24 @@ export default function ProjectsPage() {
                 rows={3}
               />
             </div>
+
+            <div className="space-y-2 border-t pt-4">
+              <Label className="flex items-center gap-2">
+                <FileSpreadsheet className="h-4 w-4" />
+                Smeta fayl (ixtiyoriy)
+              </Label>
+              <Input
+                type="file"
+                accept=".xlsx,.xls,.csv"
+                onChange={(e) => setSmetaFile(e.target.files?.[0] || null)}
+                className="cursor-pointer"
+              />
+              {smetaFile && (
+                <p className="text-xs text-muted-foreground">
+                  {smetaFile.name} ({(smetaFile.size / 1024).toFixed(0)} KB)
+                </p>
+              )}
+            </div>
           </div>
 
           <DialogFooter>
@@ -461,7 +518,7 @@ export default function ProjectsPage() {
               {isSubmitting ? (
                 <>
                   <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                  Qo'shilmoqda...
+                  {uploadProgress || "Qo'shilmoqda..."}
                 </>
               ) : (
                 <>

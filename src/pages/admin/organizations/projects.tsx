@@ -24,6 +24,7 @@ import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
 import { adminApi, AdminOrgProject, AdminOrganization } from "@/lib/api/admin";
+import { uploadApi } from "@/lib/api/upload";
 
 const STATUS_OPTIONS = [
   { value: "PLANNING", label: "Rejalashtirish", color: "bg-blue-500/10 text-blue-600" },
@@ -52,6 +53,8 @@ export default function OrgProjectsPage() {
   const [formData, setFormData] = useState({
     name: "", address: "", floors: "", budget: "", status: "ACTIVE",
   });
+  const [smetaFile, setSmetaFile] = useState<File | null>(null);
+  const [uploadProgress, setUploadProgress] = useState("");
 
   const fetchOrg = useCallback(async () => {
     if (!orgId) return;
@@ -79,6 +82,8 @@ export default function OrgProjectsPage() {
   const resetForm = () => {
     setFormData({ name: "", address: "", floors: "", budget: "", status: "ACTIVE" });
     setFormError("");
+    setSmetaFile(null);
+    setUploadProgress("");
   };
 
   const openAddDialog = () => { resetForm(); setAddDialogOpen(true); };
@@ -102,19 +107,46 @@ export default function OrgProjectsPage() {
     if (!orgId || !formData.name.trim()) { setFormError("Loyiha nomi kiritilishi kerak"); return; }
     setIsSubmitting(true);
     setFormError("");
+    setUploadProgress("");
     try {
-      await adminApi.createOrgProject(orgId, {
+      // 1. Create the project
+      setUploadProgress("Loyiha yaratilmoqda...");
+      const project = await adminApi.createOrgProject(orgId, {
         name: formData.name,
         address: formData.address || undefined,
         floors: formData.floors ? parseInt(formData.floors) : undefined,
         budget: formData.budget ? parseFloat(formData.budget) : undefined,
       });
+
+      // 2. If smeta file was provided, create smeta and import items
+      if (smetaFile && project?.id) {
+        try {
+          setUploadProgress("Smeta yaratilmoqda...");
+          const smeta = await adminApi.createProjectSmeta(orgId, project.id, {
+            name: smetaFile.name.replace(/\.(xlsx|xls|csv)$/i, ''),
+            type: 'CONSTRUCTION',
+          });
+
+          setUploadProgress("Smeta fayldan yuklanmoqda...");
+          await uploadApi.directImport(smeta.id, smetaFile, 'auto');
+          setUploadProgress("");
+        } catch (uploadErr) {
+          // Project created successfully but smeta upload failed - don't block
+          console.error("Smeta upload failed:", uploadErr);
+          setFormError("Loyiha yaratildi, lekin smeta yuklanmadi: " + (uploadErr instanceof Error ? uploadErr.message : "Xatolik"));
+          fetchProjects();
+          setIsSubmitting(false);
+          return;
+        }
+      }
+
       setAddDialogOpen(false);
       fetchProjects();
     } catch (err) {
       setFormError(err instanceof Error ? err.message : "Xatolik");
     } finally {
       setIsSubmitting(false);
+      setUploadProgress("");
     }
   };
 
@@ -299,11 +331,28 @@ export default function OrgProjectsPage() {
                 <Input type="number" placeholder="1000000" value={formData.budget} onChange={(e) => setFormData(p => ({ ...p, budget: e.target.value }))} />
               </div>
             </div>
+            <div className="space-y-2 border-t pt-4">
+              <Label className="flex items-center gap-2">
+                <FileSpreadsheet className="h-4 w-4" />
+                Smeta fayl (ixtiyoriy)
+              </Label>
+              <Input
+                type="file"
+                accept=".xlsx,.xls,.csv"
+                onChange={(e) => setSmetaFile(e.target.files?.[0] || null)}
+                className="cursor-pointer"
+              />
+              {smetaFile && (
+                <p className="text-xs text-muted-foreground">
+                  {smetaFile.name} ({(smetaFile.size / 1024).toFixed(0)} KB)
+                </p>
+              )}
+            </div>
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setAddDialogOpen(false)} disabled={isSubmitting}>Bekor qilish</Button>
             <Button onClick={handleAdd} disabled={isSubmitting}>
-              {isSubmitting ? <><Loader2 className="h-4 w-4 mr-2 animate-spin" />Yaratilmoqda...</> : "Yaratish"}
+              {isSubmitting ? <><Loader2 className="h-4 w-4 mr-2 animate-spin" />{uploadProgress || "Yaratilmoqda..."}</> : "Yaratish"}
             </Button>
           </DialogFooter>
         </DialogContent>
