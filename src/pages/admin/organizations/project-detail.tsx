@@ -1,8 +1,9 @@
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useRef } from "react";
 import { useParams, Link } from "react-router-dom";
+import * as XLSX from "xlsx";
 import {
   FolderOpen, Plus, Search, RefreshCw, Loader2, MoreVertical,
-  Edit, Trash2, AlertCircle, ArrowLeft, FileSpreadsheet, Users, Calendar,
+  Edit, Trash2, AlertCircle, ArrowLeft, FileSpreadsheet, Users, Calendar, Upload,
 } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -25,6 +26,9 @@ import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
 import { adminApi, AdminOrgProject, AdminProjectSmeta, AdminProjectUser, AdminSmetaType, AdminOrgUser } from "@/lib/api/admin";
+import { smetaItemsApi, CreateSmetaItemRequest } from "@/lib/api/smeta-items";
+
+interface ExcelRow { name: string; unit: string; quantity: number; unitPrice: number }
 
 const SMETA_TYPES: { value: AdminSmetaType; label: string }[] = [
   { value: "CONSTRUCTION", label: "Qurilish" },
@@ -58,6 +62,15 @@ export default function ProjectDetailPage() {
   const [assignUserDialogOpen, setAssignUserDialogOpen] = useState(false);
   const [allOrgUsers, setAllOrgUsers] = useState<AdminOrgUser[]>([]);
   const [selectedUserId, setSelectedUserId] = useState("");
+
+  // Excel upload state
+  const [excelDialogOpen, setExcelDialogOpen] = useState(false);
+  const [excelSmetaId, setExcelSmetaId] = useState<string>("");
+  const [excelRows, setExcelRows] = useState<ExcelRow[]>([]);
+  const [excelError, setExcelError] = useState("");
+  const [excelUploading, setExcelUploading] = useState(false);
+  const [excelFileName, setExcelFileName] = useState("");
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const [smetaFormData, setSmetaFormData] = useState({
     name: "",
@@ -253,6 +266,77 @@ export default function ProjectDetailPage() {
 
   const smetaTotalPages = Math.ceil(smetaTotal / 20);
 
+  const openExcelDialog = (smetaId: string) => {
+    setExcelSmetaId(smetaId);
+    setExcelRows([]);
+    setExcelError("");
+    setExcelFileName("");
+    setExcelDialogOpen(true);
+  };
+
+  const handleExcelFile = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setExcelFileName(file.name);
+    setExcelError("");
+
+    const reader = new FileReader();
+    reader.onload = (ev) => {
+      try {
+        const data = new Uint8Array(ev.target!.result as ArrayBuffer);
+        const workbook = XLSX.read(data, { type: "array" });
+        const sheet = workbook.Sheets[workbook.SheetNames[0]];
+        const rows = XLSX.utils.sheet_to_json<string[]>(sheet, { header: 1 });
+
+        const parsed: ExcelRow[] = [];
+        for (let i = 1; i < rows.length; i++) {
+          const row = rows[i];
+          if (!row || !row[0]) continue;
+          const name = String(row[0] || "").trim();
+          const unit = String(row[1] || "dona").trim();
+          const quantity = parseFloat(String(row[2] || "0").replace(",", ".")) || 0;
+          const unitPrice = parseFloat(String(row[3] || "0").replace(",", ".")) || 0;
+          if (name) parsed.push({ name, unit, quantity, unitPrice });
+        }
+
+        if (parsed.length === 0) {
+          setExcelError("Excel faylda ma'lumot topilmadi. Format: Nomi | Birligi | Miqdori | Narxi");
+          return;
+        }
+        setExcelRows(parsed);
+      } catch {
+        setExcelError("Excel faylni o'qishda xatolik");
+      }
+    };
+    reader.readAsArrayBuffer(file);
+  };
+
+  const handleExcelUpload = async () => {
+    if (!excelSmetaId || excelRows.length === 0) return;
+    setExcelUploading(true);
+    setExcelError("");
+    try {
+      for (const row of excelRows) {
+        const payload: CreateSmetaItemRequest = {
+          smetaId: excelSmetaId,
+          name: row.name,
+          unit: row.unit,
+          quantity: row.quantity,
+          unitPrice: row.unitPrice,
+          category: "Umumiy",
+        };
+        await smetaItemsApi.create(payload);
+      }
+      setExcelDialogOpen(false);
+      fetchSmetas();
+      fetchProject();
+    } catch (err) {
+      setExcelError(err instanceof Error ? err.message : "Yuklashda xatolik");
+    } finally {
+      setExcelUploading(false);
+    }
+  };
+
   return (
     <div className="space-y-6">
       <div className="flex items-center gap-4">
@@ -366,6 +450,9 @@ export default function ProjectDetailPage() {
                         <DropdownMenuContent align="end">
                           <DropdownMenuItem onClick={() => openEditSmetaDialog(smeta)}>
                             <Edit className="h-4 w-4 mr-2" />Tahrirlash
+                          </DropdownMenuItem>
+                          <DropdownMenuItem onClick={() => openExcelDialog(smeta.id)}>
+                            <Upload className="h-4 w-4 mr-2" />Excel yuklash
                           </DropdownMenuItem>
                           <DropdownMenuSeparator />
                           <DropdownMenuItem
@@ -615,6 +702,81 @@ export default function ProjectDetailPage() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {/* Excel Upload Dialog */}
+      <Dialog open={excelDialogOpen} onOpenChange={setExcelDialogOpen}>
+        <DialogContent className="max-w-2xl">
+          <DialogHeader>
+            <DialogTitle>Smeta elementlarini Excel orqali yuklash</DialogTitle>
+            <DialogDescription>
+              Excel fayl formati: <strong>Nomi | Birligi | Miqdori | Narxi</strong> (1-qator sarlavha)
+            </DialogDescription>
+          </DialogHeader>
+          {excelError && (
+            <div className="p-3 rounded-lg bg-destructive/10 text-destructive text-sm">{excelError}</div>
+          )}
+          <div className="space-y-4">
+            <div
+              className="border-2 border-dashed border-muted-foreground/30 rounded-lg p-8 text-center cursor-pointer hover:border-primary/50 transition-colors"
+              onClick={() => fileInputRef.current?.click()}
+            >
+              <Upload className="h-10 w-10 mx-auto text-muted-foreground mb-3" />
+              <p className="text-sm font-medium">
+                {excelFileName || "Excel faylni tanlang (.xlsx, .xls)"}
+              </p>
+              <p className="text-xs text-muted-foreground mt-1">Bosing yoki faylni bu yerga tashlang</p>
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept=".xlsx,.xls"
+                className="hidden"
+                onChange={handleExcelFile}
+              />
+            </div>
+
+            {excelRows.length > 0 && (
+              <div className="space-y-2">
+                <p className="text-sm font-medium">{excelRows.length} ta element topildi:</p>
+                <div className="max-h-64 overflow-y-auto rounded-lg border">
+                  <table className="w-full text-sm">
+                    <thead className="bg-muted/50 sticky top-0">
+                      <tr>
+                        <th className="text-left p-2 font-medium">Nomi</th>
+                        <th className="text-left p-2 font-medium">Birligi</th>
+                        <th className="text-right p-2 font-medium">Miqdori</th>
+                        <th className="text-right p-2 font-medium">Narxi</th>
+                        <th className="text-right p-2 font-medium">Jami</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {excelRows.map((row, i) => (
+                        <tr key={i} className="border-t hover:bg-muted/30">
+                          <td className="p-2">{row.name}</td>
+                          <td className="p-2 text-muted-foreground">{row.unit}</td>
+                          <td className="p-2 text-right">{row.quantity}</td>
+                          <td className="p-2 text-right">{row.unitPrice.toLocaleString()}</td>
+                          <td className="p-2 text-right font-medium">{(row.quantity * row.unitPrice).toLocaleString()}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            )}
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setExcelDialogOpen(false)} disabled={excelUploading}>
+              Bekor qilish
+            </Button>
+            <Button onClick={handleExcelUpload} disabled={excelRows.length === 0 || excelUploading}>
+              {excelUploading
+                ? <><Loader2 className="h-4 w-4 mr-2 animate-spin" />Yuklanmoqda...</>
+                : <><Upload className="h-4 w-4 mr-2" />{excelRows.length} ta element yuklash</>
+              }
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       {/* Assign User to Project Dialog */}
       <Dialog open={assignUserDialogOpen} onOpenChange={setAssignUserDialogOpen}>

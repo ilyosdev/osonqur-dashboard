@@ -67,7 +67,7 @@ export function Header() {
               </Avatar>
               <div className="hidden md:flex flex-col items-start">
                 <span className="text-sm font-medium">{user?.name || 'Foydalanuvchi'}</span>
-                <span className="text-[10px] text-muted-foreground">{user?.role || ''}</span>
+                <span className="text-[10px] text-muted-foreground">{user?.platformRole || user?.role || ''}</span>
               </div>
               <ChevronDown className="h-4 w-4 text-muted-foreground hidden md:block" />
             </Button>

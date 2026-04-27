@@ -48,9 +48,11 @@ export interface WorkLog {
 export interface CreateWorkLogRequest {
   workerId: string;
   projectId: string;
+  workType: string;
+  quantity: number;
+  unit: string;
+  unitPrice?: number;
   date: string;
-  hoursWorked: number;
-  description?: string;
 }
 
 export interface WorkerPayment {

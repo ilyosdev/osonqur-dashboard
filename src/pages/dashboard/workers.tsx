@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { UserCircle, Wallet, ClipboardList, AlertTriangle, UserPlus, Loader2 } from "lucide-react";
+import { UserCircle, Wallet, ClipboardList, AlertTriangle, UserPlus, Loader2, PlusCircle } from "lucide-react";
 import { StatsCard } from "@/components/dashboard/stats-card";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -13,8 +13,16 @@ import {
   DialogTitle,
   DialogFooter,
 } from "@/components/ui/dialog";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { useApi } from "@/hooks/use-api";
 import { workersApi } from "@/lib/api/workers";
+import { projectsApi } from "@/lib/api/projects";
 import { analyticsApi } from "@/lib/api/analytics";
 import { StatsSkeleton } from "@/components/ui/table-skeleton";
 import { ErrorMessage } from "@/components/ui/error-message";
@@ -26,11 +34,26 @@ function formatNumber(num: number): string {
   return num.toLocaleString("uz-UZ");
 }
 
+const today = new Date().toISOString().split("T")[0];
+
 export default function WorkersPage() {
   const [showAddDialog, setShowAddDialog] = useState(false);
   const [isCreating, setIsCreating] = useState(false);
   const [createError, setCreateError] = useState<string | null>(null);
   const [addForm, setAddForm] = useState({ firstName: "", lastName: "", phone: "", position: "" });
+
+  const [showSmenaDialog, setShowSmenaDialog] = useState(false);
+  const [isCreatingSmena, setIsCreatingSmena] = useState(false);
+  const [smenaError, setSmenaError] = useState<string | null>(null);
+  const [smenaForm, setSmenaForm] = useState({
+    workerId: "",
+    projectId: "",
+    workType: "",
+    quantity: "",
+    unit: "m²",
+    unitPrice: "",
+    date: today,
+  });
 
   const {
     data: workersResponse,
@@ -42,17 +65,23 @@ export default function WorkersPage() {
   const {
     data: workLogsResponse,
     loading: workLogsLoading,
+    refetch: refetchWorkLogs,
   } = useApi(() => workersApi.getWorkLogs({ limit: 10 }), []);
 
   const {
     data: workerDebtsData,
   } = useApi(() => analyticsApi.getWorkerDebts(), []);
 
+  const {
+    data: projectsResponse,
+  } = useApi(() => projectsApi.getAll({ limit: 100 }), []);
+
   const loading = workersLoading || workLogsLoading;
   const error = workersError;
 
   const workers = workersResponse?.data || [];
   const recentWorkLogs = workLogsResponse?.data || [];
+  const projects = projectsResponse?.data || [];
 
   const todayStr = new Date().toISOString().split('T')[0];
   const todayWorkLogs = recentWorkLogs.filter((l) => l.date.startsWith(todayStr));
@@ -78,6 +107,35 @@ export default function WorkersPage() {
       setCreateError(err instanceof Error ? err.message : "Usta qo'shishda xatolik");
     } finally {
       setIsCreating(false);
+    }
+  };
+
+  const handleAddSmena = async () => {
+    if (!smenaForm.workerId) { setSmenaError("Ishchini tanlang"); return; }
+    if (!smenaForm.projectId) { setSmenaError("Loyihani tanlang"); return; }
+    if (!smenaForm.workType.trim()) { setSmenaError("Ish turini kiriting"); return; }
+    if (!smenaForm.quantity || parseFloat(smenaForm.quantity) <= 0) { setSmenaError("Miqdorni kiriting"); return; }
+    if (!smenaForm.date) { setSmenaError("Sanani kiriting"); return; }
+
+    setIsCreatingSmena(true);
+    setSmenaError(null);
+    try {
+      await workersApi.createWorkLog({
+        workerId: smenaForm.workerId,
+        projectId: smenaForm.projectId,
+        workType: smenaForm.workType.trim(),
+        quantity: parseFloat(smenaForm.quantity),
+        unit: smenaForm.unit,
+        unitPrice: smenaForm.unitPrice ? parseFloat(smenaForm.unitPrice) : undefined,
+        date: new Date(smenaForm.date).toISOString(),
+      });
+      setShowSmenaDialog(false);
+      setSmenaForm({ workerId: "", projectId: "", workType: "", quantity: "", unit: "m²", unitPrice: "", date: today });
+      refetchWorkLogs();
+    } catch (err) {
+      setSmenaError(err instanceof Error ? err.message : "Smena qo'shishda xatolik");
+    } finally {
+      setIsCreatingSmena(false);
     }
   };
 
@@ -189,12 +247,18 @@ export default function WorkersPage() {
         </Card>
 
         <Card className="animate-slide-up" style={{ animationDelay: "0.3s" }}>
-          <CardHeader>
-            <CardTitle className="text-base font-semibold flex items-center gap-2">
-              <ClipboardList className="h-4 w-4 text-success" />
-              Oxirgi ishlar
-            </CardTitle>
-            <CardDescription>Bajarilgan ishlar</CardDescription>
+          <CardHeader className="flex flex-row items-center justify-between pb-2">
+            <div>
+              <CardTitle className="text-base font-semibold flex items-center gap-2">
+                <ClipboardList className="h-4 w-4 text-success" />
+                Oxirgi ishlar
+              </CardTitle>
+              <CardDescription>Bajarilgan ishlar</CardDescription>
+            </div>
+            <Button variant="ghost" size="sm" onClick={() => setShowSmenaDialog(true)}>
+              <PlusCircle className="h-4 w-4 mr-2" />
+              Smena
+            </Button>
           </CardHeader>
           <CardContent className="space-y-3">
             {workLogsLoading ? (
@@ -292,6 +356,128 @@ export default function WorkersPage() {
             </Button>
             <Button onClick={handleAddWorker} disabled={isCreating}>
               {isCreating ? (
+                <>
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  Saqlanmoqda...
+                </>
+              ) : (
+                "Qo'shish"
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Add Smena Dialog */}
+      <Dialog open={showSmenaDialog} onOpenChange={setShowSmenaDialog}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <PlusCircle className="h-5 w-5 text-primary" />
+              Smena qo'shish
+            </DialogTitle>
+          </DialogHeader>
+
+          {smenaError && (
+            <div className="p-3 rounded-lg bg-destructive/10 text-destructive text-sm">
+              {smenaError}
+            </div>
+          )}
+
+          <div className="space-y-4">
+            <div className="space-y-2">
+              <Label>Ishchi *</Label>
+              <Select
+                value={smenaForm.workerId}
+                onValueChange={(v) => setSmenaForm((p) => ({ ...p, workerId: v }))}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Ishchini tanlang..." />
+                </SelectTrigger>
+                <SelectContent>
+                  {workers.map((w) => (
+                    <SelectItem key={w.id} value={w.id}>
+                      {w.firstName} {w.lastName}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="space-y-2">
+              <Label>Loyiha *</Label>
+              <Select
+                value={smenaForm.projectId}
+                onValueChange={(v) => setSmenaForm((p) => ({ ...p, projectId: v }))}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Loyihani tanlang..." />
+                </SelectTrigger>
+                <SelectContent>
+                  {projects.map((p) => (
+                    <SelectItem key={p.id} value={p.id}>
+                      {p.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="space-y-2">
+              <Label>Ish turi *</Label>
+              <Input
+                placeholder="Masalan: G'isht terish"
+                value={smenaForm.workType}
+                onChange={(e) => setSmenaForm((p) => ({ ...p, workType: e.target.value }))}
+              />
+            </div>
+
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-2">
+                <Label>Miqdor *</Label>
+                <Input
+                  type="number"
+                  placeholder="50"
+                  value={smenaForm.quantity}
+                  onChange={(e) => setSmenaForm((p) => ({ ...p, quantity: e.target.value }))}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label>Birlik</Label>
+                <Input
+                  placeholder="m², soat, dona"
+                  value={smenaForm.unit}
+                  onChange={(e) => setSmenaForm((p) => ({ ...p, unit: e.target.value }))}
+                />
+              </div>
+            </div>
+
+            <div className="space-y-2">
+              <Label>Birlik narxi (ixtiyoriy)</Label>
+              <Input
+                type="number"
+                placeholder="15000"
+                value={smenaForm.unitPrice}
+                onChange={(e) => setSmenaForm((p) => ({ ...p, unitPrice: e.target.value }))}
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label>Sana *</Label>
+              <Input
+                type="date"
+                value={smenaForm.date}
+                onChange={(e) => setSmenaForm((p) => ({ ...p, date: e.target.value }))}
+              />
+            </div>
+          </div>
+
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowSmenaDialog(false)} disabled={isCreatingSmena}>
+              Bekor qilish
+            </Button>
+            <Button onClick={handleAddSmena} disabled={isCreatingSmena}>
+              {isCreatingSmena ? (
                 <>
                   <Loader2 className="h-4 w-4 mr-2 animate-spin" />
                   Saqlanmoqda...
