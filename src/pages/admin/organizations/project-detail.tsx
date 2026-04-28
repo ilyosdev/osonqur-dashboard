@@ -726,7 +726,7 @@ export default function ProjectDetailPage() {
 
       {/* Excel Upload Dialog */}
       <Dialog open={excelDialogOpen} onOpenChange={setExcelDialogOpen}>
-        <DialogContent className="max-w-2xl">
+        <DialogContent className="max-w-3xl w-full">
           <DialogHeader>
             <DialogTitle>Smeta elementlarini Excel orqali yuklash</DialogTitle>
             <DialogDescription>
@@ -758,21 +758,21 @@ export default function ProjectDetailPage() {
             {excelRows.length > 0 && (
               <div className="space-y-2">
                 <p className="text-sm font-medium">{excelRows.length} ta element topildi:</p>
-                <div className="max-h-64 overflow-y-auto rounded-lg border">
-                  <table className="w-full text-sm">
+                <div className="max-h-72 overflow-auto rounded-lg border">
+                  <table className="w-full text-sm table-fixed">
                     <thead className="bg-muted/50 sticky top-0">
                       <tr>
-                        <th className="text-left p-2 font-medium">Nomi</th>
-                        <th className="text-left p-2 font-medium">Birligi</th>
-                        <th className="text-right p-2 font-medium">Miqdori</th>
-                        <th className="text-right p-2 font-medium">Narxi</th>
-                        <th className="text-right p-2 font-medium">Jami</th>
+                        <th className="text-left p-2 font-medium w-[45%]">Nomi</th>
+                        <th className="text-left p-2 font-medium w-[12%]">Birlik</th>
+                        <th className="text-right p-2 font-medium w-[14%]">Miqdor</th>
+                        <th className="text-right p-2 font-medium w-[14%]">Narx</th>
+                        <th className="text-right p-2 font-medium w-[15%]">Jami</th>
                       </tr>
                     </thead>
                     <tbody>
                       {excelRows.map((row, i) => (
                         <tr key={i} className="border-t hover:bg-muted/30">
-                          <td className="p-2">{row.name}</td>
+                          <td className="p-2 break-words">{row.name}</td>
                           <td className="p-2 text-muted-foreground">{row.unit}</td>
                           <td className="p-2 text-right">{row.quantity}</td>
                           <td className="p-2 text-right">{row.unitPrice.toLocaleString()}</td>
