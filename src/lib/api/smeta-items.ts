@@ -89,6 +89,12 @@ export const smetaItemsApi = {
       body: JSON.stringify(data),
     }),
 
+  bulkCreate: (items: CreateSmetaItemRequest[]) =>
+    apiClient<{ count: number }>('/vendor/smeta-items/bulk', {
+      method: 'POST',
+      body: JSON.stringify({ items }),
+    }),
+
   update: (id: string, data: UpdateSmetaItemRequest) =>
     apiClient<SmetaItem>(`/vendor/smeta-items/${id}`, {
       method: 'PATCH',

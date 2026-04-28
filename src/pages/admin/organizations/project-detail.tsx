@@ -316,17 +316,15 @@ export default function ProjectDetailPage() {
     setExcelUploading(true);
     setExcelError("");
     try {
-      for (const row of excelRows) {
-        const payload: CreateSmetaItemRequest = {
-          smetaId: excelSmetaId,
-          name: row.name,
-          unit: row.unit,
-          quantity: row.quantity,
-          unitPrice: row.unitPrice,
-          category: "Umumiy",
-        };
-        await smetaItemsApi.create(payload);
-      }
+      const items: CreateSmetaItemRequest[] = excelRows.map((row) => ({
+        smetaId: excelSmetaId,
+        name: row.name,
+        unit: row.unit,
+        quantity: row.quantity,
+        unitPrice: row.unitPrice,
+        category: "Umumiy",
+      }));
+      await smetaItemsApi.bulkCreate(items);
       setExcelDialogOpen(false);
       fetchSmetas();
       fetchProject();
