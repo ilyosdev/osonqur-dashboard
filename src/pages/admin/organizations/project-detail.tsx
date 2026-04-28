@@ -405,8 +405,32 @@ export default function ProjectDetailPage() {
               </Button>
               <Button onClick={openAddSmetaDialog}>
                 <Plus className="h-4 w-4 mr-2" />
-                Smeta qo'shish
+                Yangi smeta
               </Button>
+              {smetas.length > 0 && (
+                smetas.length === 1 ? (
+                  <Button variant="outline" onClick={() => openExcelDialog(smetas[0].id)}>
+                    <Upload className="h-4 w-4 mr-2" />
+                    Excel yuklash
+                  </Button>
+                ) : (
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <Button variant="outline">
+                        <Upload className="h-4 w-4 mr-2" />
+                        Excel yuklash
+                      </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="end">
+                      {smetas.map((s) => (
+                        <DropdownMenuItem key={s.id} onClick={() => openExcelDialog(s.id)}>
+                          {s.name}
+                        </DropdownMenuItem>
+                      ))}
+                    </DropdownMenuContent>
+                  </DropdownMenu>
+                )
+              )}
             </div>
           </Card>
 
@@ -450,9 +474,6 @@ export default function ProjectDetailPage() {
                         <DropdownMenuContent align="end">
                           <DropdownMenuItem onClick={() => openEditSmetaDialog(smeta)}>
                             <Edit className="h-4 w-4 mr-2" />Tahrirlash
-                          </DropdownMenuItem>
-                          <DropdownMenuItem onClick={() => openExcelDialog(smeta.id)}>
-                            <Upload className="h-4 w-4 mr-2" />Excel yuklash
                           </DropdownMenuItem>
                           <DropdownMenuSeparator />
                           <DropdownMenuItem
