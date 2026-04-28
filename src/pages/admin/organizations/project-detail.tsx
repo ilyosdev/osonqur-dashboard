@@ -292,8 +292,8 @@ export default function ProjectDetailPage() {
         for (let i = 1; i < rows.length; i++) {
           const row = rows[i];
           if (!row || !row[0]) continue;
-          const name = String(row[0] || "").trim();
-          const unit = String(row[1] || "dona").trim();
+          const name = String(row[0] || "").trim().slice(0, 500);
+          const unit = String(row[1] || "dona").trim().slice(0, 50);
           const quantity = parseFloat(String(row[2] || "0").replace(",", ".")) || 0;
           const unitPrice = parseFloat(String(row[3] || "0").replace(",", ".")) || 0;
           if (name) parsed.push({ name, unit, quantity, unitPrice });
