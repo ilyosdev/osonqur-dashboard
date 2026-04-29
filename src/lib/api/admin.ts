@@ -29,6 +29,7 @@ export interface CreateOrganizationRequest {
   inn?: string;
   address?: string;
   logo?: string;
+  templateIds?: string[];
 }
 
 export interface CreateOrganizationResponse {
@@ -58,6 +59,7 @@ export interface AdminOrgUser {
   email?: string;
   telegramId?: string;
   role: string;
+  orgRoleId?: string;
   allowedRoles?: string[];
   isActive: boolean;
   createdAt: string;
@@ -167,6 +169,16 @@ export interface AdminOrgRole {
   updatedAt: string;
 }
 
+export interface AdminBotMenuItem {
+  id: string;
+  key: string;
+  label: string;
+  sortOrder: number;
+  description?: string;
+  isEnabled: boolean;
+  permissions: { key: string; name: string; isActive: boolean }[];
+}
+
 interface PaginatedResponse<T> {
   data: T[];
   total: number;
@@ -264,7 +276,7 @@ export const adminApi = {
       { method: 'GET' },
     ),
 
-  createOrgUser: (orgId: string, data: { name: string; phone: string; password: string; role: string; allowedRoles?: string[]; telegramId?: string }) =>
+  createOrgUser: (orgId: string, data: { name: string; phone: string; password: string; role?: string; orgRoleId?: string; allowedRoles?: string[]; telegramId?: string }) =>
     apiClient<AdminOrgUser>(`/admin/organizations/${orgId}/users`, {
       method: 'POST',
       body: JSON.stringify(data),
@@ -458,5 +470,14 @@ export const adminApi = {
     apiClient<{ success: boolean; reassigned: number }>(`/admin/orgs/${orgId}/roles/${roleId}/reassign`, {
       method: 'POST',
       body: JSON.stringify({ targetRoleId }),
+    }),
+
+  getOrgRoleBotMenu: (orgId: string, roleId: string) =>
+    apiClient<AdminBotMenuItem[]>(`/admin/orgs/${orgId}/roles/${roleId}/bot-menu`, { method: 'GET' }),
+
+  updateOrgRoleBotMenu: (orgId: string, roleId: string, items: { botMenuItemId: string; isEnabled: boolean }[]) =>
+    apiClient<AdminBotMenuItem[]>(`/admin/orgs/${orgId}/roles/${roleId}/bot-menu`, {
+      method: 'PUT',
+      body: JSON.stringify({ items }),
     }),
 };
