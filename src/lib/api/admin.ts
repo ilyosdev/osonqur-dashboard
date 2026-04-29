@@ -270,7 +270,7 @@ export const adminApi = {
       body: JSON.stringify(data),
     }),
 
-  updateOrgUser: (orgId: string, userId: string, data: { name?: string; phone?: string; password?: string; role?: string; allowedRoles?: string[]; isActive?: boolean; telegramId?: string }) =>
+  updateOrgUser: (orgId: string, userId: string, data: { name?: string; phone?: string; password?: string; role?: string; orgRoleId?: string; allowedRoles?: string[]; isActive?: boolean; telegramId?: string }) =>
     apiClient<AdminOrgUser>(`/admin/organizations/${orgId}/users/${userId}`, {
       method: 'PATCH',
       body: JSON.stringify(data),

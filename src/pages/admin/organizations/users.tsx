@@ -170,7 +170,7 @@ export default function OrgUsersPage() {
       if (formData.phone.trim()) data.phone = "+998" + formData.phone.replace(/\s/g, "");
       if (formData.password.trim()) data.password = formData.password;
       if (formData.telegramId !== undefined) data.telegramId = formData.telegramId || undefined;
-      if (formData.orgRoleId) data.orgRoleId = formData.orgRoleId;
+      if (formData.orgRoleId) { data.orgRoleId = formData.orgRoleId; data.role = formData.role; }
       // Always send allowedRoles (empty array clears them)
       data.allowedRoles = formData.allowedRoles;
       await adminApi.updateOrgUser(orgId, selectedUser.id, data);
@@ -386,7 +386,7 @@ export default function OrgUsersPage() {
               <Label>Rol *</Label>
               <Select value={formData.orgRoleId} onValueChange={(v) => {
                 const role = orgRoles.find(r => r.id === v);
-                setFormData(p => ({ ...p, orgRoleId: v }));
+                setFormData(p => ({ ...p, orgRoleId: v, role: role?.name || p.role }));
               }}>
                 <SelectTrigger><SelectValue placeholder="Rolni tanlang..." /></SelectTrigger>
                 <SelectContent>
@@ -439,7 +439,7 @@ export default function OrgUsersPage() {
               <Label>Rol</Label>
               <Select value={formData.orgRoleId} onValueChange={(v) => {
                 const role = orgRoles.find(r => r.id === v);
-                setFormData(p => ({ ...p, orgRoleId: v }));
+                setFormData(p => ({ ...p, orgRoleId: v, role: role?.name || p.role }));
               }}>
                 <SelectTrigger><SelectValue placeholder="Rolni tanlang..." /></SelectTrigger>
                 <SelectContent>
