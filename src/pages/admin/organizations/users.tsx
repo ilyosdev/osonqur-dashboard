@@ -26,7 +26,6 @@ import {
 import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from "@/components/ui/table";
-import { Checkbox } from "@/components/ui/checkbox";
 import { adminApi, AdminOrgUser, AdminOrganization, AdminOrgRole, UserProjectAssignment, AdminOrgProject } from "@/lib/api/admin";
 
 export default function OrgUsersPage() {
@@ -58,7 +57,6 @@ export default function OrgUsersPage() {
   const [formData, setFormData] = useState({
     name: "", phone: "", password: "", role: "PRORAB", telegramId: "", allowedRoles: [] as string[], orgRoleId: "",
   });
-  const [selectedRoleIds, setSelectedRoleIds] = useState<string[]>([]);
 
   const fetchOrg = useCallback(async () => {
     if (!orgId) return;
@@ -96,7 +94,6 @@ export default function OrgUsersPage() {
 
   const resetForm = () => {
     setFormData({ name: "", phone: "", password: "", role: "PRORAB", telegramId: "", allowedRoles: [], orgRoleId: "" });
-    setSelectedRoleIds([]);
     setFormError("");
     setShowPassword(false);
   };
@@ -144,25 +141,16 @@ export default function OrgUsersPage() {
       setFormError("Parol kamida 6 ta belgi bo'lishi kerak");
       return;
     }
-    if (selectedRoleIds.length === 0) {
-      setFormError("Kamida bitta rol tanlang");
-      return;
-    }
     setIsSubmitting(true);
     setFormError("");
     try {
-      const phone = "+998" + formData.phone.replace(/\s/g, "");
-      for (const roleId of selectedRoleIds) {
-        const orgRole = orgRoles.find(r => r.id === roleId);
-        await adminApi.createOrgUser(orgId, {
-          name: formData.name,
-          phone,
-          password: formData.password,
-          telegramId: formData.telegramId || undefined,
-          orgRoleId: roleId,
-          role: orgRole?.name || "PRORAB",
-        });
-      }
+      await adminApi.createOrgUser(orgId, {
+        name: formData.name,
+        phone: "+998" + formData.phone.replace(/\s/g, ""),
+        password: formData.password,
+        telegramId: formData.telegramId || undefined,
+        orgRoleId: formData.orgRoleId || undefined,
+      });
       setAddDialogOpen(false);
       fetchUsers();
     } catch (err) {
@@ -395,26 +383,16 @@ export default function OrgUsersPage() {
               </div>
             </div>
             <div className="space-y-2">
-              <Label>Rollar * <span className="text-muted-foreground text-xs">(bir nechta tanlash mumkin)</span></Label>
-              <div className="border rounded-lg p-3 space-y-2 max-h-48 overflow-y-auto">
-                {orgRoles.map((r) => (
-                  <div key={r.id} className="flex items-center gap-2">
-                    <Checkbox
-                      id={`role-${r.id}`}
-                      checked={selectedRoleIds.includes(r.id)}
-                      onCheckedChange={(checked) => {
-                        setSelectedRoleIds(prev =>
-                          checked ? [...prev, r.id] : prev.filter(id => id !== r.id)
-                        );
-                      }}
-                    />
-                    <label htmlFor={`role-${r.id}`} className="text-sm cursor-pointer">{r.name}</label>
-                  </div>
-                ))}
-              </div>
-              {selectedRoleIds.length > 0 && (
-                <p className="text-xs text-muted-foreground">{selectedRoleIds.length} ta rol tanlandi — har biri uchun alohida xodim yaratiladi</p>
-              )}
+              <Label>Rol *</Label>
+              <Select value={formData.orgRoleId} onValueChange={(v) => {
+                const role = orgRoles.find(r => r.id === v);
+                setFormData(p => ({ ...p, orgRoleId: v, role: role?.name || p.role }));
+              }}>
+                <SelectTrigger><SelectValue placeholder="Rolni tanlang..." /></SelectTrigger>
+                <SelectContent>
+                  {orgRoles.map((r) => <SelectItem key={r.id} value={r.id}>{r.name}</SelectItem>)}
+                </SelectContent>
+              </Select>
             </div>
             <div className="space-y-2">
               <Label>Telegram ID (ixtiyoriy)</Label>
@@ -425,12 +403,7 @@ export default function OrgUsersPage() {
           <DialogFooter>
             <Button variant="outline" onClick={() => setAddDialogOpen(false)} disabled={isSubmitting}>Bekor qilish</Button>
             <Button onClick={handleAdd} disabled={isSubmitting}>
-              {isSubmitting
-                ? <><Loader2 className="h-4 w-4 mr-2 animate-spin" />Qo'shilmoqda...</>
-                : selectedRoleIds.length > 1
-                  ? `${selectedRoleIds.length} ta xodim qo'shish`
-                  : "Qo'shish"
-              }
+              {isSubmitting ? <><Loader2 className="h-4 w-4 mr-2 animate-spin" />Qo'shilmoqda...</> : "Qo'shish"}
             </Button>
           </DialogFooter>
         </DialogContent>
