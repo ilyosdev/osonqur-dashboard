@@ -30,8 +30,9 @@ export function AuthGuard({ children }: { children: React.ReactNode }) {
     return <Navigate to="/login" state={{ from: location }} replace />;
   }
 
-  // Admin users go to /admin, not vendor dashboard
-  if (isAdmin && !location.pathname.startsWith('/admin')) {
+  // Only platform admins (SUPER_ADMIN, OPERATOR) go to /admin
+  const isPlatformAdmin = user?.platformRole === 'SUPER_ADMIN' || user?.platformRole === 'OPERATOR';
+  if (isPlatformAdmin && !location.pathname.startsWith('/admin')) {
     return <Navigate to="/admin" replace />;
   }
 

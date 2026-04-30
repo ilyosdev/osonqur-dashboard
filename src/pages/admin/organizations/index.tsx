@@ -9,6 +9,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
+import { Checkbox } from "@/components/ui/checkbox";
 import {
   Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle,
 } from "@/components/ui/dialog";
@@ -20,7 +21,7 @@ import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem,
   DropdownMenuSeparator, DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { adminApi, AdminOrganization, SubscriptionTier } from "@/lib/api/admin";
+import { adminApi, AdminOrganization, AdminRoleTemplate, SubscriptionTier } from "@/lib/api/admin";
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
@@ -53,6 +54,8 @@ export default function OrganizationsPage() {
   });
   const [showPassword, setShowPassword] = useState(false);
   const [createdAdmin, setCreatedAdmin] = useState<{ name: string; phone: string } | null>(null);
+  const [templates, setTemplates] = useState<AdminRoleTemplate[]>([]);
+  const [selectedTemplateIds, setSelectedTemplateIds] = useState<Set<string>>(new Set());
 
   const TIER_LABELS: Record<SubscriptionTier, string> = {
     ODDIY: "Oddiy (1 loyiha)",
@@ -89,6 +92,14 @@ export default function OrganizationsPage() {
     fetchOrgs();
   }, [fetchOrgs]);
 
+  useEffect(() => {
+    adminApi.getRoleTemplates().then((data) => {
+      const active = (data || []).filter((t) => t.isActive && t.isSystem);
+      setTemplates(active);
+      setSelectedTemplateIds(new Set(active.map((t) => t.id)));
+    }).catch(() => {});
+  }, []);
+
   const resetForm = () => {
     setFormData({
       name: "",
@@ -102,6 +113,7 @@ export default function OrganizationsPage() {
     setFormError("");
     setShowPassword(false);
     setCreatedAdmin(null);
+    setSelectedTemplateIds(new Set(templates.map((t) => t.id)));
   };
 
   const openAddDialog = () => { resetForm(); setAddDialogOpen(true); };
@@ -145,6 +157,7 @@ export default function OrganizationsPage() {
         subscriptionTier: formData.subscriptionTier,
         inn: formData.inn.trim() || undefined,
         address: formData.address.trim() || undefined,
+        templateIds: selectedTemplateIds.size > 0 ? Array.from(selectedTemplateIds) : undefined,
       });
       setCreatedAdmin(result.adminUser ? { name: result.adminUser.name, phone: result.adminUser.phone } : { name: formData.responsiblePerson, phone: "+998" + formData.phone.replace(/\s/g, "") });
       fetchOrgs();
@@ -432,6 +445,61 @@ export default function OrganizationsPage() {
                 <div className="space-y-2">
                   <Label>Manzil (ixtiyoriy)</Label>
                   <Input placeholder="Toshkent, Mirzo Ulug'bek" value={formData.address} onChange={(e) => setFormData(p => ({ ...p, address: e.target.value }))} />
+                </div>
+
+                <div className="border-t pt-4">
+                  <div className="flex items-center justify-between mb-3">
+                    <p className="text-sm font-medium">Rollar</p>
+                    <div className="flex gap-2">
+                      <button
+                        type="button"
+                        className="text-xs text-primary hover:underline"
+                        onClick={() => setSelectedTemplateIds(new Set(templates.map((t) => t.id)))}
+                      >
+                        Barchasini tanlash
+                      </button>
+                      <span className="text-xs text-muted-foreground">·</span>
+                      <button
+                        type="button"
+                        className="text-xs text-muted-foreground hover:underline"
+                        onClick={() => setSelectedTemplateIds(new Set())}
+                      >
+                        Tozalash
+                      </button>
+                    </div>
+                  </div>
+                  <div className="grid grid-cols-2 gap-2 mb-4">
+                    {templates.map((t) => (
+                      <div
+                        key={t.id}
+                        className={`flex items-center gap-2 p-2 rounded-lg border cursor-pointer transition-colors ${
+                          selectedTemplateIds.has(t.id)
+                            ? "border-primary bg-primary/5"
+                            : "border-border hover:bg-muted/50"
+                        }`}
+                        onClick={() => {
+                          setSelectedTemplateIds((prev) => {
+                            const next = new Set(prev);
+                            if (next.has(t.id)) next.delete(t.id);
+                            else next.add(t.id);
+                            return next;
+                          });
+                        }}
+                      >
+                        <Checkbox
+                          checked={selectedTemplateIds.has(t.id)}
+                          onCheckedChange={() => {}}
+                        />
+                        <div className="min-w-0">
+                          <p className="text-sm font-medium truncate">{t.name}</p>
+                          <p className="text-xs text-muted-foreground">{(t.permissions || []).length} ruxsat</p>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                  {selectedTemplateIds.size === 0 && (
+                    <p className="text-xs text-amber-600 mb-3">⚠️ Hech bir rol tanlanmagan — kampaniya rollarsiz yaratiladi</p>
+                  )}
                 </div>
 
                 <div className="border-t pt-4">

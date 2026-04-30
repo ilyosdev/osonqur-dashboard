@@ -460,7 +460,7 @@ export default function ProjectDetailPage() {
                 <Card key={smeta.id} className="overflow-hidden transition-all duration-200 hover:shadow-md">
                   <CardContent className="p-5">
                     <div className="flex items-start justify-between gap-2 mb-3">
-                      <Link to={`/smetas/${smeta.id}`} className="font-semibold text-lg hover:text-primary transition-colors">
+                      <Link to={`/admin/smetas/${smeta.id}`} className="font-semibold text-lg hover:text-primary transition-colors">
                         {smeta.name}
                       </Link>
                       <DropdownMenu>

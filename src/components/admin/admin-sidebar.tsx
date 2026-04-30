@@ -6,9 +6,7 @@ import {
   UserCog,
   Users,
   HardHat,
-  Shield,
   Layers,
-  KeyRound,
 } from "lucide-react";
 import {
   Sidebar,
@@ -56,18 +54,6 @@ const managementNavItems: NavItem[] = [
 ];
 
 const rolePermissionNavItems: NavItem[] = [
-  {
-    title: "Permission guruhlar",
-    url: "/admin/permission-groups",
-    icon: KeyRound,
-    roles: ["SUPER_ADMIN"],
-  },
-  {
-    title: "Rol shablonlar",
-    url: "/admin/role-templates",
-    icon: Shield,
-    roles: ["SUPER_ADMIN"],
-  },
   {
     title: "Tashkilot rollari",
     url: "/admin/org-roles",

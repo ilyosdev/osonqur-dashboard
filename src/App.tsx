@@ -71,6 +71,8 @@ function App() {
         <Route path="/admin/organizations/:orgId/users" element={<OrgUsersPage />} />
         <Route path="/admin/organizations/:orgId/projects" element={<OrgProjectsPage />} />
         <Route path="/admin/organizations/:orgId/projects/:projectId" element={<OrgProjectDetailPage />} />
+        <Route path="/admin/smetas/:id" element={<SmetaDetailPage />} />
+        <Route path="/admin/smetas/:id/add-item" element={<AddSmetaItemPage />} />
         <Route path="/admin/permission-groups" element={<PermissionGroupsPage />} />
         <Route path="/admin/role-templates" element={<RoleTemplatesPage />} />
         <Route path="/admin/org-roles" element={<OrgRolesPage />} />

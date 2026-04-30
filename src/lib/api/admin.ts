@@ -152,6 +152,16 @@ export interface AdminRoleTemplate {
   updatedAt: string;
 }
 
+export interface AdminBotMenuItem {
+  id: string;
+  key: string;
+  label: string;
+  sortOrder: number;
+  description?: string;
+  isEnabled: boolean;
+  permissions: { key: string; name: string; isActive: boolean }[];
+}
+
 export interface AdminOrgRole {
   id: string;
   name: string;
@@ -458,5 +468,14 @@ export const adminApi = {
     apiClient<{ success: boolean; reassigned: number }>(`/admin/orgs/${orgId}/roles/${roleId}/reassign`, {
       method: 'POST',
       body: JSON.stringify({ targetRoleId }),
+    }),
+
+  getOrgRoleBotMenu: (orgId: string, roleId: string) =>
+    apiClient<AdminBotMenuItem[]>(`/admin/orgs/${orgId}/roles/${roleId}/bot-menu`, { method: 'GET' }),
+
+  updateOrgRoleBotMenu: (orgId: string, roleId: string, items: { botMenuItemId: string; isEnabled: boolean }[]) =>
+    apiClient<{ success: boolean }>(`/admin/orgs/${orgId}/roles/${roleId}/bot-menu`, {
+      method: 'PUT',
+      body: JSON.stringify({ items }),
     }),
 };

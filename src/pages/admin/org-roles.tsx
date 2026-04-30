@@ -2,7 +2,7 @@ import { useEffect, useState, useCallback } from "react";
 import {
   Building2, Users, Plus, Search, RefreshCw, Loader2, MoreVertical,
   Edit, Trash2, AlertCircle, Shield, ChevronDown, ChevronRight,
-  FileKey2, ArrowRightLeft, Zap,
+  FileKey2, ArrowRightLeft, Zap, Bot,
 } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -36,6 +36,7 @@ import {
   AdminPermissionGroup,
   AdminPermission,
   AdminRoleTemplate,
+  AdminBotMenuItem,
 } from "@/lib/api/admin";
 
 export default function OrgRolesPage() {
@@ -69,6 +70,11 @@ export default function OrgRolesPage() {
 
   // Apply template state
   const [selectedTemplateId, setSelectedTemplateId] = useState<string>("");
+
+  // Bot menu state
+  const [botMenuItems, setBotMenuItems] = useState<AdminBotMenuItem[]>([]);
+  const [botMenuSaving, setBotMenuSaving] = useState(false);
+  const [activeTab, setActiveTab] = useState("permissions");
 
   // Reassign state
   const [targetRoleId, setTargetRoleId] = useState<string>("");
@@ -152,14 +158,20 @@ export default function OrgRolesPage() {
   const openManageDialog = async (role: AdminOrgRole) => {
     setSelectedRole(role);
     setExpandedGroups(new Set((permissionGroups || []).map((g) => g.id)));
+    setActiveTab("permissions");
     setManageDialogOpen(true);
     try {
-      const details = await adminApi.getOrgRoleDetails(selectedOrgId, role.id);
+      const [details, menuItems] = await Promise.all([
+        adminApi.getOrgRoleDetails(selectedOrgId, role.id),
+        adminApi.getOrgRoleBotMenu(selectedOrgId, role.id),
+      ]);
       setSelectedPermIds(new Set((details.permissions || []).map((p) => p.permissionId || p.permission?.id || p.id)));
       setSelectedAuthorityIds(new Set((details.canManage || []).map((a) => a.canManageId || a.managed?.id || '')));
+      setBotMenuItems(menuItems || []);
     } catch {
       setSelectedPermIds(new Set());
       setSelectedAuthorityIds(new Set());
+      setBotMenuItems([]);
     }
   };
 
@@ -279,6 +291,30 @@ export default function OrgRolesPage() {
       setReassignResult(err instanceof Error ? err.message : "Ko'chirishda xatolik");
     } finally {
       setIsSubmitting(false);
+    }
+  };
+
+  const toggleBotMenuItem = (itemId: string) => {
+    setBotMenuItems((prev) =>
+      prev.map((item) => item.id === itemId ? { ...item, isEnabled: !item.isEnabled } : item)
+    );
+  };
+
+  const handleSaveBotMenu = async () => {
+    if (!selectedRole) return;
+    setBotMenuSaving(true);
+    try {
+      await adminApi.updateOrgRoleBotMenu(
+        selectedOrgId,
+        selectedRole.id,
+        botMenuItems.map((item) => ({ botMenuItemId: item.id, isEnabled: item.isEnabled })),
+      );
+      const refreshed = await adminApi.getOrgRoleBotMenu(selectedOrgId, selectedRole.id);
+      setBotMenuItems(refreshed || []);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Bot menyusini saqlashda xatolik");
+    } finally {
+      setBotMenuSaving(false);
     }
   };
 
@@ -695,7 +731,7 @@ export default function OrgRolesPage() {
               Ruxsatlar va vakolat darajasini boshqaring
             </DialogDescription>
           </DialogHeader>
-          <Tabs defaultValue="permissions">
+          <Tabs value={activeTab} onValueChange={setActiveTab}>
             <TabsList>
               <TabsTrigger value="permissions">
                 <Shield className="h-4 w-4 mr-1" />
@@ -704,6 +740,10 @@ export default function OrgRolesPage() {
               <TabsTrigger value="authority">
                 <Users className="h-4 w-4 mr-1" />
                 Vakolat ({selectedAuthorityIds.size})
+              </TabsTrigger>
+              <TabsTrigger value="bot-menu">
+                <Bot className="h-4 w-4 mr-1" />
+                Bot menyusi ({botMenuItems.filter((i) => i.isEnabled).length}/{botMenuItems.length})
               </TabsTrigger>
             </TabsList>
 
@@ -844,21 +884,57 @@ export default function OrgRolesPage() {
                 )}
               </div>
             </TabsContent>
+
+            <TabsContent value="bot-menu">
+              <div className="overflow-y-auto max-h-[50vh] space-y-1 pr-2">
+                <p className="text-sm text-muted-foreground mb-3">
+                  Telegram bot menyusida ko'rsatiladigan tugmalarni tanlang:
+                </p>
+                {botMenuItems.length === 0 ? (
+                  <p className="text-center text-muted-foreground py-8">
+                    Bot menyu elementlari topilmadi
+                  </p>
+                ) : (
+                  botMenuItems.map((item) => (
+                    <div
+                      key={item.id}
+                      className={`p-3 rounded-lg border transition-colors ${
+                        item.isEnabled ? "border-primary/30 bg-primary/5" : "border-border"
+                      }`}
+                    >
+                      <div className="flex items-center gap-3">
+                        <Switch
+                          checked={item.isEnabled}
+                          onCheckedChange={() => toggleBotMenuItem(item.id)}
+                        />
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-2">
+                            <span className="font-medium text-sm">{item.label}</span>
+                          </div>
+                          {item.description && (
+                            <p className="text-xs text-muted-foreground mt-0.5">{item.description}</p>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  ))
+                )}
+              </div>
+            </TabsContent>
           </Tabs>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setManageDialogOpen(false)} disabled={permSaving}>
+            <Button variant="outline" onClick={() => setManageDialogOpen(false)} disabled={permSaving || botMenuSaving}>
               Bekor qilish
             </Button>
-            <Button onClick={handleSavePermissions} disabled={permSaving}>
-              {permSaving ? (
-                <>
-                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                  Saqlanmoqda...
-                </>
-              ) : (
-                "Saqlash"
-              )}
-            </Button>
+            {activeTab === "bot-menu" ? (
+              <Button onClick={handleSaveBotMenu} disabled={botMenuSaving}>
+                {botMenuSaving ? <><Loader2 className="h-4 w-4 mr-2 animate-spin" />Saqlanmoqda...</> : "Saqlash"}
+              </Button>
+            ) : (
+              <Button onClick={handleSavePermissions} disabled={permSaving}>
+                {permSaving ? <><Loader2 className="h-4 w-4 mr-2 animate-spin" />Saqlanmoqda...</> : "Saqlash"}
+              </Button>
+            )}
           </DialogFooter>
         </DialogContent>
       </Dialog>
