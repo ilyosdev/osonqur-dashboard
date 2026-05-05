@@ -724,7 +724,7 @@ export default function ProjectDetailPage() {
 
       {/* Excel Upload Dialog */}
       <Dialog open={excelDialogOpen} onOpenChange={setExcelDialogOpen}>
-        <DialogContent className="max-w-3xl w-full">
+        <DialogContent className="max-w-5xl w-full">
           <DialogHeader>
             <DialogTitle>Smeta elementlarini Excel orqali yuklash</DialogTitle>
             <DialogDescription>
@@ -756,7 +756,7 @@ export default function ProjectDetailPage() {
             {excelRows.length > 0 && (
               <div className="space-y-2">
                 <p className="text-sm font-medium">{excelRows.length} ta element topildi:</p>
-                <div className="max-h-72 overflow-auto rounded-lg border">
+                <div className="max-h-[55vh] overflow-auto rounded-lg border">
                   <table className="w-full text-sm table-fixed">
                     <thead className="bg-muted/50 sticky top-0">
                       <tr>
