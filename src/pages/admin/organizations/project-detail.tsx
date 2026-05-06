@@ -724,76 +724,93 @@ export default function ProjectDetailPage() {
 
       {/* Excel Upload Dialog */}
       <Dialog open={excelDialogOpen} onOpenChange={setExcelDialogOpen}>
-        <DialogContent className="max-w-5xl w-full">
-          <DialogHeader>
-            <DialogTitle>Smeta elementlarini Excel orqali yuklash</DialogTitle>
-            <DialogDescription>
-              Excel fayl formati: <strong>Nomi | Birligi | Miqdori | Narxi</strong> (1-qator sarlavha)
-            </DialogDescription>
-          </DialogHeader>
-          {excelError && (
-            <div className="p-3 rounded-lg bg-destructive/10 text-destructive text-sm">{excelError}</div>
-          )}
-          <div className="space-y-4">
-            <div
-              className="border-2 border-dashed border-muted-foreground/30 rounded-lg p-8 text-center cursor-pointer hover:border-primary/50 transition-colors"
-              onClick={() => fileInputRef.current?.click()}
-            >
-              <Upload className="h-10 w-10 mx-auto text-muted-foreground mb-3" />
-              <p className="text-sm font-medium">
-                {excelFileName || "Excel faylni tanlang (.xlsx, .xls)"}
-              </p>
-              <p className="text-xs text-muted-foreground mt-1">Bosing yoki faylni bu yerga tashlang</p>
-              <input
-                ref={fileInputRef}
-                type="file"
-                accept=".xlsx,.xls"
-                className="hidden"
-                onChange={handleExcelFile}
-              />
+        <DialogContent className="!w-[96vw] !max-w-[96vw] h-[calc(100vh-32px)] max-h-[calc(100vh-32px)] flex flex-col p-0 gap-0 overflow-hidden">
+          {/* Header */}
+          <div className="px-7 pt-6 pb-0 shrink-0">
+            <div className="flex items-start justify-between mb-1">
+              <div>
+                <h2 className="text-lg font-medium">Smeta elementlarini Excel orqali yuklash</h2>
+                <p className="text-sm text-muted-foreground mt-1">
+                  Excel fayl formati: <strong className="text-foreground font-medium">Nomi</strong> | <strong className="text-foreground font-medium">Birligi</strong> | <strong className="text-foreground font-medium">Miqdori</strong> | <strong className="text-foreground font-medium">Narxi</strong> <span className="text-muted-foreground/60">(1-qator sarlavha)</span>
+                </p>
+              </div>
             </div>
 
+            {excelError && (
+              <div className="mt-3 p-3 rounded-lg bg-destructive/10 text-destructive text-sm">{excelError}</div>
+            )}
+
+            {/* File upload area */}
+            <div
+              className="mt-4 border border-dashed border-muted-foreground/30 rounded-xl p-4 flex items-center gap-4 cursor-pointer hover:border-primary/50 transition-colors bg-muted/30"
+              onClick={() => fileInputRef.current?.click()}
+            >
+              <div className="w-10 h-10 rounded-lg bg-green-500/10 flex items-center justify-center shrink-0">
+                <FileSpreadsheet className="h-5 w-5 text-green-600" />
+              </div>
+              <div className="flex-1 min-w-0">
+                <p className="text-sm font-medium truncate">{excelFileName || "Excel faylni tanlang (.xlsx, .xls)"}</p>
+                <p className="text-xs text-muted-foreground mt-0.5">Bosing yoki faylni bu yerga tashlang</p>
+              </div>
+              <input ref={fileInputRef} type="file" accept=".xlsx,.xls" className="hidden" onChange={handleExcelFile} />
+            </div>
+
+            {/* Row count */}
             {excelRows.length > 0 && (
-              <div className="space-y-2">
-                <p className="text-sm font-medium">{excelRows.length} ta element topildi:</p>
-                <div className="max-h-[55vh] overflow-auto rounded-lg border">
-                  <table className="w-full text-sm table-fixed">
-                    <thead className="bg-muted/50 sticky top-0">
-                      <tr>
-                        <th className="text-left p-2 font-medium w-[45%]">Nomi</th>
-                        <th className="text-left p-2 font-medium w-[12%]">Birlik</th>
-                        <th className="text-right p-2 font-medium w-[14%]">Miqdor</th>
-                        <th className="text-right p-2 font-medium w-[14%]">Narx</th>
-                        <th className="text-right p-2 font-medium w-[15%]">Jami</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {excelRows.map((row, i) => (
-                        <tr key={i} className="border-t hover:bg-muted/30">
-                          <td className="p-2 break-words">{row.name}</td>
-                          <td className="p-2 text-muted-foreground">{row.unit}</td>
-                          <td className="p-2 text-right">{row.quantity}</td>
-                          <td className="p-2 text-right">{row.unitPrice.toLocaleString()}</td>
-                          <td className="p-2 text-right font-medium">{(row.quantity * row.unitPrice).toLocaleString()}</td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
+              <div className="flex items-center gap-2 mt-4 mb-3">
+                <div className="w-2 h-2 rounded-full bg-green-500" />
+                <span className="text-sm font-medium">{excelRows.length} ta element topildi</span>
               </div>
             )}
           </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setExcelDialogOpen(false)} disabled={excelUploading}>
-              Bekor qilish
-            </Button>
-            <Button onClick={handleExcelUpload} disabled={excelRows.length === 0 || excelUploading}>
-              {excelUploading
-                ? <><Loader2 className="h-4 w-4 mr-2 animate-spin" />Yuklanmoqda...</>
-                : <><Upload className="h-4 w-4 mr-2" />{excelRows.length} ta element yuklash</>
-              }
-            </Button>
-          </DialogFooter>
+
+          {/* Table */}
+          {excelRows.length > 0 && (
+            <div className="flex-1 overflow-auto border-t border-border min-h-0">
+              <table className="w-full text-sm" style={{ tableLayout: 'fixed' }}>
+                <thead className="bg-muted/50 sticky top-0 z-10">
+                  <tr>
+                    <th className="text-left px-4 py-2.5 font-medium text-muted-foreground text-xs w-10">#</th>
+                    <th className="text-left px-4 py-2.5 font-medium text-muted-foreground text-xs w-[38%]">Nomi</th>
+                    <th className="text-left px-4 py-2.5 font-medium text-muted-foreground text-xs w-[16%]">Birligi</th>
+                    <th className="text-right px-4 py-2.5 font-medium text-muted-foreground text-xs w-[12%]">Miqdori</th>
+                    <th className="text-right px-4 py-2.5 font-medium text-muted-foreground text-xs w-[18%]">Narxi</th>
+                    <th className="text-right px-4 py-2.5 font-medium text-muted-foreground text-xs w-[12%]">Jami</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {excelRows.map((row, i) => (
+                    <tr key={i} className="border-t border-border/50 hover:bg-muted/30">
+                      <td className="px-4 py-2.5 text-muted-foreground text-xs">{i + 1}</td>
+                      <td className="px-4 py-2.5 break-words leading-snug">{row.name}</td>
+                      <td className="px-4 py-2.5 text-muted-foreground">{row.unit}</td>
+                      <td className="px-4 py-2.5 text-right">{row.quantity}</td>
+                      <td className="px-4 py-2.5 text-right font-medium">{row.unitPrice.toLocaleString()}</td>
+                      <td className="px-4 py-2.5 text-right">{(row.quantity * row.unitPrice).toLocaleString()}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+
+          {/* Footer */}
+          <div className="px-6 py-4 flex items-center justify-between border-t border-border bg-muted/30 shrink-0">
+            <p className="text-sm text-muted-foreground">
+              Jami: <strong className="text-foreground font-medium">{excelRows.length.toLocaleString()}</strong> ta element yuklanadi
+            </p>
+            <div className="flex gap-2.5">
+              <Button variant="outline" onClick={() => setExcelDialogOpen(false)} disabled={excelUploading}>
+                Bekor qilish
+              </Button>
+              <Button onClick={handleExcelUpload} disabled={excelRows.length === 0 || excelUploading}>
+                {excelUploading
+                  ? <><Loader2 className="h-4 w-4 mr-2 animate-spin" />Yuklanmoqda...</>
+                  : <><Upload className="h-4 w-4 mr-2" />{excelRows.length} ta element yuklash</>
+                }
+              </Button>
+            </div>
+          </div>
         </DialogContent>
       </Dialog>
 
