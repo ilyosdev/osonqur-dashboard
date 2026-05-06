@@ -309,8 +309,7 @@ export default function OrgRolesPage() {
         selectedRole.id,
         botMenuItems.map((item) => ({ botMenuItemId: item.id, isEnabled: item.isEnabled })),
       );
-      const refreshed = await adminApi.getOrgRoleBotMenu(selectedOrgId, selectedRole.id);
-      setBotMenuItems(refreshed || []);
+      setManageDialogOpen(false);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Bot menyusini saqlashda xatolik");
     } finally {
