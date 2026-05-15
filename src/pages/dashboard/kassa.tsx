@@ -45,6 +45,7 @@ import {
 import { useApi, useMutation } from "@/hooks/use-api";
 import { useAuth } from "@/lib/auth";
 import { usePermission } from "@/hooks";
+import { useProject } from "@/lib/project-context";
 import { Badge } from "@/components/ui/badge";
 import {
   cashRegistersApi,
@@ -65,9 +66,10 @@ function formatMoney(num: number): string {
 type ActiveView = "balance" | "history" | "expenses" | "requests" | "incomes" | "employees";
 
 export default function KassaPage() {
-  const { user } = useAuth();
+  const { user, hasPermission } = useAuth();
+  const canViewKoshelok = hasPermission('kassa:view') || hasPermission('kashlok:view_all');
   const isReadOnly = !usePermission('cash-register:create');
-  const canRequestMoney = usePermission('cash-request:create');
+  const canRequestMoney = usePermission('cash-request:create') || hasPermission('kassa:request_money');
   const isBugalteriya = usePermission('income:view');
 
   const [activeView, setActiveView] = useState<ActiveView>("balance");
@@ -82,13 +84,13 @@ export default function KassaPage() {
   const [dateFrom, setDateFrom] = useState("");
   const [dateTo, setDateTo] = useState("");
 
-  // Koshelok data
+  // Koshelok data — faqat kashlok:view_own bo'lsa chaqiriladi
   const {
     data: koshelok,
     loading: koshelokLoading,
     error: koshelokError,
     refetch: refetchKoshelok,
-  } = useApi(() => cashRegistersApi.getMyKoshelok(), []);
+  } = useApi(() => cashRegistersApi.getMyKoshelok(), [], { enabled: canViewKoshelok });
 
   // Transaction history (IN type)
   const {
@@ -202,7 +204,8 @@ export default function KassaPage() {
     }
   };
 
-  if (koshelokError) {
+  // koshelokError faqat canViewKoshelok=true bo'lsa muhim
+  if (koshelokError && canViewKoshelok) {
     return (
       <div className="space-y-6 animate-fade-in">
         <div className="flex flex-col gap-1">
@@ -838,29 +841,22 @@ function RequestMoneyDialog({
   onOpenChange: (open: boolean) => void;
   onSuccess: () => void;
 }) {
-  const [projectId, setProjectId] = useState("");
+  const { selectedProjectId, selectedProject } = useProject();
   const [amount, setAmount] = useState("");
   const [reason, setReason] = useState("");
-
-  const { data: projectsData } = useApi(
-    () => projectsApi.getAll({ limit: 100 }),
-    [],
-    { enabled: open }
-  );
 
   const { mutate, loading } = useMutation((data: { projectId: string; amount: number; reason?: string }) =>
     cashRequestsApi.create(data)
   );
 
   const handleSubmit = async () => {
-    if (!projectId || !amount) return;
+    if (!amount || !selectedProjectId) return;
     try {
       await mutate({
-        projectId,
+        projectId: selectedProjectId,
         amount: Number(amount),
         reason: reason || undefined,
       });
-      setProjectId("");
       setAmount("");
       setReason("");
       onSuccess();
@@ -874,26 +870,19 @@ function RequestMoneyDialog({
       <DialogContent>
         <DialogHeader>
           <DialogTitle>Pul so'rash</DialogTitle>
-          <DialogDescription>
-            Yangi pul so'rovi yarating
-          </DialogDescription>
+          <DialogDescription>Yangi pul so'rovi yarating</DialogDescription>
         </DialogHeader>
         <div className="space-y-4 py-2">
-          <div className="space-y-2">
-            <Label>Loyiha</Label>
-            <Select value={projectId} onValueChange={setProjectId}>
-              <SelectTrigger>
-                <SelectValue placeholder="Loyihani tanlang" />
-              </SelectTrigger>
-              <SelectContent>
-                {(projectsData?.data ?? []).map((p) => (
-                  <SelectItem key={p.id} value={p.id}>
-                    {p.name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
+          {selectedProject ? (
+            <div className="flex items-center gap-2 px-3 py-2 bg-muted/50 rounded-md">
+              <span className="text-xs text-muted-foreground">Loyiha:</span>
+              <span className="text-sm font-medium">{selectedProject.name}</span>
+            </div>
+          ) : (
+            <p className="text-sm text-amber-600 bg-amber-50 rounded-md px-3 py-2">
+              Avval sidebar dan loyihani tanlang
+            </p>
+          )}
           <div className="space-y-2">
             <Label>Summa (so'm)</Label>
             <Input
@@ -919,7 +908,7 @@ function RequestMoneyDialog({
           </Button>
           <Button
             onClick={handleSubmit}
-            disabled={loading || !projectId || !amount}
+            disabled={loading || !selectedProjectId || !amount}
           >
             {loading ? "Yuborilmoqda..." : "Yuborish"}
           </Button>

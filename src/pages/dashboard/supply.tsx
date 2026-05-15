@@ -64,8 +64,13 @@ function formatDate(dateStr: string): string {
 type ActiveView = "orders" | "new-order" | "debts" | "history" | "suppliers" | "pending";
 
 export default function SupplyPage() {
-  const { user } = useAuth();
-  const [activeView, setActiveView] = useState<ActiveView>("orders");
+  const { user, hasPermission } = useAuth();
+  const canViewOrders = hasPermission("order:view");
+  const canViewSuppliers = hasPermission("supplier:view");
+  const canViewDebts = hasPermission("supplier_debt:view") || hasPermission("debt:view");
+
+  const firstView: ActiveView = canViewOrders ? "orders" : canViewSuppliers ? "suppliers" : canViewDebts ? "debts" : "orders";
+  const [activeView, setActiveView] = useState<ActiveView>(firstView);
 
   // Dialog states
   const [createOrderDialogOpen, setCreateOrderDialogOpen] = useState(false);
@@ -276,48 +281,60 @@ export default function SupplyPage() {
 
       {/* Action buttons */}
       <div className="grid gap-3 grid-cols-2 sm:grid-cols-3 lg:grid-cols-6">
-        <ActionButton
-          icon={ShoppingCart}
-          label="Zayavkalar"
-          active={activeView === "pending"}
-          onClick={() => setActiveView("pending")}
-          badge={approvedRequests.length}
-        />
-        <ActionButton
-          icon={Package}
-          label="Buyurtmalar"
-          active={activeView === "orders"}
-          onClick={() => setActiveView("orders")}
-        />
-        <ActionButton
-          icon={Plus}
-          label="Yangi buyurtma"
-          active={activeView === "new-order"}
-          onClick={() => setCreateOrderDialogOpen(true)}
-        />
-        <ActionButton
-          icon={Truck}
-          label="Postavshiklar"
-          active={activeView === "suppliers"}
-          onClick={() => setActiveView("suppliers")}
-        />
-        <ActionButton
-          icon={CreditCard}
-          label="Qarzlar"
-          active={activeView === "debts"}
-          onClick={() => setActiveView("debts")}
-          badge={supplierDebts.length > 0 ? supplierDebts.length : undefined}
-        />
-        <ActionButton
-          icon={History}
-          label="Tarix"
-          active={activeView === "history"}
-          onClick={() => setActiveView("history")}
-        />
+        {canViewOrders && (
+          <ActionButton
+            icon={ShoppingCart}
+            label="Zayavkalar"
+            active={activeView === "pending"}
+            onClick={() => setActiveView("pending")}
+            badge={approvedRequests.length}
+          />
+        )}
+        {canViewOrders && (
+          <ActionButton
+            icon={Package}
+            label="Buyurtmalar"
+            active={activeView === "orders"}
+            onClick={() => setActiveView("orders")}
+          />
+        )}
+        {canViewOrders && (
+          <ActionButton
+            icon={Plus}
+            label="Yangi buyurtma"
+            active={activeView === "new-order"}
+            onClick={() => setCreateOrderDialogOpen(true)}
+          />
+        )}
+        {canViewSuppliers && (
+          <ActionButton
+            icon={Truck}
+            label="Postavshiklar"
+            active={activeView === "suppliers"}
+            onClick={() => setActiveView("suppliers")}
+          />
+        )}
+        {canViewDebts && (
+          <ActionButton
+            icon={CreditCard}
+            label="Qarzlar"
+            active={activeView === "debts"}
+            onClick={() => setActiveView("debts")}
+            badge={supplierDebts.length > 0 ? supplierDebts.length : undefined}
+          />
+        )}
+        {canViewOrders && (
+          <ActionButton
+            icon={History}
+            label="Tarix"
+            active={activeView === "history"}
+            onClick={() => setActiveView("history")}
+          />
+        )}
       </div>
 
       {/* Content sections */}
-      {activeView === "orders" && (
+      {activeView === "orders" && canViewOrders && (
         <OrdersSection
           approvedRequests={approvedRequests}
           pendingOrders={pendingOrders}
@@ -329,7 +346,7 @@ export default function SupplyPage() {
           }}
         />
       )}
-      {activeView === "debts" && (
+      {activeView === "debts" && canViewDebts && (
         <DebtsSection
           supplierDebts={supplierDebts}
           loading={supplierDebtsLoading}
@@ -340,7 +357,7 @@ export default function SupplyPage() {
           totalDebt={supplierDebtsData?.totalDebt || 0}
         />
       )}
-      {activeView === "history" && (
+      {activeView === "history" && canViewOrders && (
         <HistorySection
           completedOrders={completedOrders}
           loading={ordersLoading}

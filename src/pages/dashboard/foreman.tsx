@@ -1,16 +1,17 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import {
   ClipboardList,
   Users,
   Package,
   HandCoins,
   PlusCircle,
-  Briefcase,
   CheckCircle,
   Clock,
   DollarSign,
   UserPlus,
   FileText,
+  BarChart2,
+  Wallet,
 } from "lucide-react";
 import { StatsCard } from "@/components/dashboard/stats-card";
 import {
@@ -55,18 +56,52 @@ import { requestsApi, PurchaseRequest } from "@/lib/api/requests";
 import { cashRequestsApi, CashRequest } from "@/lib/api/finance";
 import { projectsApi } from "@/lib/api/projects";
 import { smetaItemsApi, SmetaItem } from "@/lib/api/smeta-items";
+import { smetasApi, Smeta } from "@/lib/api/smetas";
 import { StatsSkeleton } from "@/components/ui/table-skeleton";
 import { ErrorMessage } from "@/components/ui/error-message";
+import { useProject } from "@/lib/project-context";
 
 function formatMoney(num: number): string {
   return num.toLocaleString("uz-UZ");
 }
 
-type ActiveView = "worklogs" | "workers" | "requests" | "cash";
+type ActiveView = "worklogs" | "workers" | "requests" | "cash" | "smeta";
 
 export default function ForemanPage() {
-  const { user } = useAuth();
-  const [activeView, setActiveView] = useState<ActiveView>("worklogs");
+  const { user, hasPermission } = useAuth();
+  const { selectedProjectId } = useProject();
+
+  // Permissions — mirrors bot menu items exactly
+  const canViewWorkers = hasPermission("worker:view");
+  const canCreateRequest = hasPermission("request:create");
+  const canEditSmeta = hasPermission("smeta:edit");
+  const canUseKassa = hasPermission("kassa:view") || hasPermission("kassa:request_money");
+  const canCreateWorker = hasPermission("worker:create");
+  const canPayWorker = hasPermission("worker:pay");
+  const canCreateWorklog = hasPermission("worklog:create");
+  const canViewWorklog = hasPermission("worklog:view");
+
+  // Determine first available view
+  const firstView: ActiveView =
+    canViewWorklog || canCreateWorklog ? "worklogs"
+    : canViewWorkers ? "workers"
+    : canCreateRequest ? "requests"
+    : canUseKassa ? "cash"
+    : canEditSmeta ? "smeta"
+    : "worklogs";
+
+  const [activeView, setActiveView] = useState<ActiveView>(firstView);
+
+  // Keep activeView valid if permissions change
+  useEffect(() => {
+    const viewAllowed =
+      (activeView === "worklogs" && (canViewWorklog || canCreateWorklog)) ||
+      (activeView === "workers" && canViewWorkers) ||
+      (activeView === "requests" && canCreateRequest) ||
+      (activeView === "cash" && canUseKassa) ||
+      (activeView === "smeta" && canEditSmeta);
+    if (!viewAllowed) setActiveView(firstView);
+  }, [canViewWorkers, canCreateRequest, canEditSmeta, canUseKassa, canViewWorklog, canCreateWorklog]);
 
   // Dialog states
   const [workLogDialogOpen, setWorkLogDialogOpen] = useState(false);
@@ -79,61 +114,59 @@ export default function ForemanPage() {
   const [dateFrom, setDateFrom] = useState("");
   const [dateTo, setDateTo] = useState("");
 
-  // Work logs
+  // Work logs — only fetch if user has worklog permission
   const {
     data: workLogsData,
     loading: workLogsLoading,
-    error: workLogsError,
     refetch: refetchWorkLogs,
   } = useApi(() => workersApi.getWorkLogs({
     limit: 50,
     ...(dateFrom && { startDate: dateFrom }),
     ...(dateTo && { endDate: dateTo }),
-  }), [dateFrom, dateTo]);
+  }), [dateFrom, dateTo], { enabled: canViewWorklog || canCreateWorklog });
 
-  // Workers
+  // Workers — only if user can view workers
   const {
     data: workersData,
     loading: workersLoading,
     refetch: refetchWorkers,
-  } = useApi(() => workersApi.getAll({ limit: 100 }), []);
+  } = useApi(() => workersApi.getAll({ limit: 100 }), [], { enabled: canViewWorkers });
 
-  // My requests
+  // My requests — only if user can create/view requests
   const {
     data: requestsData,
     loading: requestsLoading,
     refetch: refetchRequests,
-  } = useApi(() => requestsApi.getAll({ limit: 50 }), []);
+  } = useApi(() => requestsApi.getAll({ limit: 50 }), [], { enabled: canCreateRequest });
 
-  // Cash requests
+  // Cash requests — only if user has kassa permission
   const {
     data: cashRequestsData,
     loading: cashRequestsLoading,
     refetch: refetchCashRequests,
-  } = useApi(() => cashRequestsApi.getAll({ limit: 50 }), []);
+  } = useApi(() => cashRequestsApi.getAll({ limit: 50 }), [], { enabled: canUseKassa });
+
+  // Smetas for current project — only if user can edit smeta
+  const {
+    data: smetasData,
+    loading: smetasLoading,
+  } = useApi(
+    () => smetasApi.getAll({ projectId: selectedProjectId || undefined, limit: 20 }),
+    [selectedProjectId],
+    { enabled: canEditSmeta && !!selectedProjectId }
+  );
 
   const workLogs = workLogsData?.data || [];
   const workers = workersData?.data || [];
   const requests = requestsData?.data || [];
   const cashRequests = cashRequestsData?.data || [];
+  const smetas = smetasData?.data || [];
 
-  // Stats
+  // Stats — show only what user has access to
   const totalWorkLogs = workLogsData?.total || 0;
   const validatedWorkLogs = workLogs.filter(w => w.isValidated).length;
   const pendingRequests = requests.filter(r => r.status === "PENDING").length;
   const pendingCashRequests = cashRequests.filter(r => r.status === "PENDING").length;
-
-  if (workLogsError) {
-    return (
-      <div className="space-y-6 animate-fade-in">
-        <div className="flex flex-col gap-1">
-          <h1 className="text-2xl font-bold tracking-tight">Prorab</h1>
-          <p className="text-muted-foreground">Ish boshqaruvi</p>
-        </div>
-        <ErrorMessage error={workLogsError} onRetry={refetchWorkLogs} />
-      </div>
-    );
-  }
 
   return (
     <div className="space-y-6 animate-fade-in">
@@ -145,88 +178,120 @@ export default function ForemanPage() {
         </p>
       </div>
 
-      {/* Stats */}
+      {/* Stats — only for relevant permissions */}
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        <StatsCard
-          title="Ish jurnallari"
-          value={totalWorkLogs}
-          subtitle={`${validatedWorkLogs} tasdiqlangan`}
-          icon={ClipboardList}
-          variant="primary"
-          className="animate-slide-up stagger-1"
-        />
-        <StatsCard
-          title="Ishchilar"
-          value={workers.length}
-          subtitle="ta ro'yxatda"
-          icon={Users}
-          variant="success"
-          className="animate-slide-up stagger-2"
-        />
-        <StatsCard
-          title="Material so'rovlari"
-          value={pendingRequests}
-          subtitle="ta kutilmoqda"
-          icon={Package}
-          variant="warning"
-          className="animate-slide-up stagger-3"
-        />
-        <StatsCard
-          title="Pul so'rovlari"
-          value={pendingCashRequests}
-          subtitle="ta kutilmoqda"
-          icon={HandCoins}
-          variant="default"
-          className="animate-slide-up stagger-4"
-        />
+        {(canViewWorklog || canCreateWorklog) && (
+          <StatsCard
+            title="Ish jurnallari"
+            value={totalWorkLogs}
+            subtitle={`${validatedWorkLogs} tasdiqlangan`}
+            icon={ClipboardList}
+            variant="primary"
+            className="animate-slide-up stagger-1"
+          />
+        )}
+        {canViewWorkers && (
+          <StatsCard
+            title="Ishchilar"
+            value={workers.length}
+            subtitle="ta ro'yxatda"
+            icon={Users}
+            variant="success"
+            className="animate-slide-up stagger-2"
+          />
+        )}
+        {canCreateRequest && (
+          <StatsCard
+            title="Material so'rovlari"
+            value={pendingRequests}
+            subtitle="ta kutilmoqda"
+            icon={Package}
+            variant="warning"
+            className="animate-slide-up stagger-3"
+          />
+        )}
+        {canUseKassa && (
+          <StatsCard
+            title="Pul so'rovlari"
+            value={pendingCashRequests}
+            subtitle="ta kutilmoqda"
+            icon={HandCoins}
+            variant="default"
+            className="animate-slide-up stagger-4"
+          />
+        )}
       </div>
 
-      {/* Action buttons */}
+      {/* Action buttons — shown only for enabled bot menu items */}
       <div className="grid gap-3 grid-cols-2 sm:grid-cols-4 lg:grid-cols-8">
-        <ActionButton
-          icon={ClipboardList}
-          label="Ish jurnali"
-          active={activeView === "worklogs"}
-          onClick={() => setActiveView("worklogs")}
-        />
-        <ActionButton
-          icon={PlusCircle}
-          label="Ish qo'shish"
-          onClick={() => setWorkLogDialogOpen(true)}
-        />
-        <ActionButton
-          icon={Users}
-          label="Ishchilar"
-          active={activeView === "workers"}
-          onClick={() => setActiveView("workers")}
-        />
-        <ActionButton
-          icon={UserPlus}
-          label="Ishchi qo'shish"
-          onClick={() => setAddWorkerDialogOpen(true)}
-        />
-        <ActionButton
-          icon={Package}
-          label="Zayavkalar"
-          active={activeView === "requests"}
-          onClick={() => setActiveView("requests")}
-        />
-        <ActionButton
-          icon={FileText}
-          label="Zayavka qo'shish"
-          onClick={() => setMaterialRequestDialogOpen(true)}
-        />
-        <ActionButton
-          icon={HandCoins}
-          label="Pul so'rovlari"
-          active={activeView === "cash"}
-          onClick={() => setActiveView("cash")}
-        />
-        <ActionButton
-          icon={DollarSign}
-          label="Pul so'rash"
-          onClick={() => setCashRequestDialogOpen(true)}
-        />
+        {(canViewWorklog || canCreateWorklog) && (
+          <ActionButton
+            icon={ClipboardList}
+            label="Ish jurnali"
+            active={activeView === "worklogs"}
+            onClick={() => setActiveView("worklogs")}
+          />
+        )}
+        {canCreateWorklog && (
+          <ActionButton
+            icon={PlusCircle}
+            label="Ish qo'shish"
+            onClick={() => setWorkLogDialogOpen(true)}
+          />
+        )}
+        {canViewWorkers && (
+          <ActionButton
+            icon={Users}
+            label="Ishchilar"
+            active={activeView === "workers"}
+            onClick={() => setActiveView("workers")}
+          />
+        )}
+        {canCreateWorker && (
+          <ActionButton
+            icon={UserPlus}
+            label="Ishchi qo'shish"
+            onClick={() => setAddWorkerDialogOpen(true)}
+          />
+        )}
+        {canCreateRequest && (
+          <ActionButton
+            icon={Package}
+            label="Zayavkalar"
+            active={activeView === "requests"}
+            onClick={() => setActiveView("requests")}
+          />
+        )}
+        {canCreateRequest && (
+          <ActionButton
+            icon={FileText}
+            label="Zayavka qo'shish"
+            onClick={() => setMaterialRequestDialogOpen(true)}
+          />
+        )}
+        {canUseKassa && (
+          <ActionButton
+            icon={HandCoins}
+            label="Pul so'rovlari"
+            active={activeView === "cash"}
+            onClick={() => setActiveView("cash")}
+          />
+        )}
+        {canUseKassa && (
+          <ActionButton
+            icon={DollarSign}
+            label="Pul so'rash"
+            onClick={() => setCashRequestDialogOpen(true)}
+          />
+        )}
+        {canEditSmeta && (
+          <ActionButton
+            icon={BarChart2}
+            label="Smeta"
+            active={activeView === "smeta"}
+            onClick={() => setActiveView("smeta")}
+          />
+        )}
       </div>
 
       {/* Date filters for work logs */}
@@ -265,79 +330,97 @@ export default function ForemanPage() {
       )}
 
       {/* Content sections */}
-      {activeView === "worklogs" && (
+      {activeView === "worklogs" && (canViewWorklog || canCreateWorklog) && (
         <WorkLogsSection
           workLogs={workLogs}
           loading={workLogsLoading}
         />
       )}
-      {activeView === "workers" && (
+      {activeView === "workers" && canViewWorkers && (
         <WorkersSection
           workers={workers}
           loading={workersLoading}
+          canPay={canPayWorker}
           onPayment={() => setPaymentDialogOpen(true)}
         />
       )}
-      {activeView === "requests" && (
+      {activeView === "requests" && canCreateRequest && (
         <MaterialRequestsSection
           requests={requests}
           loading={requestsLoading}
         />
       )}
-      {activeView === "cash" && (
+      {activeView === "cash" && canUseKassa && (
         <CashRequestsSection
           requests={cashRequests}
           loading={cashRequestsLoading}
         />
       )}
+      {activeView === "smeta" && canEditSmeta && (
+        <SmetaSection
+          smetas={smetas}
+          loading={smetasLoading}
+          projectId={selectedProjectId}
+        />
+      )}
 
       {/* Dialogs */}
-      <AddWorkLogDialog
-        open={workLogDialogOpen}
-        onOpenChange={setWorkLogDialogOpen}
-        workers={workers}
-        onSuccess={() => {
-          setWorkLogDialogOpen(false);
-          refetchWorkLogs();
-        }}
-      />
+      {canCreateWorklog && (
+        <AddWorkLogDialog
+          open={workLogDialogOpen}
+          onOpenChange={setWorkLogDialogOpen}
+          workers={workers}
+          onSuccess={() => {
+            setWorkLogDialogOpen(false);
+            refetchWorkLogs();
+          }}
+        />
+      )}
 
-      <AddWorkerDialog
-        open={addWorkerDialogOpen}
-        onOpenChange={setAddWorkerDialogOpen}
-        onSuccess={() => {
-          setAddWorkerDialogOpen(false);
-          refetchWorkers();
-        }}
-      />
+      {canCreateWorker && (
+        <AddWorkerDialog
+          open={addWorkerDialogOpen}
+          onOpenChange={setAddWorkerDialogOpen}
+          onSuccess={() => {
+            setAddWorkerDialogOpen(false);
+            refetchWorkers();
+          }}
+        />
+      )}
 
-      <WorkerPaymentDialog
-        open={paymentDialogOpen}
-        onOpenChange={setPaymentDialogOpen}
-        workers={workers}
-        onSuccess={() => {
-          setPaymentDialogOpen(false);
-          refetchWorkers();
-        }}
-      />
+      {canPayWorker && (
+        <WorkerPaymentDialog
+          open={paymentDialogOpen}
+          onOpenChange={setPaymentDialogOpen}
+          workers={workers}
+          onSuccess={() => {
+            setPaymentDialogOpen(false);
+            refetchWorkers();
+          }}
+        />
+      )}
 
-      <MaterialRequestDialog
-        open={materialRequestDialogOpen}
-        onOpenChange={setMaterialRequestDialogOpen}
-        onSuccess={() => {
-          setMaterialRequestDialogOpen(false);
-          refetchRequests();
-        }}
-      />
+      {canCreateRequest && (
+        <MaterialRequestDialog
+          open={materialRequestDialogOpen}
+          onOpenChange={setMaterialRequestDialogOpen}
+          onSuccess={() => {
+            setMaterialRequestDialogOpen(false);
+            refetchRequests();
+          }}
+        />
+      )}
 
-      <CashRequestDialog
-        open={cashRequestDialogOpen}
-        onOpenChange={setCashRequestDialogOpen}
-        onSuccess={() => {
-          setCashRequestDialogOpen(false);
-          refetchCashRequests();
-        }}
-      />
+      {canUseKassa && (
+        <CashRequestDialog
+          open={cashRequestDialogOpen}
+          onOpenChange={setCashRequestDialogOpen}
+          onSuccess={() => {
+            setCashRequestDialogOpen(false);
+            refetchCashRequests();
+          }}
+        />
+      )}
     </div>
   );
 }
@@ -452,10 +535,12 @@ function WorkLogsSection({
 function WorkersSection({
   workers,
   loading,
+  canPay,
   onPayment,
 }: {
   workers: Worker[];
   loading: boolean;
+  canPay: boolean;
   onPayment: () => void;
 }) {
   return (
@@ -468,10 +553,12 @@ function WorkersSection({
           </CardTitle>
           <CardDescription>Ro'yxatdagi ishchilar</CardDescription>
         </div>
-        <Button size="sm" onClick={onPayment}>
-          <DollarSign className="h-4 w-4 mr-1" />
-          To'lov
-        </Button>
+        {canPay && (
+          <Button size="sm" onClick={onPayment}>
+            <DollarSign className="h-4 w-4 mr-1" />
+            To'lov
+          </Button>
+        )}
       </CardHeader>
       <CardContent>
         {loading ? (
@@ -646,6 +733,173 @@ function CashRequestsSection({
   );
 }
 
+function SmetaSection({
+  smetas,
+  loading,
+  projectId,
+}: {
+  smetas: Smeta[];
+  loading: boolean;
+  projectId: string | null;
+}) {
+  const [selectedSmetaId, setSelectedSmetaId] = useState<string | null>(null);
+  const [editItemId, setEditItemId] = useState<string | null>(null);
+  const [editValue, setEditValue] = useState("");
+  const { mutate: updateItem, loading: saving } = useMutation(
+    ({ id, usedQuantity }: { id: string; usedQuantity: number }) =>
+      smetaItemsApi.update(id, { usedQuantity })
+  );
+
+  const { data: itemsData, loading: itemsLoading, refetch: refetchItems } = useApi(
+    () => smetaItemsApi.getAll({ smetaId: selectedSmetaId!, limit: 100 }),
+    [selectedSmetaId],
+    { enabled: !!selectedSmetaId }
+  );
+
+  const items = itemsData?.data || [];
+
+  const handleSave = async (itemId: string) => {
+    const val = Number(editValue);
+    if (isNaN(val) || val < 0) return;
+    try {
+      await updateItem({ id: itemId, usedQuantity: val });
+      setEditItemId(null);
+      setEditValue("");
+      refetchItems();
+    } catch {
+      // handled by useMutation
+    }
+  };
+
+  if (!projectId) {
+    return (
+      <Card className="animate-slide-up">
+        <CardContent className="py-8 text-center text-muted-foreground">
+          <BarChart2 className="h-12 w-12 mx-auto mb-4 opacity-50" />
+          <p>Loyiha tanlanmagan</p>
+        </CardContent>
+      </Card>
+    );
+  }
+
+  return (
+    <Card className="animate-slide-up">
+      <CardHeader>
+        <CardTitle className="text-base font-semibold flex items-center gap-2">
+          <BarChart2 className="h-4 w-4 text-primary" />
+          Smeta yangilash
+        </CardTitle>
+        <CardDescription>Bajarilgan ish miqdorlarini yangilang</CardDescription>
+      </CardHeader>
+      <CardContent className="space-y-4">
+        {loading ? (
+          <div className="space-y-2">
+            {[1, 2, 3].map(i => (
+              <div key={i} className="h-10 bg-muted/50 rounded animate-pulse" />
+            ))}
+          </div>
+        ) : smetas.length === 0 ? (
+          <div className="text-center py-8 text-muted-foreground">
+            <BarChart2 className="h-12 w-12 mx-auto mb-4 opacity-50" />
+            <p>Loyihada smeta yo'q</p>
+          </div>
+        ) : (
+          <>
+            <div className="space-y-1">
+              <Label className="text-xs">Smeta tanlang</Label>
+              <Select
+                value={selectedSmetaId || ""}
+                onValueChange={(v) => { setSelectedSmetaId(v); setEditItemId(null); }}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Smeta..." />
+                </SelectTrigger>
+                <SelectContent>
+                  {smetas.map(s => (
+                    <SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            {selectedSmetaId && (
+              <div className="rounded-md border overflow-hidden">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Nomi</TableHead>
+                      <TableHead className="w-20">Birlik</TableHead>
+                      <TableHead className="w-24 text-right">Smeta</TableHead>
+                      <TableHead className="w-28 text-right">Bajarildi</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {itemsLoading ? (
+                      <TableRow>
+                        <TableCell colSpan={4} className="text-center py-6 text-muted-foreground">
+                          Yuklanmoqda...
+                        </TableCell>
+                      </TableRow>
+                    ) : items.length === 0 ? (
+                      <TableRow>
+                        <TableCell colSpan={4} className="text-center py-6 text-muted-foreground">
+                          Smeta itemlari yo'q
+                        </TableCell>
+                      </TableRow>
+                    ) : items.map(item => (
+                      <TableRow key={item.id}>
+                        <TableCell className="font-medium">{item.name}</TableCell>
+                        <TableCell>{item.unit}</TableCell>
+                        <TableCell className="text-right">{item.quantity}</TableCell>
+                        <TableCell className="text-right">
+                          {editItemId === item.id ? (
+                            <div className="flex items-center gap-1 justify-end">
+                              <Input
+                                type="number"
+                                min={0}
+                                className="w-20 h-7 text-xs"
+                                value={editValue}
+                                onChange={e => setEditValue(e.target.value)}
+                                autoFocus
+                                onKeyDown={e => {
+                                  if (e.key === "Enter") handleSave(item.id);
+                                  if (e.key === "Escape") { setEditItemId(null); setEditValue(""); }
+                                }}
+                              />
+                              <Button
+                                size="sm"
+                                className="h-7 px-2 text-xs"
+                                onClick={() => handleSave(item.id)}
+                                disabled={saving}
+                              >
+                                {saving ? "..." : "OK"}
+                              </Button>
+                            </div>
+                          ) : (
+                            <button
+                              className="underline underline-offset-2 decoration-dotted text-primary hover:text-primary/80 transition-colors"
+                              onClick={() => {
+                                setEditItemId(item.id);
+                                setEditValue(String(item.usedQuantity ?? 0));
+                              }}
+                            >
+                              {item.usedQuantity ?? 0}
+                            </button>
+                          )}
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
+            )}
+          </>
+        )}
+      </CardContent>
+    </Card>
+  );
+}
+
 // --- Dialog Components ---
 
 function AddWorkLogDialog({
@@ -673,19 +927,20 @@ function AddWorkLogDialog({
   );
 
   const { mutate, loading } = useMutation(
-    (data: { workerId: string; projectId: string; date: string; hoursWorked: number; description?: string }) =>
+    (data: { workerId: string; projectId: string; workType: string; quantity: number; unit: string; date: string }) =>
       workersApi.createWorkLog(data)
   );
 
   const handleSubmit = async () => {
-    if (!workerId || !projectId || !quantity || !workType) return;
+    if (!workerId || !projectId || !quantity || !workType || !unit) return;
     try {
       await mutate({
         workerId,
         projectId,
+        workType,
+        quantity: Number(quantity),
+        unit,
         date,
-        hoursWorked: Number(quantity),
-        description: `${workType} - ${quantity} ${unit}`,
       });
       setWorkerId("");
       setWorkType("");

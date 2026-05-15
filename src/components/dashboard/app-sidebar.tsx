@@ -8,7 +8,6 @@ import {
   Home,
   Settings,
   Users,
-  HardHat,
   Wallet,
   Package,
   Truck,
@@ -21,8 +20,14 @@ import {
   BarChart3,
   Crown,
   ShoppingCart,
-  ChevronsUpDown,
   FolderOpen,
+  HardHat,
+  TrendingUp,
+  TrendingDown,
+  DollarSign,
+  CreditCard,
+  ArrowLeftRight,
+  History,
 } from "lucide-react";
 import {
   Sidebar,
@@ -54,7 +59,8 @@ type NavItem = {
   url: string;
   icon: React.ComponentType<{ className?: string }>;
   badge?: number;
-  roles?: string[];
+  // one or more permissions — item shows if user has ANY of them
+  permissions?: string[];
   requiresProject?: boolean;
 };
 
@@ -68,136 +74,70 @@ const mainNavItems: NavItem[] = [
     title: "Loyihalar",
     url: "/projects",
     icon: Building2,
-    roles: ["DIREKTOR", "BOSS", "BUGALTERIYA", "PTO", "SNABJENIYA", "SKLAD", "PRORAB"],
+    permissions: ["smeta:view", "request:create", "request:view_all", "worker:view", "order:view", "warehouse:view", "driver:view_assigned", "moderator:view_pending", "statistics:view"],
   },
   {
     title: "Smetalar",
     url: "/smetas",
     icon: FileText,
-    roles: ["BOSS", "DIREKTOR", "PTO", "PRORAB"],
+    permissions: ["smeta:view", "smeta:edit"],
     requiresProject: true,
   },
   {
     title: "So'rovlar",
     url: "/requests",
     icon: ClipboardList,
-    roles: ["DIREKTOR", "BOSS"],
+    permissions: ["request:view_all"],
     requiresProject: true,
   },
   {
     title: "Hisobotlar",
     url: "/reports",
     icon: ChartBar,
-    roles: ["BOSS"],
+    permissions: ["report:view"],
     requiresProject: true,
   },
   {
     title: "Xodimlar",
     url: "/users",
     icon: Users,
-    roles: ["DIREKTOR", "BOSS"],
+    permissions: ["user:view", "user:manage"],
   },
 ];
 
+// Bot menyu itemlariga mos — qaysi permission yoqilgan bo'lsa shu ko'rinadi
+// Bir xil URLdagi itemlar deduplikatsiya qilinadi (faqat birinchisi ko'rsatiladi)
 const roleNavItems: NavItem[] = [
-  {
-    title: "Direktor",
-    url: "/direktor",
-    icon: Crown,
-    roles: ["DIREKTOR"],
-    requiresProject: true,
-  },
-  {
-    title: "Ta'minot",
-    url: "/supply",
-    icon: ShoppingCart,
-    roles: ["SNABJENIYA"],
-    requiresProject: true,
-  },
-  {
-    title: "Prorab",
-    url: "/foreman",
-    icon: HardHat,
-    roles: ["PRORAB"],
-    requiresProject: true,
-  },
-  {
-    title: "Kassa",
-    url: "/kassa",
-    icon: Banknote,
-    roles: ["BOSS", "DIREKTOR", "BUGALTERIYA", "SNABJENIYA", "SKLAD", "PRORAB", "PTO", "HAYDOVCHI", "MODERATOR"],
-    requiresProject: true,
-  },
-  {
-    title: "Moliya",
-    url: "/finance",
-    icon: Wallet,
-    roles: ["BUGALTERIYA", "BOSS", "DIREKTOR"],
-    requiresProject: true,
-  },
-  {
-    title: "Ombor",
-    url: "/warehouse",
-    icon: Package,
-    roles: ["SKLAD", "BOSS", "DIREKTOR"],
-    requiresProject: true,
-  },
-  {
-    title: "Yetkazuvchilar",
-    url: "/suppliers",
-    icon: Truck,
-    roles: ["SNABJENIYA", "DIREKTOR"],
-    requiresProject: true,
-  },
-  {
-    title: "Ustalar",
-    url: "/workers",
-    icon: UserCircle,
-    roles: ["BUGALTERIYA", "DIREKTOR"],
-    requiresProject: true,
-  },
-  {
-    title: "Tekshirish",
-    url: "/validation",
-    icon: CheckSquare,
-    roles: ["DIREKTOR", "PTO", "BOSS"],
-    requiresProject: true,
-  },
-  {
-    title: "Yetkazish",
-    url: "/driver",
-    icon: Car,
-    roles: ["HAYDOVCHI"],
-    requiresProject: true,
-  },
-  {
-    title: "Moderatsiya",
-    url: "/moderator",
-    icon: Shield,
-    roles: ["MODERATOR"],
-    requiresProject: true,
-  },
-  {
-    title: "Mening ishlarim",
-    url: "/worker-portal",
-    icon: Briefcase,
-    roles: ["WORKER"],
-    requiresProject: true,
-  },
-  {
-    title: "Ta'minotchi",
-    url: "/supplier-portal",
-    icon: Store,
-    roles: ["POSTAVSHIK"],
-    requiresProject: true,
-  },
-  {
-    title: "Smeta taqqoslash",
-    url: "/smeta-comparison",
-    icon: BarChart3,
-    roles: ["PTO"],
-    requiresProject: true,
-  },
+  { title: "Statistika", url: "/direktor", icon: Crown, permissions: ["statistics:view"] },
+  { title: "Tasdiqlash", url: "/direktor", icon: CheckSquare, permissions: ["request:approve"] },
+  { title: "Qarzlar", url: "/direktor", icon: Wallet, permissions: ["debt:view"] },
+  { title: "Smeta vs Fakt", url: "/smeta-comparison", icon: BarChart3, permissions: ["smeta_comparison:view"] },
+  { title: "Hisobotlar", url: "/reports", icon: ChartBar, permissions: ["report:view"] },
+  { title: "Zayavka yaratish", url: "/foreman", icon: ClipboardList, permissions: ["request:create"] },
+  { title: "Smeta yangilash", url: "/smetas", icon: FileText, permissions: ["smeta:edit"] },
+  { title: "Ustalar", url: "/workers", icon: UserCircle, permissions: ["worker:view"] },
+  { title: "Koshelok", url: "/kassa", icon: Banknote, permissions: ["kassa:view", "kassa:request_money", "kassa:add_expense"] },
+  { title: "Buyurtmalar", url: "/supply", icon: ShoppingCart, permissions: ["order:view"] },
+  { title: "Postavshiklar", url: "/suppliers", icon: Truck, permissions: ["supplier:view"] },
+  { title: "Postavshik qarzlari", url: "/supply", icon: Store, permissions: ["supplier_debt:view"] },
+  { title: "Kirim", url: "/finance", icon: TrendingUp, permissions: ["income:create"] },
+  { title: "Umumiy rasxodlar", url: "/finance", icon: TrendingDown, permissions: ["expense:view"] },
+  { title: "Pul zayavkalari", url: "/finance", icon: DollarSign, permissions: ["cash_request:approve"] },
+  { title: "Kosheloklar", url: "/finance", icon: CreditCard, permissions: ["kashlok:view_all"] },
+  { title: "Ombor", url: "/warehouse", icon: Package, permissions: ["warehouse:view"] },
+  { title: "Kutilayotgan yetkazmalar", url: "/warehouse", icon: Truck, permissions: ["warehouse:receive"] },
+  { title: "Ko'chirish", url: "/warehouse", icon: ArrowLeftRight, permissions: ["warehouse:transfer"] },
+  { title: "Tayinlangan zayavkalar", url: "/driver", icon: Car, permissions: ["driver:view_assigned"] },
+  { title: "Faol yetkazma", url: "/driver", icon: Truck, permissions: ["driver:mark_collected"] },
+  { title: "Yetkazma tarixi", url: "/driver", icon: History, permissions: ["driver:mark_delivered"] },
+  { title: "Mahsulot kiritish", url: "/moderator", icon: Shield, permissions: ["moderator:view_pending"] },
+  { title: "Moderatsiya tarixi", url: "/moderator", icon: History, permissions: ["moderator:finalize"] },
+  { title: "Bajarilgan ishlar", url: "/worker-portal", icon: Briefcase, permissions: ["worker_portal:work_logs"] },
+  { title: "To'lovlar (ishchi)", url: "/worker-portal", icon: Wallet, permissions: ["worker_portal:payments"] },
+  { title: "Hisob-kitob (ishchi)", url: "/worker-portal", icon: BarChart3, permissions: ["worker_portal:view"] },
+  { title: "Berilgan tovar", url: "/supplier-portal", icon: Package, permissions: ["supplier_portal:orders"] },
+  { title: "Olingan pullar", url: "/supplier-portal", icon: Wallet, permissions: ["supplier_portal:debts"] },
+  { title: "Hisob-kitob (postavshik)", url: "/supplier-portal", icon: Store, permissions: ["supplier_portal:view"] },
 ];
 
 const settingsNavItems: NavItem[] = [
@@ -205,14 +145,14 @@ const settingsNavItems: NavItem[] = [
     title: "Sozlamalar",
     url: "/settings",
     icon: Settings,
-    roles: ["DIREKTOR", "BOSS"],
+    permissions: ["settings:view"],
   },
 ];
 
 export function AppSidebar() {
   const location = useLocation();
   const pathname = location.pathname;
-  const { user, pageRoutes } = useAuth();
+  const { user, hasPermission } = useAuth();
   const { projects, selectedProject, selectedProjectId, selectProject } = useProject();
 
   const isActive = (url: string) => {
@@ -221,13 +161,15 @@ export function AppSidebar() {
   };
 
   const canSeeItem = (item: NavItem) => {
-    if (!item.roles || item.roles.length === 0) return true;
-    // Match both /projects and /dashboard/projects formats
-    return pageRoutes.includes(item.url) || pageRoutes.includes('/dashboard' + item.url);
+    if (!item.permissions || item.permissions.length === 0) return true;
+    return item.permissions.some((p) => hasPermission(p));
   };
 
   const visibleMainItems = mainNavItems.filter(canSeeItem);
-  const visibleRoleItems = roleNavItems.filter(canSeeItem);
+  // Bir xil URLdan faqat birinchi ko'rinadigan itemni olish
+  const visibleRoleItems = roleNavItems.filter(canSeeItem).filter((item, _, arr) =>
+    arr.findIndex(i => i.url === item.url) === arr.indexOf(item)
+  );
   const visibleSettingsItems = settingsNavItems.filter(canSeeItem);
 
   // Items that require project selection are dimmed when no project is selected

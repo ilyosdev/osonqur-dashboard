@@ -71,9 +71,22 @@ type ActiveView = "requests" | "debts" | "validation" | "suppliers";
 const STORAGE_KEY = "direktor_selected_project";
 
 export default function DirektorPage() {
-  const { user } = useAuth();
+  const { user, hasPermission } = useAuth();
   const { selectedProjectId: globalProjectId, selectProject: globalSelectProject } = useProject();
-  const [activeView, setActiveView] = useState<ActiveView>("requests");
+
+  const canApproveRequests = hasPermission("request:approve") || hasPermission("request:view_all");
+  const canViewDebts = hasPermission("debt:view");
+  const canValidate = hasPermission("smeta:validate");
+  const canViewSuppliers = hasPermission("supplier:view");
+
+  const firstView: ActiveView =
+    canApproveRequests ? "requests"
+    : canViewDebts ? "debts"
+    : canValidate ? "validation"
+    : canViewSuppliers ? "suppliers"
+    : "requests";
+
+  const [activeView, setActiveView] = useState<ActiveView>(firstView);
 
   // Project selection state - synced with global context
   const [selectedProjectId, setSelectedProjectId] = useState<string>(() =>
@@ -131,28 +144,28 @@ export default function DirektorPage() {
     loading: pendingRequestsLoading,
     error: pendingRequestsError,
     refetch: refetchPendingRequests,
-  } = useApi(() => requestsApi.getAll({ status: "PENDING", limit: 50, projectId: projectIdParam }), [selectedProjectId]);
+  } = useApi(() => requestsApi.getAll({ status: "PENDING", limit: 50, projectId: projectIdParam }), [selectedProjectId], { enabled: canApproveRequests });
 
   // Fetch finalized requests (for debt creation)
   const {
     data: finalizedRequestsData,
     loading: finalizedRequestsLoading,
     refetch: refetchFinalizedRequests,
-  } = useApi(() => requestsApi.getAll({ status: "FINALIZED", limit: 50, projectId: projectIdParam }), [selectedProjectId]);
+  } = useApi(() => requestsApi.getAll({ status: "FINALIZED", limit: 50, projectId: projectIdParam }), [selectedProjectId], { enabled: canViewDebts });
 
   // Fetch suppliers
   const {
     data: suppliersData,
     loading: suppliersLoading,
     refetch: refetchSuppliers,
-  } = useApi(() => suppliersApi.getAll({ limit: 100 }), []);
+  } = useApi(() => suppliersApi.getAll({ limit: 100 }), [], { enabled: canViewSuppliers });
 
   // Fetch supplier debts from analytics
   const {
     data: supplierDebtsData,
     loading: supplierDebtsLoading,
     refetch: refetchDebts,
-  } = useApi(() => analyticsApi.getSupplierDebts(projectIdParam), [selectedProjectId]);
+  } = useApi(() => analyticsApi.getSupplierDebts(projectIdParam), [selectedProjectId], { enabled: canViewDebts });
 
   // Fetch individual debts for selected supplier
   const {
@@ -164,21 +177,21 @@ export default function DirektorPage() {
       ? suppliersApi.getDebts(selectedSupplierForDebts.id, { isPaid: false, limit: 50 })
       : Promise.resolve({ data: [] as SupplierDebt[], total: 0, page: 1, limit: 50, totalPages: 0 }),
     [selectedSupplierForDebts?.id],
-    { enabled: !!selectedSupplierForDebts }
+    { enabled: !!selectedSupplierForDebts && canViewDebts }
   );
 
   // Fetch worker debts from analytics
   const {
     data: workerDebtsData,
     loading: workerDebtsLoading,
-  } = useApi(() => analyticsApi.getWorkerDebts(projectIdParam), [selectedProjectId]);
+  } = useApi(() => analyticsApi.getWorkerDebts(projectIdParam), [selectedProjectId], { enabled: canViewDebts });
 
   // Fetch unvalidated work logs
   const {
     data: unvalidatedWorkLogsData,
     loading: unvalidatedWorkLogsLoading,
     refetch: refetchWorkLogs,
-  } = useApi(() => workersApi.getUnvalidatedWorkLogs({ limit: 50, projectId: projectIdParam }), [selectedProjectId]);
+  } = useApi(() => workersApi.getUnvalidatedWorkLogs({ limit: 50, projectId: projectIdParam }), [selectedProjectId], { enabled: canValidate });
 
   // Fetch dashboard summary
   const {
@@ -399,36 +412,44 @@ export default function DirektorPage() {
 
       {/* Action buttons */}
       <div className="grid gap-3 grid-cols-2 sm:grid-cols-4">
-        <ActionButton
-          icon={Package}
-          label="Zayavkalar"
-          active={activeView === "requests"}
-          onClick={() => setActiveView("requests")}
-          badge={pendingRequests.length}
-        />
-        <ActionButton
-          icon={CreditCard}
-          label="Qarzlar"
-          active={activeView === "debts"}
-          onClick={() => setActiveView("debts")}
-        />
-        <ActionButton
-          icon={ClipboardCheck}
-          label="Tasdiqlash"
-          active={activeView === "validation"}
-          onClick={() => setActiveView("validation")}
-          badge={unvalidatedWorkLogs.length}
-        />
-        <ActionButton
-          icon={Building2}
-          label="Postavshiklar"
-          active={activeView === "suppliers"}
-          onClick={() => setActiveView("suppliers")}
-        />
+        {canApproveRequests && (
+          <ActionButton
+            icon={Package}
+            label="Zayavkalar"
+            active={activeView === "requests"}
+            onClick={() => setActiveView("requests")}
+            badge={pendingRequests.length}
+          />
+        )}
+        {canViewDebts && (
+          <ActionButton
+            icon={CreditCard}
+            label="Qarzlar"
+            active={activeView === "debts"}
+            onClick={() => setActiveView("debts")}
+          />
+        )}
+        {canValidate && (
+          <ActionButton
+            icon={ClipboardCheck}
+            label="Tasdiqlash"
+            active={activeView === "validation"}
+            onClick={() => setActiveView("validation")}
+            badge={unvalidatedWorkLogs.length}
+          />
+        )}
+        {canViewSuppliers && (
+          <ActionButton
+            icon={Building2}
+            label="Postavshiklar"
+            active={activeView === "suppliers"}
+            onClick={() => setActiveView("suppliers")}
+          />
+        )}
       </div>
 
       {/* Content sections */}
-      {activeView === "requests" && (
+      {activeView === "requests" && canApproveRequests && (
         <RequestsSection
           requests={pendingRequests}
           loading={pendingRequestsLoading}
@@ -439,7 +460,7 @@ export default function DirektorPage() {
           rejecting={rejecting}
         />
       )}
-      {activeView === "debts" && (
+      {activeView === "debts" && canViewDebts && (
         <DebtsSection
           supplierDebts={supplierDebts}
           workerDebts={workerDebts}
@@ -453,7 +474,7 @@ export default function DirektorPage() {
           totalWorkerDebt={workerDebtsData?.totalDebt || 0}
         />
       )}
-      {activeView === "validation" && (
+      {activeView === "validation" && canValidate && (
         <ValidationSection
           workLogs={unvalidatedWorkLogs}
           loading={unvalidatedWorkLogsLoading}
@@ -474,7 +495,7 @@ export default function DirektorPage() {
           validating={validatingWorkLog}
         />
       )}
-      {activeView === "suppliers" && (
+      {activeView === "suppliers" && canViewSuppliers && (
         <SuppliersSection
           suppliers={suppliers}
           supplierDebts={supplierDebts}

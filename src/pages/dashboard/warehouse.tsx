@@ -81,6 +81,8 @@ const ITEMS_PER_PAGE = 30;
 export default function WarehousePage() {
   const { user } = useAuth();
   const isSklad = usePermission('warehouse:view');
+  const canReceive = usePermission('warehouse:receive');
+  const canTransfer = usePermission('warehouse:transfer');
 
   const [activeTab, setActiveTab] = useState("warehouses");
   const [activeDialog, setActiveDialog] = useState<DialogType>(null);
@@ -362,7 +364,7 @@ export default function WarehousePage() {
       )}
 
       <Tabs value={activeTab} onValueChange={setActiveTab}>
-        <TabsList className="grid w-full grid-cols-4">
+        <TabsList className={`grid w-full grid-cols-${[true, true, canReceive, isSklad].filter(Boolean).length}`}>
           <TabsTrigger value="warehouses" className="flex items-center gap-2">
             <Warehouse className="h-4 w-4" />
             Omborlar
@@ -371,24 +373,28 @@ export default function WarehousePage() {
             <Boxes className="h-4 w-4" />
             Inventar
           </TabsTrigger>
-          <TabsTrigger value="deliveries" className="flex items-center gap-2">
-            <Truck className="h-4 w-4" />
-            Yetkazmalar
-            {deliveredRequests.length > 0 && (
-              <Badge variant="secondary" className="ml-1 bg-warning/10 text-warning">
-                {deliveredRequests.length}
-              </Badge>
-            )}
-          </TabsTrigger>
-          <TabsTrigger value="operations" className="flex items-center gap-2">
-            <History className="h-4 w-4" />
-            Operatsiyalar
-            {pendingTransfers.length > 0 && (
-              <Badge variant="secondary" className="ml-1 bg-warning/10 text-warning">
-                {pendingTransfers.length}
-              </Badge>
-            )}
-          </TabsTrigger>
+          {canReceive && (
+            <TabsTrigger value="deliveries" className="flex items-center gap-2">
+              <Truck className="h-4 w-4" />
+              Yetkazmalar
+              {deliveredRequests.length > 0 && (
+                <Badge variant="secondary" className="ml-1 bg-warning/10 text-warning">
+                  {deliveredRequests.length}
+                </Badge>
+              )}
+            </TabsTrigger>
+          )}
+          {isSklad && (
+            <TabsTrigger value="operations" className="flex items-center gap-2">
+              <History className="h-4 w-4" />
+              Operatsiyalar
+              {pendingTransfers.length > 0 && (
+                <Badge variant="secondary" className="ml-1 bg-warning/10 text-warning">
+                  {pendingTransfers.length}
+                </Badge>
+              )}
+            </TabsTrigger>
+          )}
         </TabsList>
 
         <TabsContent value="warehouses" className="mt-4">

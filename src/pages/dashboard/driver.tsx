@@ -35,6 +35,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { useApi, useMutation } from "@/hooks/use-api";
+import { useAuth } from "@/lib/auth";
 import { driversApi, DriverDelivery } from "@/lib/api/drivers";
 import { StatsSkeleton } from "@/components/ui/table-skeleton";
 import { ErrorMessage } from "@/components/ui/error-message";
@@ -80,7 +81,13 @@ function groupRequestsByBatch(requests: DriverDelivery[]): RequestBatch[] {
 }
 
 export default function DriverPage() {
-  const [activeTab, setActiveTab] = useState("assigned");
+  const { hasPermission } = useAuth();
+  const canViewAssigned = hasPermission("driver:view_assigned");
+  const canMarkCollected = hasPermission("driver:mark_collected");
+  const canMarkDelivered = hasPermission("driver:mark_delivered");
+
+  const firstTab = canViewAssigned ? "assigned" : canMarkCollected ? "in-transit" : "history";
+  const [activeTab, setActiveTab] = useState(firstTab);
   const [collectDialog, setCollectDialog] = useState<DriverDelivery | null>(null);
   const [deliverDialog, setDeliverDialog] = useState<DriverDelivery | null>(null);
   const [collectedQty, setCollectedQty] = useState("");
@@ -216,29 +223,35 @@ export default function DriverPage() {
       )}
 
       <Tabs value={activeTab} onValueChange={setActiveTab}>
-        <TabsList className="grid w-full grid-cols-3">
-          <TabsTrigger value="assigned" className="flex items-center gap-2">
-            <Package className="h-4 w-4" />
-            Tayinlangan
-            {assignedRequests.length > 0 && (
-              <Badge variant="secondary" className="ml-1">
-                {assignedRequests.length}
-              </Badge>
-            )}
-          </TabsTrigger>
-          <TabsTrigger value="in-transit" className="flex items-center gap-2">
-            <Truck className="h-4 w-4" />
-            Yo'lda
-            {inTransitRequests.length > 0 && (
-              <Badge variant="secondary" className="ml-1">
-                {inTransitRequests.length}
-              </Badge>
-            )}
-          </TabsTrigger>
-          <TabsTrigger value="history" className="flex items-center gap-2">
-            <History className="h-4 w-4" />
-            Tarix
-          </TabsTrigger>
+        <TabsList className={`grid w-full grid-cols-${[canViewAssigned, canMarkCollected, canMarkDelivered].filter(Boolean).length || 1}`}>
+          {canViewAssigned && (
+            <TabsTrigger value="assigned" className="flex items-center gap-2">
+              <Package className="h-4 w-4" />
+              Tayinlangan
+              {assignedRequests.length > 0 && (
+                <Badge variant="secondary" className="ml-1">
+                  {assignedRequests.length}
+                </Badge>
+              )}
+            </TabsTrigger>
+          )}
+          {canMarkCollected && (
+            <TabsTrigger value="in-transit" className="flex items-center gap-2">
+              <Truck className="h-4 w-4" />
+              Yo'lda
+              {inTransitRequests.length > 0 && (
+                <Badge variant="secondary" className="ml-1">
+                  {inTransitRequests.length}
+                </Badge>
+              )}
+            </TabsTrigger>
+          )}
+          {canMarkDelivered && (
+            <TabsTrigger value="history" className="flex items-center gap-2">
+              <History className="h-4 w-4" />
+              Tarix
+            </TabsTrigger>
+          )}
         </TabsList>
 
         <TabsContent value="assigned" className="mt-4">

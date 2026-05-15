@@ -23,6 +23,7 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useApi } from "@/hooks/use-api";
+import { useAuth } from "@/lib/auth";
 import { suppliersApi, SupplierOrder, SupplierDebt } from "@/lib/api/suppliers";
 import { StatsSkeleton } from "@/components/ui/table-skeleton";
 import { ErrorMessage } from "@/components/ui/error-message";
@@ -44,7 +45,13 @@ function formatDate(dateStr: string): string {
 }
 
 export default function SupplierPortalPage() {
-  const [activeTab, setActiveTab] = useState("orders");
+  const { hasPermission } = useAuth();
+  const canViewOrders = hasPermission("supplier_portal:orders");
+  const canViewDebts = hasPermission("supplier_portal:view");
+  const canViewPayments = hasPermission("supplier_portal:debts");
+
+  const firstTab = canViewOrders ? "orders" : canViewDebts ? "debts" : "payments";
+  const [activeTab, setActiveTab] = useState(firstTab);
 
   // Fetch orders for this supplier (user-specific)
   const {
@@ -137,29 +144,35 @@ export default function SupplierPortalPage() {
       )}
 
       <Tabs value={activeTab} onValueChange={setActiveTab}>
-        <TabsList className="grid w-full grid-cols-3">
-          <TabsTrigger value="orders" className="flex items-center gap-2">
-            <Package className="h-4 w-4" />
-            Buyurtmalar
-            {pendingOrders > 0 && (
-              <Badge variant="secondary" className="ml-1 bg-warning/10 text-warning">
-                {pendingOrders}
-              </Badge>
-            )}
-          </TabsTrigger>
-          <TabsTrigger value="debts" className="flex items-center gap-2">
-            <CreditCard className="h-4 w-4" />
-            Qarzlar
-            {unpaidDebts.length > 0 && (
-              <Badge variant="secondary" className="ml-1 bg-destructive/10 text-destructive">
-                {unpaidDebts.length}
-              </Badge>
-            )}
-          </TabsTrigger>
-          <TabsTrigger value="payments" className="flex items-center gap-2">
-            <Wallet className="h-4 w-4" />
-            To'lovlar
-          </TabsTrigger>
+        <TabsList className={`grid w-full grid-cols-${[canViewOrders, canViewDebts, canViewPayments].filter(Boolean).length || 1}`}>
+          {canViewOrders && (
+            <TabsTrigger value="orders" className="flex items-center gap-2">
+              <Package className="h-4 w-4" />
+              Buyurtmalar
+              {pendingOrders > 0 && (
+                <Badge variant="secondary" className="ml-1 bg-warning/10 text-warning">
+                  {pendingOrders}
+                </Badge>
+              )}
+            </TabsTrigger>
+          )}
+          {canViewDebts && (
+            <TabsTrigger value="debts" className="flex items-center gap-2">
+              <CreditCard className="h-4 w-4" />
+              Qarzlar
+              {unpaidDebts.length > 0 && (
+                <Badge variant="secondary" className="ml-1 bg-destructive/10 text-destructive">
+                  {unpaidDebts.length}
+                </Badge>
+              )}
+            </TabsTrigger>
+          )}
+          {canViewPayments && (
+            <TabsTrigger value="payments" className="flex items-center gap-2">
+              <Wallet className="h-4 w-4" />
+              To'lovlar
+            </TabsTrigger>
+          )}
         </TabsList>
 
         <TabsContent value="orders" className="mt-4">

@@ -22,6 +22,7 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useApi } from "@/hooks/use-api";
+import { useAuth } from "@/lib/auth";
 import { workersApi, WorkLog, WorkerPayment } from "@/lib/api/workers";
 import { StatsSkeleton } from "@/components/ui/table-skeleton";
 import { ErrorMessage } from "@/components/ui/error-message";
@@ -49,7 +50,12 @@ interface WorkerBalance {
 }
 
 export default function WorkerPortalPage() {
-  const [activeTab, setActiveTab] = useState("work-logs");
+  const { hasPermission } = useAuth();
+  const canViewWorkLogs = hasPermission("worker_portal:work_logs");
+  const canViewPayments = hasPermission("worker_portal:payments");
+
+  const firstTab = canViewWorkLogs ? "work-logs" : "payments";
+  const [activeTab, setActiveTab] = useState(firstTab);
 
   // Fetch work logs for this worker (user-specific)
   const {
@@ -138,20 +144,24 @@ export default function WorkerPortalPage() {
       )}
 
       <Tabs value={activeTab} onValueChange={setActiveTab}>
-        <TabsList className="grid w-full grid-cols-2">
-          <TabsTrigger value="work-logs" className="flex items-center gap-2">
-            <FileText className="h-4 w-4" />
-            Ish hisobotlari
-            {pendingCount > 0 && (
-              <Badge variant="secondary" className="ml-1 bg-warning/10 text-warning">
-                {pendingCount}
-              </Badge>
-            )}
-          </TabsTrigger>
-          <TabsTrigger value="payments" className="flex items-center gap-2">
-            <Wallet className="h-4 w-4" />
-            To'lovlar
-          </TabsTrigger>
+        <TabsList className={`grid w-full grid-cols-${[canViewWorkLogs, canViewPayments].filter(Boolean).length || 1}`}>
+          {canViewWorkLogs && (
+            <TabsTrigger value="work-logs" className="flex items-center gap-2">
+              <FileText className="h-4 w-4" />
+              Ish hisobotlari
+              {pendingCount > 0 && (
+                <Badge variant="secondary" className="ml-1 bg-warning/10 text-warning">
+                  {pendingCount}
+                </Badge>
+              )}
+            </TabsTrigger>
+          )}
+          {canViewPayments && (
+            <TabsTrigger value="payments" className="flex items-center gap-2">
+              <Wallet className="h-4 w-4" />
+              To'lovlar
+            </TabsTrigger>
+          )}
         </TabsList>
 
         <TabsContent value="work-logs" className="mt-4">

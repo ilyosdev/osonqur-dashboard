@@ -32,6 +32,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { useApi, useMutation } from "@/hooks/use-api";
+import { useAuth } from "@/lib/auth";
 import { requestsApi, PurchaseRequest } from "@/lib/api/requests";
 import { StatsSkeleton } from "@/components/ui/table-skeleton";
 import { ErrorMessage } from "@/components/ui/error-message";
@@ -60,7 +61,12 @@ interface FinalizeData {
 }
 
 export default function ModeratorPage() {
-  const [activeTab, setActiveTab] = useState("pending");
+  const { hasPermission } = useAuth();
+  const canViewPending = hasPermission("moderator:view_pending");
+  const canFinalize = hasPermission("moderator:finalize");
+
+  const firstTab = canViewPending ? "pending" : "history";
+  const [activeTab, setActiveTab] = useState(firstTab);
   const [finalizeDialog, setFinalizeDialog] = useState<PurchaseRequest | null>(null);
   const [finalizeData, setFinalizeData] = useState<FinalizeData>({
     finalUnitPrice: "",
@@ -184,20 +190,24 @@ export default function ModeratorPage() {
       )}
 
       <Tabs value={activeTab} onValueChange={setActiveTab}>
-        <TabsList className="grid w-full grid-cols-2">
-          <TabsTrigger value="pending" className="flex items-center gap-2">
-            <Clock className="h-4 w-4" />
-            Yakunlash kerak
-            {pendingRequests.length > 0 && (
-              <Badge variant="secondary" className="ml-1">
-                {pendingRequests.length}
-              </Badge>
-            )}
-          </TabsTrigger>
-          <TabsTrigger value="history" className="flex items-center gap-2">
-            <History className="h-4 w-4" />
-            Yakunlangan
-          </TabsTrigger>
+        <TabsList className={`grid w-full grid-cols-${[canViewPending, canFinalize].filter(Boolean).length || 1}`}>
+          {canViewPending && (
+            <TabsTrigger value="pending" className="flex items-center gap-2">
+              <Clock className="h-4 w-4" />
+              Yakunlash kerak
+              {pendingRequests.length > 0 && (
+                <Badge variant="secondary" className="ml-1">
+                  {pendingRequests.length}
+                </Badge>
+              )}
+            </TabsTrigger>
+          )}
+          {canFinalize && (
+            <TabsTrigger value="history" className="flex items-center gap-2">
+              <History className="h-4 w-4" />
+              Yakunlangan
+            </TabsTrigger>
+          )}
         </TabsList>
 
         <TabsContent value="pending" className="mt-4">

@@ -8,6 +8,7 @@ import { useApi } from "@/hooks/use-api";
 import { accountsApi, incomesApi, expensesApi, cashRegistersApi } from "@/lib/api/finance";
 import { StatsSkeleton, CardSkeleton } from "@/components/ui/table-skeleton";
 import { ErrorMessage } from "@/components/ui/error-message";
+import { useAuth } from "@/lib/auth";
 
 function formatNumber(num: number): string {
   if (num >= 1000000000) {
@@ -28,27 +29,33 @@ const categoryNames: Record<string, string> = {
 };
 
 export default function FinancePage() {
+  const { hasPermission } = useAuth();
+  const canViewIncome = hasPermission("income:create") || hasPermission("income:view");
+  const canViewExpenses = hasPermission("expense:view");
+  const canViewKassas = hasPermission("kashlok:view_all");
+  const canViewCashRequests = hasPermission("cash_request:approve");
+
   const {
     data: accountsResponse,
     loading: accountsLoading,
     error: accountsError,
     refetch: refetchAccounts,
-  } = useApi(() => accountsApi.getAll({ limit: 100 }), []);
+  } = useApi(() => accountsApi.getAll({ limit: 100 }), [], { enabled: canViewIncome || canViewExpenses });
 
   const {
     data: incomesResponse,
     loading: incomesLoading,
-  } = useApi(() => incomesApi.getAll({ limit: 5 }), []);
+  } = useApi(() => incomesApi.getAll({ limit: 5 }), [], { enabled: canViewIncome });
 
   const {
     data: expensesResponse,
     loading: expensesLoading,
-  } = useApi(() => expensesApi.getAll({ limit: 5 }), []);
+  } = useApi(() => expensesApi.getAll({ limit: 5 }), [], { enabled: canViewExpenses });
 
   const {
     data: cashRegistersResponse,
     loading: cashRegistersLoading,
-  } = useApi(() => cashRegistersApi.getAll({ limit: 100 }), []);
+  } = useApi(() => cashRegistersApi.getAll({ limit: 100 }), [], { enabled: canViewKassas });
 
   const loading = accountsLoading || incomesLoading || expensesLoading || cashRegistersLoading;
   const error = accountsError;
@@ -86,43 +93,51 @@ export default function FinancePage() {
         <StatsSkeleton />
       ) : (
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-          <StatsCard
-            title="Jami kirim"
-            value={formatNumber(totalIncome)}
-            subtitle="oxirgi"
-            icon={TrendingUp}
-            variant="success"
-            className="animate-slide-up stagger-1"
-          />
-          <StatsCard
-            title="Jami chiqim"
-            value={formatNumber(totalExpense)}
-            subtitle="oxirgi"
-            icon={TrendingDown}
-            variant="danger"
-            className="animate-slide-up stagger-2"
-          />
-          <StatsCard
-            title="Balans"
-            value={formatNumber(totalBalance)}
-            subtitle="qoldiq"
-            icon={Wallet}
-            variant="primary"
-            className="animate-slide-up stagger-3"
-          />
-          <StatsCard
-            title="Kassalarda"
-            value={formatNumber(totalCashBalance)}
-            subtitle="naqd pul"
-            icon={PiggyBank}
-            variant="warning"
-            className="animate-slide-up stagger-4"
-          />
+          {canViewIncome && (
+            <StatsCard
+              title="Jami kirim"
+              value={formatNumber(totalIncome)}
+              subtitle="oxirgi"
+              icon={TrendingUp}
+              variant="success"
+              className="animate-slide-up stagger-1"
+            />
+          )}
+          {canViewExpenses && (
+            <StatsCard
+              title="Jami chiqim"
+              value={formatNumber(totalExpense)}
+              subtitle="oxirgi"
+              icon={TrendingDown}
+              variant="danger"
+              className="animate-slide-up stagger-2"
+            />
+          )}
+          {(canViewIncome || canViewExpenses) && (
+            <StatsCard
+              title="Balans"
+              value={formatNumber(totalBalance)}
+              subtitle="qoldiq"
+              icon={Wallet}
+              variant="primary"
+              className="animate-slide-up stagger-3"
+            />
+          )}
+          {canViewKassas && (
+            <StatsCard
+              title="Kassalarda"
+              value={formatNumber(totalCashBalance)}
+              subtitle="naqd pul"
+              icon={PiggyBank}
+              variant="warning"
+              className="animate-slide-up stagger-4"
+            />
+          )}
         </div>
       )}
 
       <div className="grid gap-6 lg:grid-cols-2">
-        <Card className="animate-slide-up" style={{ animationDelay: "0.2s" }}>
+        {canViewIncome && <Card className="animate-slide-up" style={{ animationDelay: "0.2s" }}>
           <CardHeader className="flex flex-row items-center justify-between pb-2">
             <div>
               <CardTitle className="text-base font-semibold flex items-center gap-2">
@@ -170,9 +185,9 @@ export default function FinancePage() {
               </p>
             )}
           </CardContent>
-        </Card>
+        </Card>}
 
-        <Card className="animate-slide-up" style={{ animationDelay: "0.3s" }}>
+        {canViewExpenses && <Card className="animate-slide-up" style={{ animationDelay: "0.3s" }}>
           <CardHeader className="flex flex-row items-center justify-between pb-2">
             <div>
               <CardTitle className="text-base font-semibold flex items-center gap-2">
@@ -220,10 +235,10 @@ export default function FinancePage() {
               </p>
             )}
           </CardContent>
-        </Card>
+        </Card>}
       </div>
 
-      <Card className="animate-slide-up" style={{ animationDelay: "0.4s" }}>
+      {canViewKassas && <Card className="animate-slide-up" style={{ animationDelay: "0.4s" }}>
         <CardHeader>
           <CardTitle className="text-base font-semibold flex items-center gap-2">
             <DollarSign className="h-4 w-4 text-warning" />
@@ -266,7 +281,7 @@ export default function FinancePage() {
             </p>
           )}
         </CardContent>
-      </Card>
+      </Card>}
     </div>
   );
 }
