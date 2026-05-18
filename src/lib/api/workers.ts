@@ -2,22 +2,21 @@ import { apiClient, PaginationParams, PaginatedResponse } from './client';
 
 export interface Worker {
   id: string;
-  firstName: string;
-  lastName: string;
+  name: string;
   phone?: string;
-  position?: string;
-  salary?: number;
+  specialty?: string;
   vendorId: string;
+  totalEarned: number;
+  totalPaid: number;
+  balance: number;
   createdAt: string;
   updatedAt: string;
 }
 
 export interface CreateWorkerRequest {
-  firstName: string;
-  lastName: string;
+  name: string;
   phone?: string;
-  position?: string;
-  salary?: number;
+  specialty?: string;
 }
 
 export interface GetWorkersParams extends PaginationParams {
@@ -70,9 +69,8 @@ export interface WorkerPayment {
 export interface CreateWorkerPaymentRequest {
   workerId: string;
   amount: number;
-  paymentDate: string;
-  paymentType: string;
-  description?: string;
+  note?: string;
+  workLogId?: string;
 }
 
 export interface UpdateWorkerRequest {
@@ -88,6 +86,7 @@ export interface GetWorkLogsParams extends PaginationParams {
   projectId?: string;
   startDate?: string;
   endDate?: string;
+  isPaid?: boolean;
 }
 
 export interface GetUnvalidatedWorkLogsParams extends PaginationParams {
@@ -153,7 +152,8 @@ export const workersApi = {
     if (params?.projectId) searchParams.append('projectId', params.projectId);
     if (params?.startDate) searchParams.append('startDate', params.startDate);
     if (params?.endDate) searchParams.append('endDate', params.endDate);
-    
+    if (params?.isPaid !== undefined) searchParams.append('isPaid', params.isPaid.toString());
+
     const query = searchParams.toString();
     return apiClient<PaginatedResponse<WorkLog>>(
       `/vendor/workers/work-logs/list${query ? `?${query}` : ''}`,

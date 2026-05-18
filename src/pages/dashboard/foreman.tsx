@@ -1,1489 +1,438 @@
-import { useState, useEffect } from "react";
-import {
-  ClipboardList,
-  Users,
-  Package,
-  HandCoins,
-  PlusCircle,
-  CheckCircle,
-  Clock,
-  DollarSign,
-  UserPlus,
-  FileText,
-  BarChart2,
-  Wallet,
-} from "lucide-react";
-import { StatsCard } from "@/components/dashboard/stats-card";
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
+import React, { useState } from "react";
+import { ClipboardList, Plus, ChevronLeft, ChevronRight, Clock, CheckCircle, XCircle, Truck, Package, PackageCheck, CheckSquare } from "lucide-react";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
 import { Badge } from "@/components/ui/badge";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
+import { StatsCard } from "@/components/dashboard/stats-card";
 import { useApi, useMutation } from "@/hooks/use-api";
-import { useAuth } from "@/lib/auth";
-import { workersApi, WorkLog, Worker } from "@/lib/api/workers";
 import { requestsApi, PurchaseRequest } from "@/lib/api/requests";
-import { cashRequestsApi, CashRequest } from "@/lib/api/finance";
-import { projectsApi } from "@/lib/api/projects";
-import { smetaItemsApi, SmetaItem } from "@/lib/api/smeta-items";
-import { smetasApi, Smeta } from "@/lib/api/smetas";
-import { StatsSkeleton } from "@/components/ui/table-skeleton";
-import { ErrorMessage } from "@/components/ui/error-message";
 import { useProject } from "@/lib/project-context";
 
-function formatMoney(num: number): string {
-  return num.toLocaleString("uz-UZ");
-}
+type View = "menu" | "create" | "history";
 
-type ActiveView = "worklogs" | "workers" | "requests" | "cash" | "smeta";
+const STATUS_LABEL: Record<string, string> = {
+  PENDING: "Snabjeniya tasdig'ini kutmoqda",
+  APPROVED: "Tasdiqlandi, snabjeniyada",
+  REJECTED: "Rad etildi",
+  IN_TRANSIT: "Haydovchida, yo'lda",
+  DELIVERED: "Haydovchi yetkazdi, skladda",
+  RECEIVED: "Skladchi qabul qildi",
+  FINALIZED: "Yakunlandi",
+};
+
+const STATUS_ICON: Record<string, React.ReactNode> = {
+  PENDING: <Clock className="h-4 w-4 text-warning" />,
+  APPROVED: <CheckCircle className="h-4 w-4 text-success" />,
+  REJECTED: <XCircle className="h-4 w-4 text-destructive" />,
+  IN_TRANSIT: <Truck className="h-4 w-4 text-primary" />,
+  DELIVERED: <Package className="h-4 w-4 text-primary" />,
+  RECEIVED: <PackageCheck className="h-4 w-4 text-success" />,
+  FINALIZED: <CheckSquare className="h-4 w-4 text-success" />,
+};
+
+const STATUS_VARIANT: Record<string, "secondary" | "destructive" | "outline"> = {
+  PENDING: "secondary",
+  APPROVED: "outline",
+  REJECTED: "destructive",
+  IN_TRANSIT: "outline",
+  DELIVERED: "outline",
+  RECEIVED: "outline",
+  FINALIZED: "outline",
+};
 
 export default function ForemanPage() {
-  const { user, hasPermission } = useAuth();
-  const { selectedProjectId } = useProject();
-
-  // Permissions — mirrors bot menu items exactly
-  const canViewWorkers = hasPermission("worker:view");
-  const canCreateRequest = hasPermission("request:create");
-  const canEditSmeta = hasPermission("smeta:edit");
-  const canUseKassa = hasPermission("kassa:view") || hasPermission("kassa:request_money");
-  const canCreateWorker = hasPermission("worker:create");
-  const canPayWorker = hasPermission("worker:pay");
-  const canCreateWorklog = hasPermission("worklog:create");
-  const canViewWorklog = hasPermission("worklog:view");
-
-  // Determine first available view
-  const firstView: ActiveView =
-    canViewWorklog || canCreateWorklog ? "worklogs"
-    : canViewWorkers ? "workers"
-    : canCreateRequest ? "requests"
-    : canUseKassa ? "cash"
-    : canEditSmeta ? "smeta"
-    : "worklogs";
-
-  const [activeView, setActiveView] = useState<ActiveView>(firstView);
-
-  // Keep activeView valid if permissions change
-  useEffect(() => {
-    const viewAllowed =
-      (activeView === "worklogs" && (canViewWorklog || canCreateWorklog)) ||
-      (activeView === "workers" && canViewWorkers) ||
-      (activeView === "requests" && canCreateRequest) ||
-      (activeView === "cash" && canUseKassa) ||
-      (activeView === "smeta" && canEditSmeta);
-    if (!viewAllowed) setActiveView(firstView);
-  }, [canViewWorkers, canCreateRequest, canEditSmeta, canUseKassa, canViewWorklog, canCreateWorklog]);
-
-  // Dialog states
-  const [workLogDialogOpen, setWorkLogDialogOpen] = useState(false);
-  const [addWorkerDialogOpen, setAddWorkerDialogOpen] = useState(false);
-  const [paymentDialogOpen, setPaymentDialogOpen] = useState(false);
-  const [materialRequestDialogOpen, setMaterialRequestDialogOpen] = useState(false);
-  const [cashRequestDialogOpen, setCashRequestDialogOpen] = useState(false);
-
-  // Date filter for work logs
-  const [dateFrom, setDateFrom] = useState("");
-  const [dateTo, setDateTo] = useState("");
-
-  // Work logs — only fetch if user has worklog permission
-  const {
-    data: workLogsData,
-    loading: workLogsLoading,
-    refetch: refetchWorkLogs,
-  } = useApi(() => workersApi.getWorkLogs({
-    limit: 50,
-    ...(dateFrom && { startDate: dateFrom }),
-    ...(dateTo && { endDate: dateTo }),
-  }), [dateFrom, dateTo], { enabled: canViewWorklog || canCreateWorklog });
-
-  // Workers — only if user can view workers
-  const {
-    data: workersData,
-    loading: workersLoading,
-    refetch: refetchWorkers,
-  } = useApi(() => workersApi.getAll({ limit: 100 }), [], { enabled: canViewWorkers });
-
-  // My requests — only if user can create/view requests
-  const {
-    data: requestsData,
-    loading: requestsLoading,
-    refetch: refetchRequests,
-  } = useApi(() => requestsApi.getAll({ limit: 50 }), [], { enabled: canCreateRequest });
-
-  // Cash requests — only if user has kassa permission
-  const {
-    data: cashRequestsData,
-    loading: cashRequestsLoading,
-    refetch: refetchCashRequests,
-  } = useApi(() => cashRequestsApi.getAll({ limit: 50 }), [], { enabled: canUseKassa });
-
-  // Smetas for current project — only if user can edit smeta
-  const {
-    data: smetasData,
-    loading: smetasLoading,
-  } = useApi(
-    () => smetasApi.getAll({ projectId: selectedProjectId || undefined, limit: 20 }),
-    [selectedProjectId],
-    { enabled: canEditSmeta && !!selectedProjectId }
-  );
-
-  const workLogs = workLogsData?.data || [];
-  const workers = workersData?.data || [];
-  const requests = requestsData?.data || [];
-  const cashRequests = cashRequestsData?.data || [];
-  const smetas = smetasData?.data || [];
-
-  // Stats — show only what user has access to
-  const totalWorkLogs = workLogsData?.total || 0;
-  const validatedWorkLogs = workLogs.filter(w => w.isValidated).length;
-  const pendingRequests = requests.filter(r => r.status === "PENDING").length;
-  const pendingCashRequests = cashRequests.filter(r => r.status === "PENDING").length;
+  const { selectedProjectId, selectedProject } = useProject();
+  const [view, setView] = useState<View>("menu");
 
   return (
     <div className="space-y-6 animate-fade-in">
-      {/* Header */}
-      <div className="flex flex-col gap-1">
-        <h1 className="text-2xl font-bold tracking-tight">Prorab</h1>
-        <p className="text-muted-foreground">
-          Xush kelibsiz, {user?.name || "Prorab"}
-        </p>
-      </div>
-
-      {/* Stats — only for relevant permissions */}
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        {(canViewWorklog || canCreateWorklog) && (
-          <StatsCard
-            title="Ish jurnallari"
-            value={totalWorkLogs}
-            subtitle={`${validatedWorkLogs} tasdiqlangan`}
-            icon={ClipboardList}
-            variant="primary"
-            className="animate-slide-up stagger-1"
-          />
-        )}
-        {canViewWorkers && (
-          <StatsCard
-            title="Ishchilar"
-            value={workers.length}
-            subtitle="ta ro'yxatda"
-            icon={Users}
-            variant="success"
-            className="animate-slide-up stagger-2"
-          />
-        )}
-        {canCreateRequest && (
-          <StatsCard
-            title="Material so'rovlari"
-            value={pendingRequests}
-            subtitle="ta kutilmoqda"
-            icon={Package}
-            variant="warning"
-            className="animate-slide-up stagger-3"
-          />
-        )}
-        {canUseKassa && (
-          <StatsCard
-            title="Pul so'rovlari"
-            value={pendingCashRequests}
-            subtitle="ta kutilmoqda"
-            icon={HandCoins}
-            variant="default"
-            className="animate-slide-up stagger-4"
-          />
+      <div>
+        <h1 className="text-2xl font-bold tracking-tight">Zayavkalar</h1>
+        {selectedProject && (
+          <p className="text-muted-foreground">{selectedProject.name}</p>
         )}
       </div>
 
-      {/* Action buttons — shown only for enabled bot menu items */}
-      <div className="grid gap-3 grid-cols-2 sm:grid-cols-4 lg:grid-cols-8">
-        {(canViewWorklog || canCreateWorklog) && (
-          <ActionButton
-            icon={ClipboardList}
-            label="Ish jurnali"
-            active={activeView === "worklogs"}
-            onClick={() => setActiveView("worklogs")}
-          />
-        )}
-        {canCreateWorklog && (
-          <ActionButton
-            icon={PlusCircle}
-            label="Ish qo'shish"
-            onClick={() => setWorkLogDialogOpen(true)}
-          />
-        )}
-        {canViewWorkers && (
-          <ActionButton
-            icon={Users}
-            label="Ishchilar"
-            active={activeView === "workers"}
-            onClick={() => setActiveView("workers")}
-          />
-        )}
-        {canCreateWorker && (
-          <ActionButton
-            icon={UserPlus}
-            label="Ishchi qo'shish"
-            onClick={() => setAddWorkerDialogOpen(true)}
-          />
-        )}
-        {canCreateRequest && (
-          <ActionButton
-            icon={Package}
-            label="Zayavkalar"
-            active={activeView === "requests"}
-            onClick={() => setActiveView("requests")}
-          />
-        )}
-        {canCreateRequest && (
-          <ActionButton
-            icon={FileText}
-            label="Zayavka qo'shish"
-            onClick={() => setMaterialRequestDialogOpen(true)}
-          />
-        )}
-        {canUseKassa && (
-          <ActionButton
-            icon={HandCoins}
-            label="Pul so'rovlari"
-            active={activeView === "cash"}
-            onClick={() => setActiveView("cash")}
-          />
-        )}
-        {canUseKassa && (
-          <ActionButton
-            icon={DollarSign}
-            label="Pul so'rash"
-            onClick={() => setCashRequestDialogOpen(true)}
-          />
-        )}
-        {canEditSmeta && (
-          <ActionButton
-            icon={BarChart2}
-            label="Smeta"
-            active={activeView === "smeta"}
-            onClick={() => setActiveView("smeta")}
-          />
-        )}
-      </div>
+      {view === "menu" && <MenuView onSelect={setView} projectId={selectedProjectId} />}
+      {view === "create" && <CreateView onBack={() => setView("menu")} projectId={selectedProjectId} />}
+      {view === "history" && <HistoryView onBack={() => setView("menu")} projectId={selectedProjectId} />}
+    </div>
+  );
+}
 
-      {/* Date filters for work logs */}
-      {activeView === "worklogs" && (
-        <Card>
-          <CardContent className="pt-4 pb-3">
-            <div className="flex flex-wrap items-end gap-3">
-              <div className="space-y-1">
-                <Label className="text-xs">Boshlanish</Label>
-                <Input
-                  type="date"
-                  value={dateFrom}
-                  onChange={(e) => setDateFrom(e.target.value)}
-                  className="w-40"
-                />
-              </div>
-              <div className="space-y-1">
-                <Label className="text-xs">Tugash</Label>
-                <Input
-                  type="date"
-                  value={dateTo}
-                  onChange={(e) => setDateTo(e.target.value)}
-                  className="w-40"
-                />
-              </div>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => { setDateFrom(""); setDateTo(""); }}
-              >
-                Tozalash
-              </Button>
+function MenuView({ onSelect, projectId }: { onSelect: (v: View) => void; projectId: string | null }) {
+  const { data } = useApi(
+    () => requestsApi.getAll({ projectId: projectId || undefined, limit: 100 }),
+    [projectId],
+    { enabled: !!projectId }
+  );
+
+  const requests = data?.data || [];
+  const total = requests.length;
+  const pending = requests.filter(r => r.status === "PENDING").length;
+  const approved = requests.filter(r => ["APPROVED", "IN_TRANSIT", "DELIVERED", "RECEIVED", "FINALIZED"].includes(r.status)).length;
+
+  return (
+    <div className="space-y-4">
+      {/* Action cards */}
+      <div className="flex flex-col gap-2">
+        <Card className="cursor-pointer hover:bg-muted/50 transition-colors" onClick={() => onSelect("create")}>
+          <CardContent className="flex items-center gap-3 px-4 py-3">
+            <div className="h-9 w-9 rounded-lg bg-primary/10 flex items-center justify-center shrink-0">
+              <Plus className="h-4 w-4 text-primary" />
             </div>
+            <div className="flex-1">
+              <p className="font-semibold text-sm">Zayavka qo'shish</p>
+              <p className="text-xs text-muted-foreground">Yangi material so'rovi</p>
+            </div>
+            <ChevronRight className="h-4 w-4 text-muted-foreground" />
           </CardContent>
         </Card>
-      )}
+        <Card className="cursor-pointer hover:bg-muted/50 transition-colors" onClick={() => onSelect("history")}>
+          <CardContent className="flex items-center gap-3 px-4 py-3">
+            <div className="h-9 w-9 rounded-lg bg-muted flex items-center justify-center shrink-0">
+              <ClipboardList className="h-4 w-4 text-muted-foreground" />
+            </div>
+            <div className="flex-1">
+              <p className="font-semibold text-sm">Zayavka tarixi</p>
+              <p className="text-xs text-muted-foreground">Yuborilgan zayavkalar</p>
+            </div>
+            <ChevronRight className="h-4 w-4 text-muted-foreground" />
+          </CardContent>
+        </Card>
+      </div>
 
-      {/* Content sections */}
-      {activeView === "worklogs" && (canViewWorklog || canCreateWorklog) && (
-        <WorkLogsSection
-          workLogs={workLogs}
-          loading={workLogsLoading}
-        />
-      )}
-      {activeView === "workers" && canViewWorkers && (
-        <WorkersSection
-          workers={workers}
-          loading={workersLoading}
-          canPay={canPayWorker}
-          onPayment={() => setPaymentDialogOpen(true)}
-        />
-      )}
-      {activeView === "requests" && canCreateRequest && (
-        <MaterialRequestsSection
-          requests={requests}
-          loading={requestsLoading}
-        />
-      )}
-      {activeView === "cash" && canUseKassa && (
-        <CashRequestsSection
-          requests={cashRequests}
-          loading={cashRequestsLoading}
-        />
-      )}
-      {activeView === "smeta" && canEditSmeta && (
-        <SmetaSection
-          smetas={smetas}
-          loading={smetasLoading}
-          projectId={selectedProjectId}
-        />
-      )}
-
-      {/* Dialogs */}
-      {canCreateWorklog && (
-        <AddWorkLogDialog
-          open={workLogDialogOpen}
-          onOpenChange={setWorkLogDialogOpen}
-          workers={workers}
-          onSuccess={() => {
-            setWorkLogDialogOpen(false);
-            refetchWorkLogs();
-          }}
-        />
-      )}
-
-      {canCreateWorker && (
-        <AddWorkerDialog
-          open={addWorkerDialogOpen}
-          onOpenChange={setAddWorkerDialogOpen}
-          onSuccess={() => {
-            setAddWorkerDialogOpen(false);
-            refetchWorkers();
-          }}
-        />
-      )}
-
-      {canPayWorker && (
-        <WorkerPaymentDialog
-          open={paymentDialogOpen}
-          onOpenChange={setPaymentDialogOpen}
-          workers={workers}
-          onSuccess={() => {
-            setPaymentDialogOpen(false);
-            refetchWorkers();
-          }}
-        />
-      )}
-
-      {canCreateRequest && (
-        <MaterialRequestDialog
-          open={materialRequestDialogOpen}
-          onOpenChange={setMaterialRequestDialogOpen}
-          onSuccess={() => {
-            setMaterialRequestDialogOpen(false);
-            refetchRequests();
-          }}
-        />
-      )}
-
-      {canUseKassa && (
-        <CashRequestDialog
-          open={cashRequestDialogOpen}
-          onOpenChange={setCashRequestDialogOpen}
-          onSuccess={() => {
-            setCashRequestDialogOpen(false);
-            refetchCashRequests();
-          }}
-        />
+      {/* Stats */}
+      {projectId && (
+        <div className="grid gap-4 sm:grid-cols-3">
+          <StatsCard title="Jami zayavkalar" value={String(total)} subtitle="ta" icon={ClipboardList} variant="primary" />
+          <StatsCard title="Kutilmoqda" value={String(pending)} subtitle="ta" icon={Clock} variant="warning" />
+          <StatsCard title="Tasdiqlangan" value={String(approved)} subtitle="ta" icon={CheckCircle} variant="success" />
+        </div>
       )}
     </div>
   );
 }
 
-// --- Sub-components ---
+type ParsedItem = { name: string; qty: number; unit: string };
 
-function ActionButton({
-  icon: Icon,
-  label,
-  active,
-  onClick,
-}: {
-  icon: React.ComponentType<{ className?: string }>;
-  label: string;
-  active?: boolean;
-  onClick: () => void;
-}) {
-  return (
-    <Button
-      variant={active ? "default" : "outline"}
-      className="h-auto py-3 flex flex-col gap-1.5 items-center"
-      onClick={onClick}
-    >
-      <Icon className="h-5 w-5" />
-      <span className="text-xs">{label}</span>
-    </Button>
-  );
+function parseText(text: string): ParsedItem[] {
+  const items: ParsedItem[] = [];
+  // Split by comma or newline
+  const parts = text.split(/[,\n]+/).map(p => p.trim()).filter(Boolean);
+  for (const part of parts) {
+    // Match: "NAME UNIT QTY" like "ТРОЙНИК ... ШТ 1,00" or "NAME QTY UNIT" like "Sement 100 qop"
+    const m1 = part.match(/^(.+?)\s+(ШТ|шт|dona|kg|кг|м|m|т|ton|qop|litr|л)\s+([\d,\.]+)\s*$/i);
+    const m2 = part.match(/^(.+?)\s+([\d,\.]+)\s*(ШТ|шт|dona|kg|кг|м|m|т|ton|qop|litr|л|штук|шт\.?)?\s*$/i);
+    if (m1) {
+      const qty = parseFloat(m1[3].replace(',', '.'));
+      if (!isNaN(qty) && qty > 0) items.push({ name: m1[1].trim(), qty, unit: m1[2] });
+    } else if (m2) {
+      const qty = parseFloat(m2[2].replace(',', '.'));
+      if (!isNaN(qty) && qty > 0) items.push({ name: m2[1].trim(), qty, unit: m2[3] || "dona" });
+    } else if (part.length > 2) {
+      items.push({ name: part, qty: 1, unit: "dona" });
+    }
+  }
+  return items;
 }
 
-function WorkLogsSection({
-  workLogs,
-  loading,
-}: {
-  workLogs: WorkLog[];
-  loading: boolean;
-}) {
-  return (
-    <Card className="animate-slide-up">
-      <CardHeader>
-        <CardTitle className="text-base font-semibold flex items-center gap-2">
-          <ClipboardList className="h-4 w-4 text-primary" />
-          Ish jurnallari
-        </CardTitle>
-        <CardDescription>Bajarilgan ishlar ro'yxati</CardDescription>
-      </CardHeader>
-      <CardContent>
-        {loading ? (
-          <div className="space-y-3">
-            {[1, 2, 3].map((i) => (
-              <div key={i} className="h-16 bg-muted/50 rounded-lg animate-pulse" />
-            ))}
-          </div>
-        ) : workLogs.length === 0 ? (
-          <div className="text-center py-8 text-muted-foreground">
-            <ClipboardList className="h-12 w-12 mx-auto mb-4 opacity-50" />
-            <p>Hozircha ish jurnali yo'q</p>
-          </div>
-        ) : (
-          <div className="space-y-3">
-            {workLogs.map((log) => (
-              <div
-                key={log.id}
-                className={`p-4 rounded-lg border ${
-                  log.isValidated
-                    ? "bg-success/5 border-success/20"
-                    : "bg-warning/5 border-warning/20"
-                }`}
-              >
-                <div className="flex items-start justify-between gap-4">
-                  <div className="flex-1 min-w-0">
-                    <p className="font-medium">{log.workType}</p>
-                    <p className="text-sm text-muted-foreground mt-1">
-                      {log.worker?.name || "Noma'lum"} • {log.quantity} {log.unit}
-                    </p>
-                    <p className="text-xs text-muted-foreground">
-                      {new Date(log.date).toLocaleDateString("uz-UZ")}
-                    </p>
-                  </div>
-                  <div className="text-right">
-                    <Badge
-                      variant={log.isValidated ? "default" : "secondary"}
-                      className={log.isValidated ? "bg-success text-white" : ""}
-                    >
-                      {log.isValidated ? (
-                        <>
-                          <CheckCircle className="h-3 w-3 mr-1" />
-                          Tasdiqlangan
-                        </>
-                      ) : (
-                        <>
-                          <Clock className="h-3 w-3 mr-1" />
-                          Kutilmoqda
-                        </>
-                      )}
-                    </Badge>
-                    {log.totalAmount && (
-                      <p className="text-sm font-semibold mt-2">
-                        {formatMoney(log.totalAmount)} so'm
-                      </p>
-                    )}
-                  </div>
-                </div>
-              </div>
-            ))}
-          </div>
-        )}
-      </CardContent>
-    </Card>
-  );
-}
+function CreateView({ onBack, projectId }: { onBack: () => void; projectId: string | null }) {
+  const [text, setText] = useState("");
+  const [parsed, setParsed] = useState<ParsedItem[] | null>(null);
+  const [successCount, setSuccessCount] = useState<number | null>(null);
+  const [error, setError] = useState("");
 
-function WorkersSection({
-  workers,
-  loading,
-  canPay,
-  onPayment,
-}: {
-  workers: Worker[];
-  loading: boolean;
-  canPay: boolean;
-  onPayment: () => void;
-}) {
-  return (
-    <Card className="animate-slide-up">
-      <CardHeader className="flex flex-row items-center justify-between">
-        <div>
-          <CardTitle className="text-base font-semibold flex items-center gap-2">
-            <Users className="h-4 w-4 text-primary" />
-            Ishchilar
-          </CardTitle>
-          <CardDescription>Ro'yxatdagi ishchilar</CardDescription>
-        </div>
-        {canPay && (
-          <Button size="sm" onClick={onPayment}>
-            <DollarSign className="h-4 w-4 mr-1" />
-            To'lov
-          </Button>
-        )}
-      </CardHeader>
-      <CardContent>
-        {loading ? (
-          <div className="space-y-3">
-            {[1, 2, 3].map((i) => (
-              <div key={i} className="h-16 bg-muted/50 rounded-lg animate-pulse" />
-            ))}
-          </div>
-        ) : workers.length === 0 ? (
-          <div className="text-center py-8 text-muted-foreground">
-            <Users className="h-12 w-12 mx-auto mb-4 opacity-50" />
-            <p>Hozircha ishchi yo'q</p>
-          </div>
-        ) : (
-          <div className="rounded-md border overflow-hidden">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Ism</TableHead>
-                  <TableHead>Telefon</TableHead>
-                  <TableHead>Mutaxassislik</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {workers.map((worker) => (
-                  <TableRow key={worker.id}>
-                    <TableCell className="font-medium">
-                      {worker.firstName} {worker.lastName}
-                    </TableCell>
-                    <TableCell>{worker.phone || "-"}</TableCell>
-                    <TableCell>{worker.position || "-"}</TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          </div>
-        )}
-      </CardContent>
-    </Card>
-  );
-}
+  const { mutate: submit, loading, error: submitError } = useMutation(async () => {
+    if (!projectId) throw new Error("Loyiha tanlanmagan");
+    if (!parsed || parsed.length === 0) throw new Error("Material topilmadi");
+    const result = await requestsApi.submitText(projectId, parsed);
+    setSuccessCount(result.count);
+    setParsed(null);
+    setText("");
+  });
 
-function MaterialRequestsSection({
-  requests,
-  loading,
-}: {
-  requests: PurchaseRequest[];
-  loading: boolean;
-}) {
-  const getStatusBadge = (status: string) => {
-    const statusMap: Record<string, { label: string; className: string }> = {
-      PENDING: { label: "Kutilmoqda", className: "bg-warning/10 text-warning" },
-      APPROVED: { label: "Tasdiqlangan", className: "bg-success/10 text-success" },
-      REJECTED: { label: "Rad etilgan", className: "bg-destructive/10 text-destructive" },
-      FINALIZED: { label: "Tugallangan", className: "bg-primary/10 text-primary" },
-    };
-    const config = statusMap[status] || statusMap.PENDING;
-    return <Badge className={config.className}>{config.label}</Badge>;
-  };
+  const [parsing, setParsing] = useState(false);
 
-  return (
-    <Card className="animate-slide-up">
-      <CardHeader>
-        <CardTitle className="text-base font-semibold flex items-center gap-2">
-          <Package className="h-4 w-4 text-primary" />
-          Material zayavkalari
-        </CardTitle>
-        <CardDescription>Yuborilgan so'rovlar</CardDescription>
-      </CardHeader>
-      <CardContent>
-        {loading ? (
-          <div className="space-y-3">
-            {[1, 2, 3].map((i) => (
-              <div key={i} className="h-16 bg-muted/50 rounded-lg animate-pulse" />
-            ))}
-          </div>
-        ) : requests.length === 0 ? (
-          <div className="text-center py-8 text-muted-foreground">
-            <Package className="h-12 w-12 mx-auto mb-4 opacity-50" />
-            <p>Hozircha zayavka yo'q</p>
-          </div>
-        ) : (
-          <div className="space-y-3">
-            {requests.map((request) => (
-              <div
-                key={request.id}
-                className="flex items-center justify-between p-4 rounded-lg border bg-card"
-              >
-                <div>
-                  <p className="font-medium">{request.smetaItem?.name || "Noma'lum"}</p>
-                  <p className="text-sm text-muted-foreground">
-                    {formatMoney(request.requestedQty)} {request.smetaItem?.unit || ""}
-                  </p>
-                  <p className="text-xs text-muted-foreground">
-                    {new Date(request.createdAt).toLocaleDateString("uz-UZ")}
-                  </p>
-                </div>
-                {getStatusBadge(request.status)}
-              </div>
-            ))}
-          </div>
-        )}
-      </CardContent>
-    </Card>
-  );
-}
-
-function CashRequestsSection({
-  requests,
-  loading,
-}: {
-  requests: CashRequest[];
-  loading: boolean;
-}) {
-  const getStatusBadge = (status: string) => {
-    const statusMap: Record<string, { label: string; className: string }> = {
-      PENDING: { label: "Kutilmoqda", className: "bg-warning/10 text-warning" },
-      APPROVED: { label: "Tasdiqlangan", className: "bg-success/10 text-success" },
-      REJECTED: { label: "Rad etilgan", className: "bg-destructive/10 text-destructive" },
-      FINALIZED: { label: "Bajarilgan", className: "bg-primary/10 text-primary" },
-    };
-    const config = statusMap[status] || statusMap.PENDING;
-    return <Badge className={config.className}>{config.label}</Badge>;
-  };
-
-  return (
-    <Card className="animate-slide-up">
-      <CardHeader>
-        <CardTitle className="text-base font-semibold flex items-center gap-2">
-          <HandCoins className="h-4 w-4 text-primary" />
-          Pul so'rovlari
-        </CardTitle>
-        <CardDescription>Yuborilgan pul so'rovlari</CardDescription>
-      </CardHeader>
-      <CardContent>
-        {loading ? (
-          <div className="space-y-3">
-            {[1, 2, 3].map((i) => (
-              <div key={i} className="h-16 bg-muted/50 rounded-lg animate-pulse" />
-            ))}
-          </div>
-        ) : requests.length === 0 ? (
-          <div className="text-center py-8 text-muted-foreground">
-            <HandCoins className="h-12 w-12 mx-auto mb-4 opacity-50" />
-            <p>Hozircha pul so'rovi yo'q</p>
-          </div>
-        ) : (
-          <div className="space-y-3">
-            {requests.map((request) => (
-              <div
-                key={request.id}
-                className="flex items-center justify-between p-4 rounded-lg border bg-card"
-              >
-                <div>
-                  <p className="text-lg font-bold text-primary">
-                    {formatMoney(request.amount)} so'm
-                  </p>
-                  {request.reason && (
-                    <p className="text-sm text-muted-foreground">{request.reason}</p>
-                  )}
-                  <p className="text-xs text-muted-foreground">
-                    {new Date(request.createdAt).toLocaleDateString("uz-UZ")}
-                  </p>
-                </div>
-                {getStatusBadge(request.status)}
-              </div>
-            ))}
-          </div>
-        )}
-      </CardContent>
-    </Card>
-  );
-}
-
-function SmetaSection({
-  smetas,
-  loading,
-  projectId,
-}: {
-  smetas: Smeta[];
-  loading: boolean;
-  projectId: string | null;
-}) {
-  const [selectedSmetaId, setSelectedSmetaId] = useState<string | null>(null);
-  const [editItemId, setEditItemId] = useState<string | null>(null);
-  const [editValue, setEditValue] = useState("");
-  const { mutate: updateItem, loading: saving } = useMutation(
-    ({ id, usedQuantity }: { id: string; usedQuantity: number }) =>
-      smetaItemsApi.update(id, { usedQuantity })
-  );
-
-  const { data: itemsData, loading: itemsLoading, refetch: refetchItems } = useApi(
-    () => smetaItemsApi.getAll({ smetaId: selectedSmetaId!, limit: 100 }),
-    [selectedSmetaId],
-    { enabled: !!selectedSmetaId }
-  );
-
-  const items = itemsData?.data || [];
-
-  const handleSave = async (itemId: string) => {
-    const val = Number(editValue);
-    if (isNaN(val) || val < 0) return;
+  const handleParse = async () => {
+    setError("");
+    setParsing(true);
     try {
-      await updateItem({ id: itemId, usedQuantity: val });
-      setEditItemId(null);
-      setEditValue("");
-      refetchItems();
+      const result = await requestsApi.parseText(text);
+      if (!result.items || result.items.length === 0) {
+        setError("Material topilmadi. Masalan: \"Sement 100 qop, armatura 500 kg\"");
+        return;
+      }
+      setParsed(result.items);
     } catch {
-      // handled by useMutation
+      // fallback to local regex
+      const items = parseText(text);
+      if (items.length === 0) {
+        setError("Material topilmadi. Masalan: \"Sement 100 qop, armatura 500 kg\"");
+        return;
+      }
+      setParsed(items);
+    } finally {
+      setParsing(false);
     }
   };
 
-  if (!projectId) {
+  if (successCount !== null) {
     return (
-      <Card className="animate-slide-up">
-        <CardContent className="py-8 text-center text-muted-foreground">
-          <BarChart2 className="h-12 w-12 mx-auto mb-4 opacity-50" />
-          <p>Loyiha tanlanmagan</p>
+      <Card>
+        <CardContent className="py-8 text-center space-y-4">
+          <CheckCircle className="h-12 w-12 text-success mx-auto" />
+          <p className="font-semibold text-lg">{successCount} ta zayavka yuborildi!</p>
+          <div className="flex gap-3 justify-center">
+            <Button onClick={() => setSuccessCount(null)}>Yangi zayavka</Button>
+            <Button variant="outline" onClick={onBack}>Orqaga</Button>
+          </div>
         </CardContent>
       </Card>
     );
   }
 
   return (
-    <Card className="animate-slide-up">
-      <CardHeader>
-        <CardTitle className="text-base font-semibold flex items-center gap-2">
-          <BarChart2 className="h-4 w-4 text-primary" />
-          Smeta yangilash
-        </CardTitle>
-        <CardDescription>Bajarilgan ish miqdorlarini yangilang</CardDescription>
-      </CardHeader>
-      <CardContent className="space-y-4">
-        {loading ? (
+    <div className="space-y-4">
+      <div className="flex items-center gap-2">
+        <Button variant="ghost" size="sm" onClick={onBack}>
+          <ChevronLeft className="h-4 w-4" />
+          Orqaga
+        </Button>
+        <h2 className="font-semibold">Zayavka qo'shish</h2>
+      </div>
+
+      {!projectId && (
+        <p className="text-sm text-amber-600 bg-amber-50 rounded-md px-3 py-2">Avval loyihani tanlang</p>
+      )}
+
+      {!parsed ? (
+        <>
+          <Card>
+            <CardContent className="pt-4 space-y-3">
+              <Label>Materiallarni yozing (bir nechta bo'lishi mumkin)</Label>
+              <Textarea
+                placeholder={"Masalan:\nSement 100 qop, armatura 500 kg, rozetka 20 dona\n\nyoki:\nТРОЙНИК СТАЛЬНОЙ... ШТ 1,00\nПЕРЕХОД ПРИВАРНОЙ... ШТ 3,00"}
+                value={text}
+                onChange={e => setText(e.target.value)}
+                rows={8}
+                className="font-mono text-sm"
+              />
+              {error && <p className="text-sm text-destructive">{error}</p>}
+            </CardContent>
+          </Card>
+          <Button className="w-full" onClick={handleParse} disabled={!text.trim() || !projectId || parsing}>
+            {parsing ? "Tahlil qilinmoqda..." : "Davom etish →"}
+          </Button>
+        </>
+      ) : (
+        <>
+          <p className="text-sm text-muted-foreground">Zayavkalar ro'yxati — tekshiring:</p>
           <div className="space-y-2">
-            {[1, 2, 3].map(i => (
-              <div key={i} className="h-10 bg-muted/50 rounded animate-pulse" />
+            {parsed.map((item, i) => (
+              <Card key={i}>
+                <CardContent className="py-3 flex items-center justify-between gap-2">
+                  <div>
+                    <p className="font-medium text-sm">{item.name}</p>
+                    <p className="text-sm text-muted-foreground">{item.qty} {item.unit}</p>
+                  </div>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="text-destructive h-7 px-2 shrink-0"
+                    onClick={() => {
+                      const newItems = parsed.filter((_, idx) => idx !== i);
+                      if (newItems.length === 0) setParsed(null);
+                      else setParsed(newItems);
+                    }}
+                  >
+                    O'chirish
+                  </Button>
+                </CardContent>
+              </Card>
             ))}
           </div>
-        ) : smetas.length === 0 ? (
-          <div className="text-center py-8 text-muted-foreground">
-            <BarChart2 className="h-12 w-12 mx-auto mb-4 opacity-50" />
-            <p>Loyihada smeta yo'q</p>
+          <p className="text-sm font-medium">Jami: {parsed.length} ta zayavka</p>
+          {submitError && <p className="text-sm text-destructive">{String(submitError)}</p>}
+          <div className="flex gap-3">
+            <Button variant="outline" onClick={() => setParsed(null)} className="flex-1">
+              Tahrirlash
+            </Button>
+            <Button onClick={() => submit(undefined)} disabled={loading} className="flex-1">
+              {loading ? "Yuborilmoqda..." : "Tasdiqlash"}
+            </Button>
           </div>
-        ) : (
-          <>
-            <div className="space-y-1">
-              <Label className="text-xs">Smeta tanlang</Label>
-              <Select
-                value={selectedSmetaId || ""}
-                onValueChange={(v) => { setSelectedSmetaId(v); setEditItemId(null); }}
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="Smeta..." />
-                </SelectTrigger>
-                <SelectContent>
-                  {smetas.map(s => (
-                    <SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
+        </>
+      )}
+    </div>
+  );
+}
 
-            {selectedSmetaId && (
-              <div className="rounded-md border overflow-hidden">
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>Nomi</TableHead>
-                      <TableHead className="w-20">Birlik</TableHead>
-                      <TableHead className="w-24 text-right">Smeta</TableHead>
-                      <TableHead className="w-28 text-right">Bajarildi</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {itemsLoading ? (
-                      <TableRow>
-                        <TableCell colSpan={4} className="text-center py-6 text-muted-foreground">
-                          Yuklanmoqda...
-                        </TableCell>
-                      </TableRow>
-                    ) : items.length === 0 ? (
-                      <TableRow>
-                        <TableCell colSpan={4} className="text-center py-6 text-muted-foreground">
-                          Smeta itemlari yo'q
-                        </TableCell>
-                      </TableRow>
-                    ) : items.map(item => (
-                      <TableRow key={item.id}>
-                        <TableCell className="font-medium">{item.name}</TableCell>
-                        <TableCell>{item.unit}</TableCell>
-                        <TableCell className="text-right">{item.quantity}</TableCell>
-                        <TableCell className="text-right">
-                          {editItemId === item.id ? (
-                            <div className="flex items-center gap-1 justify-end">
-                              <Input
-                                type="number"
-                                min={0}
-                                className="w-20 h-7 text-xs"
-                                value={editValue}
-                                onChange={e => setEditValue(e.target.value)}
-                                autoFocus
-                                onKeyDown={e => {
-                                  if (e.key === "Enter") handleSave(item.id);
-                                  if (e.key === "Escape") { setEditItemId(null); setEditValue(""); }
-                                }}
-                              />
-                              <Button
-                                size="sm"
-                                className="h-7 px-2 text-xs"
-                                onClick={() => handleSave(item.id)}
-                                disabled={saving}
-                              >
-                                {saving ? "..." : "OK"}
-                              </Button>
-                            </div>
-                          ) : (
-                            <button
-                              className="underline underline-offset-2 decoration-dotted text-primary hover:text-primary/80 transition-colors"
-                              onClick={() => {
-                                setEditItemId(item.id);
-                                setEditValue(String(item.usedQuantity ?? 0));
-                              }}
-                            >
-                              {item.usedQuantity ?? 0}
-                            </button>
-                          )}
-                        </TableCell>
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
+type Period = "today" | "week" | "month" | "all";
+
+const PERIOD_LABELS: Record<Period, string> = {
+  today: "Bugun",
+  week: "Oxirgi hafta",
+  month: "Oxirgi oy",
+  all: "Barchasi",
+};
+
+function getDateRange(period: Period): { dateFrom?: string; dateTo?: string } {
+  const now = new Date();
+  const startOfDay = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  if (period === "today") return { dateFrom: startOfDay.toISOString(), dateTo: new Date(startOfDay.getTime() + 86400000).toISOString() };
+  if (period === "week") return { dateFrom: new Date(startOfDay.getTime() - 7 * 86400000).toISOString() };
+  if (period === "month") return { dateFrom: new Date(now.getFullYear(), now.getMonth(), 1).toISOString() };
+  return {};
+}
+
+const PAGE_SIZE = 10;
+
+function HistoryView({ onBack, projectId }: { onBack: () => void; projectId: string | null }) {
+  const [period, setPeriod] = useState<Period>("week");
+  const [page, setPage] = useState(0);
+  const [selectedBatch, setSelectedBatch] = useState<PurchaseRequest[] | null>(null);
+
+  const dateRange = getDateRange(period);
+  const { data, loading } = useApi(
+    () => requestsApi.getAll({ projectId: projectId || undefined, limit: 200, ...dateRange }),
+    [period, projectId],
+  );
+
+  const requests = data?.data || [];
+
+  const batchMap = new Map<string, PurchaseRequest[]>();
+  for (const req of requests) {
+    const key = req.batchId || `single_${req.id}`;
+    if (!batchMap.has(key)) batchMap.set(key, []);
+    batchMap.get(key)!.push(req);
+  }
+  const batches = Array.from(batchMap.values()).sort(
+    (a, b) => new Date(b[0].createdAt).getTime() - new Date(a[0].createdAt).getTime()
+  );
+
+  const totalPages = Math.ceil(batches.length / PAGE_SIZE);
+  const pageBatches = batches.slice(page * PAGE_SIZE, (page + 1) * PAGE_SIZE);
+
+  if (selectedBatch) {
+    return (
+      <div className="space-y-4">
+        <div className="flex items-center gap-2">
+          <Button variant="ghost" size="sm" onClick={() => setSelectedBatch(null)}>
+            <ChevronLeft className="h-4 w-4" />
+            Orqaga
+          </Button>
+          <h2 className="font-semibold">
+            Zayavka #{Math.min(...selectedBatch.map(r => r.requestNumber || 0))} · {new Date(selectedBatch[0].createdAt).toLocaleDateString("uz-UZ")}
+          </h2>
+        </div>
+        <Card>
+          <CardContent className="pt-4 space-y-3">
+            {selectedBatch.map((req, i) => (
+              <div key={req.id} className="border-b last:border-0 pb-3 last:pb-0 space-y-1">
+                <div className="flex items-start justify-between gap-2">
+                  <p className="font-medium text-sm flex items-center gap-1.5">
+                    <span className="text-muted-foreground text-xs w-5">{i + 1}.</span>
+                    {STATUS_ICON[req.status] || <Package className="h-4 w-4" />}
+                    {req.smetaItem?.name || req.note?.split(" | ")[0] || "Noma'lum"}
+                  </p>
+                  <Badge variant={STATUS_VARIANT[req.status] || "secondary"} className="text-xs shrink-0">
+                    {STATUS_LABEL[req.status] || req.status}
+                  </Badge>
+                </div>
+                <p className="text-sm text-muted-foreground pl-8">
+                  {req.requestedQty} {req.smetaItem?.unit || ""}
+                </p>
               </div>
-            )}
-          </>
-        )}
-      </CardContent>
-    </Card>
-  );
-}
-
-// --- Dialog Components ---
-
-function AddWorkLogDialog({
-  open,
-  onOpenChange,
-  workers,
-  onSuccess,
-}: {
-  open: boolean;
-  onOpenChange: (open: boolean) => void;
-  workers: Worker[];
-  onSuccess: () => void;
-}) {
-  const [workerId, setWorkerId] = useState("");
-  const [workType, setWorkType] = useState("");
-  const [quantity, setQuantity] = useState("");
-  const [unit, setUnit] = useState("");
-  const [date, setDate] = useState(new Date().toISOString().split("T")[0]);
-  const [projectId, setProjectId] = useState("");
-
-  const { data: projectsData } = useApi(
-    () => projectsApi.getAll({ limit: 100 }),
-    [],
-    { enabled: open }
-  );
-
-  const { mutate, loading } = useMutation(
-    (data: { workerId: string; projectId: string; workType: string; quantity: number; unit: string; date: string }) =>
-      workersApi.createWorkLog(data)
-  );
-
-  const handleSubmit = async () => {
-    if (!workerId || !projectId || !quantity || !workType || !unit) return;
-    try {
-      await mutate({
-        workerId,
-        projectId,
-        workType,
-        quantity: Number(quantity),
-        unit,
-        date,
-      });
-      setWorkerId("");
-      setWorkType("");
-      setQuantity("");
-      setUnit("");
-      setProjectId("");
-      onSuccess();
-    } catch {
-      // error handled by useMutation
-    }
-  };
+            ))}
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent>
-        <DialogHeader>
-          <DialogTitle>Ish qo'shish</DialogTitle>
-          <DialogDescription>
-            Yangi bajarilgan ishni yozing
-          </DialogDescription>
-        </DialogHeader>
-        <div className="space-y-4 py-2">
-          <div className="space-y-2">
-            <Label>Loyiha</Label>
-            <Select value={projectId} onValueChange={setProjectId}>
-              <SelectTrigger>
-                <SelectValue placeholder="Loyihani tanlang" />
-              </SelectTrigger>
-              <SelectContent>
-                {(projectsData?.data ?? []).map((p) => (
-                  <SelectItem key={p.id} value={p.id}>
-                    {p.name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-          <div className="space-y-2">
-            <Label>Ishchi</Label>
-            <Select value={workerId} onValueChange={setWorkerId}>
-              <SelectTrigger>
-                <SelectValue placeholder="Ishchini tanlang" />
-              </SelectTrigger>
-              <SelectContent>
-                {workers.map((w) => (
-                  <SelectItem key={w.id} value={w.id}>
-                    {w.firstName} {w.lastName}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-          <div className="space-y-2">
-            <Label>Ish turi</Label>
-            <Input
-              placeholder="Masalan: Suvoq ishi"
-              value={workType}
-              onChange={(e) => setWorkType(e.target.value)}
-            />
-          </div>
-          <div className="grid grid-cols-2 gap-4">
-            <div className="space-y-2">
-              <Label>Miqdori</Label>
-              <Input
-                type="number"
-                min={1}
-                placeholder="Miqdor"
-                value={quantity}
-                onChange={(e) => setQuantity(e.target.value)}
-              />
-            </div>
-            <div className="space-y-2">
-              <Label>O'lchov birligi</Label>
-              <Select value={unit} onValueChange={setUnit}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Birlik" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="m²">m²</SelectItem>
-                  <SelectItem value="m³">m³</SelectItem>
-                  <SelectItem value="dona">dona</SelectItem>
-                  <SelectItem value="p.m">p.m</SelectItem>
-                  <SelectItem value="soat">soat</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-          </div>
-          <div className="space-y-2">
-            <Label>Sana</Label>
-            <Input
-              type="date"
-              value={date}
-              onChange={(e) => setDate(e.target.value)}
-            />
-          </div>
+    <div className="space-y-4">
+      <div className="flex items-center gap-2">
+        <Button variant="ghost" size="sm" onClick={onBack}>
+          <ChevronLeft className="h-4 w-4" />
+          Orqaga
+        </Button>
+        <h2 className="font-semibold">Zayavka tarixi</h2>
+      </div>
+
+      <div className="flex flex-wrap gap-2">
+        {(Object.keys(PERIOD_LABELS) as Period[]).map(p => (
+          <Button key={p} size="sm" variant={period === p ? "default" : "outline"}
+            onClick={() => { setPeriod(p); setPage(0); setSelectedBatch(null); }}>
+            {PERIOD_LABELS[p]}
+          </Button>
+        ))}
+      </div>
+
+      {loading && <p className="text-muted-foreground text-sm">Yuklanmoqda...</p>}
+
+      {!loading && batches.length === 0 && (
+        <Card>
+          <CardContent className="py-8 text-center text-muted-foreground">
+            Bu davrda zayavkalar topilmadi.
+          </CardContent>
+        </Card>
+      )}
+
+      {pageBatches.map((batch, i) => {
+        const globalIndex = page * PAGE_SIZE + i + 1;
+        const date = new Date(batch[0].createdAt);
+        const statusCounts = batch.reduce((acc, r) => {
+          acc[r.status] = (acc[r.status] || 0) + 1;
+          return acc;
+        }, {} as Record<string, number>);
+        const dominantStatus = Object.entries(statusCounts).sort((a, b) => b[1] - a[1])[0]?.[0];
+
+        const minNum = Math.min(...batch.map(r => r.requestNumber || 0));
+        const numLabel = `#${minNum}`;
+
+        return (
+          <Card key={batch[0].batchId || batch[0].id}
+            className="cursor-pointer hover:shadow-md transition-shadow"
+            onClick={() => setSelectedBatch(batch)}>
+            <CardContent className="py-3 px-4">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <span className="text-sm font-bold text-primary">{numLabel}</span>
+                  <div>
+                    <p className="text-sm font-medium">{batch.length} ta mahsulot</p>
+                    <p className="text-xs text-muted-foreground">
+                      {date.toLocaleDateString("uz-UZ")} · {date.toLocaleTimeString("uz-UZ", { hour: "2-digit", minute: "2-digit" })}
+                    </p>
+                  </div>
+                </div>
+                <div className="flex items-center gap-2">
+                  <Badge variant={STATUS_VARIANT[dominantStatus] || "secondary"} className="text-xs">
+                    {STATUS_LABEL[dominantStatus] || dominantStatus}
+                  </Badge>
+                  <ChevronRight className="h-4 w-4 text-muted-foreground" />
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        );
+      })}
+
+      {totalPages > 1 && (
+        <div className="flex items-center justify-center gap-3">
+          <Button variant="outline" size="sm" onClick={() => setPage(p => p - 1)} disabled={page === 0}>
+            <ChevronLeft className="h-4 w-4" />
+          </Button>
+          <span className="text-sm text-muted-foreground">{page + 1} / {totalPages}</span>
+          <Button variant="outline" size="sm" onClick={() => setPage(p => p + 1)} disabled={page >= totalPages - 1}>
+            <ChevronRight className="h-4 w-4" />
+          </Button>
         </div>
-        <DialogFooter>
-          <Button variant="outline" onClick={() => onOpenChange(false)}>
-            Bekor qilish
-          </Button>
-          <Button
-            onClick={handleSubmit}
-            disabled={loading || !workerId || !projectId || !workType || !quantity}
-          >
-            {loading ? "Saqlanmoqda..." : "Saqlash"}
-          </Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
-  );
-}
-
-function AddWorkerDialog({
-  open,
-  onOpenChange,
-  onSuccess,
-}: {
-  open: boolean;
-  onOpenChange: (open: boolean) => void;
-  onSuccess: () => void;
-}) {
-  const [firstName, setFirstName] = useState("");
-  const [lastName, setLastName] = useState("");
-  const [phone, setPhone] = useState("");
-  const [position, setPosition] = useState("");
-
-  const { mutate, loading } = useMutation(
-    (data: { firstName: string; lastName: string; phone?: string; position?: string }) =>
-      workersApi.create(data)
-  );
-
-  const handleSubmit = async () => {
-    if (!firstName || !lastName) return;
-    try {
-      await mutate({
-        firstName,
-        lastName,
-        phone: phone || undefined,
-        position: position || undefined,
-      });
-      setFirstName("");
-      setLastName("");
-      setPhone("");
-      setPosition("");
-      onSuccess();
-    } catch {
-      // error handled by useMutation
-    }
-  };
-
-  return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent>
-        <DialogHeader>
-          <DialogTitle>Ishchi qo'shish</DialogTitle>
-          <DialogDescription>
-            Yangi ishchi ma'lumotlarini kiriting
-          </DialogDescription>
-        </DialogHeader>
-        <div className="space-y-4 py-2">
-          <div className="grid grid-cols-2 gap-4">
-            <div className="space-y-2">
-              <Label>Ism *</Label>
-              <Input
-                placeholder="Ism"
-                value={firstName}
-                onChange={(e) => setFirstName(e.target.value)}
-              />
-            </div>
-            <div className="space-y-2">
-              <Label>Familiya *</Label>
-              <Input
-                placeholder="Familiya"
-                value={lastName}
-                onChange={(e) => setLastName(e.target.value)}
-              />
-            </div>
-          </div>
-          <div className="space-y-2">
-            <Label>Telefon</Label>
-            <Input
-              placeholder="+998 90 123 45 67"
-              value={phone}
-              onChange={(e) => setPhone(e.target.value)}
-            />
-          </div>
-          <div className="space-y-2">
-            <Label>Mutaxassislik</Label>
-            <Input
-              placeholder="Masalan: Suvokchi"
-              value={position}
-              onChange={(e) => setPosition(e.target.value)}
-            />
-          </div>
-        </div>
-        <DialogFooter>
-          <Button variant="outline" onClick={() => onOpenChange(false)}>
-            Bekor qilish
-          </Button>
-          <Button
-            onClick={handleSubmit}
-            disabled={loading || !firstName || !lastName}
-          >
-            {loading ? "Saqlanmoqda..." : "Saqlash"}
-          </Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
-  );
-}
-
-function WorkerPaymentDialog({
-  open,
-  onOpenChange,
-  workers,
-  onSuccess,
-}: {
-  open: boolean;
-  onOpenChange: (open: boolean) => void;
-  workers: Worker[];
-  onSuccess: () => void;
-}) {
-  const [workerId, setWorkerId] = useState("");
-  const [amount, setAmount] = useState("");
-  const [description, setDescription] = useState("");
-  const [paymentType, setPaymentType] = useState("CASH");
-
-  const { mutate, loading } = useMutation(
-    (data: { workerId: string; amount: number; paymentDate: string; paymentType: string; description?: string }) =>
-      workersApi.createPayment(data)
-  );
-
-  const handleSubmit = async () => {
-    if (!workerId || !amount) return;
-    try {
-      await mutate({
-        workerId,
-        amount: Number(amount),
-        paymentDate: new Date().toISOString().split("T")[0],
-        paymentType,
-        description: description || undefined,
-      });
-      setWorkerId("");
-      setAmount("");
-      setDescription("");
-      onSuccess();
-    } catch {
-      // error handled by useMutation
-    }
-  };
-
-  return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent>
-        <DialogHeader>
-          <DialogTitle>Ishchiga to'lov</DialogTitle>
-          <DialogDescription>
-            Ishchiga to'lov ma'lumotlarini kiriting
-          </DialogDescription>
-        </DialogHeader>
-        <div className="space-y-4 py-2">
-          <div className="space-y-2">
-            <Label>Ishchi</Label>
-            <Select value={workerId} onValueChange={setWorkerId}>
-              <SelectTrigger>
-                <SelectValue placeholder="Ishchini tanlang" />
-              </SelectTrigger>
-              <SelectContent>
-                {workers.map((w) => (
-                  <SelectItem key={w.id} value={w.id}>
-                    {w.firstName} {w.lastName}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-          <div className="space-y-2">
-            <Label>Summa (so'm)</Label>
-            <Input
-              type="number"
-              min={1}
-              placeholder="Summani kiriting"
-              value={amount}
-              onChange={(e) => setAmount(e.target.value)}
-            />
-          </div>
-          <div className="space-y-2">
-            <Label>To'lov turi</Label>
-            <Select value={paymentType} onValueChange={setPaymentType}>
-              <SelectTrigger>
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="CASH">Naqd</SelectItem>
-                <SelectItem value="CARD">Karta</SelectItem>
-                <SelectItem value="TRANSFER">O'tkazma</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-          <div className="space-y-2">
-            <Label>Izoh</Label>
-            <Textarea
-              placeholder="Izoh (ixtiyoriy)"
-              value={description}
-              onChange={(e) => setDescription(e.target.value)}
-            />
-          </div>
-        </div>
-        <DialogFooter>
-          <Button variant="outline" onClick={() => onOpenChange(false)}>
-            Bekor qilish
-          </Button>
-          <Button
-            onClick={handleSubmit}
-            disabled={loading || !workerId || !amount}
-          >
-            {loading ? "Saqlanmoqda..." : "To'lash"}
-          </Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
-  );
-}
-
-function MaterialRequestDialog({
-  open,
-  onOpenChange,
-  onSuccess,
-}: {
-  open: boolean;
-  onOpenChange: (open: boolean) => void;
-  onSuccess: () => void;
-}) {
-  const [smetaItemId, setSmetaItemId] = useState("");
-  const [quantity, setQuantity] = useState("");
-  const [note, setNote] = useState("");
-  const [projectId, setProjectId] = useState("");
-
-  const { data: projectsData } = useApi(
-    () => projectsApi.getAll({ limit: 100 }),
-    [],
-    { enabled: open }
-  );
-
-  const { data: smetaItemsData } = useApi(
-    () => smetaItemsApi.getAll({ limit: 200, itemType: "MATERIAL" }),
-    [],
-    { enabled: open }
-  );
-
-  const { mutate, loading } = useMutation(
-    (data: { smetaItemId: string; requestedQty: number; requestedAmount: number; note?: string }) =>
-      requestsApi.create(data)
-  );
-
-  const selectedItem = smetaItemsData?.data?.find(i => i.id === smetaItemId);
-
-  const handleSubmit = async () => {
-    if (!smetaItemId || !quantity) return;
-    const item = smetaItemsData?.data?.find(i => i.id === smetaItemId);
-    if (!item) return;
-
-    try {
-      await mutate({
-        smetaItemId,
-        requestedQty: Number(quantity),
-        requestedAmount: Number(quantity) * item.unitPrice,
-        note: note || undefined,
-      });
-      setSmetaItemId("");
-      setQuantity("");
-      setNote("");
-      onSuccess();
-    } catch {
-      // error handled by useMutation
-    }
-  };
-
-  return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent>
-        <DialogHeader>
-          <DialogTitle>Material so'rovi</DialogTitle>
-          <DialogDescription>
-            Kerakli materialni so'rang
-          </DialogDescription>
-        </DialogHeader>
-        <div className="space-y-4 py-2">
-          <div className="space-y-2">
-            <Label>Material</Label>
-            <Select value={smetaItemId} onValueChange={setSmetaItemId}>
-              <SelectTrigger>
-                <SelectValue placeholder="Materialni tanlang" />
-              </SelectTrigger>
-              <SelectContent>
-                {(smetaItemsData?.data ?? []).map((item) => (
-                  <SelectItem key={item.id} value={item.id}>
-                    {item.name} ({item.unit})
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-          <div className="space-y-2">
-            <Label>Miqdori {selectedItem ? `(${selectedItem.unit})` : ""}</Label>
-            <Input
-              type="number"
-              min={1}
-              placeholder="Miqdorni kiriting"
-              value={quantity}
-              onChange={(e) => setQuantity(e.target.value)}
-            />
-          </div>
-          {selectedItem && quantity && (
-            <div className="p-3 rounded-lg bg-muted/50">
-              <p className="text-sm text-muted-foreground">Taxminiy summa:</p>
-              <p className="text-lg font-bold text-primary">
-                {formatMoney(Number(quantity) * selectedItem.unitPrice)} so'm
-              </p>
-            </div>
-          )}
-          <div className="space-y-2">
-            <Label>Izoh</Label>
-            <Textarea
-              placeholder="Izoh (ixtiyoriy)"
-              value={note}
-              onChange={(e) => setNote(e.target.value)}
-            />
-          </div>
-        </div>
-        <DialogFooter>
-          <Button variant="outline" onClick={() => onOpenChange(false)}>
-            Bekor qilish
-          </Button>
-          <Button
-            onClick={handleSubmit}
-            disabled={loading || !smetaItemId || !quantity}
-          >
-            {loading ? "Yuborilmoqda..." : "Yuborish"}
-          </Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
-  );
-}
-
-function CashRequestDialog({
-  open,
-  onOpenChange,
-  onSuccess,
-}: {
-  open: boolean;
-  onOpenChange: (open: boolean) => void;
-  onSuccess: () => void;
-}) {
-  const [projectId, setProjectId] = useState("");
-  const [amount, setAmount] = useState("");
-  const [reason, setReason] = useState("");
-
-  const { data: projectsData } = useApi(
-    () => projectsApi.getAll({ limit: 100 }),
-    [],
-    { enabled: open }
-  );
-
-  const { mutate, loading } = useMutation(
-    (data: { projectId: string; amount: number; reason?: string }) =>
-      cashRequestsApi.create(data)
-  );
-
-  const handleSubmit = async () => {
-    if (!projectId || !amount) return;
-    try {
-      await mutate({
-        projectId,
-        amount: Number(amount),
-        reason: reason || undefined,
-      });
-      setProjectId("");
-      setAmount("");
-      setReason("");
-      onSuccess();
-    } catch {
-      // error handled by useMutation
-    }
-  };
-
-  return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent>
-        <DialogHeader>
-          <DialogTitle>Pul so'rash</DialogTitle>
-          <DialogDescription>
-            Yangi pul so'rovini yarating
-          </DialogDescription>
-        </DialogHeader>
-        <div className="space-y-4 py-2">
-          <div className="space-y-2">
-            <Label>Loyiha</Label>
-            <Select value={projectId} onValueChange={setProjectId}>
-              <SelectTrigger>
-                <SelectValue placeholder="Loyihani tanlang" />
-              </SelectTrigger>
-              <SelectContent>
-                {(projectsData?.data ?? []).map((p) => (
-                  <SelectItem key={p.id} value={p.id}>
-                    {p.name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-          <div className="space-y-2">
-            <Label>Summa (so'm)</Label>
-            <Input
-              type="number"
-              min={1}
-              placeholder="Summani kiriting"
-              value={amount}
-              onChange={(e) => setAmount(e.target.value)}
-            />
-          </div>
-          <div className="space-y-2">
-            <Label>Sabab</Label>
-            <Textarea
-              placeholder="Nima uchun kerak..."
-              value={reason}
-              onChange={(e) => setReason(e.target.value)}
-            />
-          </div>
-        </div>
-        <DialogFooter>
-          <Button variant="outline" onClick={() => onOpenChange(false)}>
-            Bekor qilish
-          </Button>
-          <Button
-            onClick={handleSubmit}
-            disabled={loading || !projectId || !amount}
-          >
-            {loading ? "Yuborilmoqda..." : "Yuborish"}
-          </Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
+      )}
+    </div>
   );
 }

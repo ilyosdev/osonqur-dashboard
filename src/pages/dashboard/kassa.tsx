@@ -81,8 +81,20 @@ export default function KassaPage() {
   const [rejectReason, setRejectReason] = useState("");
 
   // Date filter state
-  const [dateFrom, setDateFrom] = useState("");
-  const [dateTo, setDateTo] = useState("");
+  const [periodFilter, setPeriodFilter] = useState<"all" | "today" | "week" | "month">("all");
+
+  const getPeriodDates = (p: "all" | "today" | "week" | "month"): { dateFrom: string; dateTo: string } => {
+    const now = new Date();
+    const pad = (n: number) => String(n).padStart(2, "0");
+    const iso = (d: Date) => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+    const today = iso(now);
+    if (p === "today") return { dateFrom: today, dateTo: today };
+    if (p === "week") { const f = new Date(now); f.setDate(now.getDate() - 7); return { dateFrom: iso(f), dateTo: today }; }
+    if (p === "month") { const f = new Date(now); f.setDate(now.getDate() - 30); return { dateFrom: iso(f), dateTo: today }; }
+    return { dateFrom: "", dateTo: "" };
+  };
+
+  const { dateFrom, dateTo } = getPeriodDates(periodFilter);
 
   // Koshelok data — faqat kashlok:view_own bo'lsa chaqiriladi
   const {
@@ -92,23 +104,20 @@ export default function KassaPage() {
     refetch: refetchKoshelok,
   } = useApi(() => cashRegistersApi.getMyKoshelok(), [], { enabled: canViewKoshelok });
 
-  // Transaction history (IN type)
+  // Transaction history (ALL types)
   const {
     data: historyData,
     loading: historyLoading,
     refetch: refetchHistory,
   } = useApi(
     () =>
-      koshelok
-        ? cashRegistersApi.getTransactions(koshelok.id, {
-            type: "IN",
-            limit: 50,
-            ...(dateFrom && { dateFrom }),
-            ...(dateTo && { dateTo }),
-          })
-        : Promise.resolve({ data: [], total: 0, page: 1, limit: 50, totalPages: 0 } as PaginatedResponse<CashTransaction>),
-    [koshelok?.id, dateFrom, dateTo],
-    { enabled: activeView === "history" && !!koshelok }
+      cashRegistersApi.getMyTransactions({
+        limit: 50,
+        ...(dateFrom && { dateFrom }),
+        ...(dateTo && { dateTo }),
+      }),
+    [dateFrom, dateTo],
+    { enabled: activeView === "history" && canViewKoshelok }
   );
 
   // Expenses (OUT type)
@@ -118,16 +127,14 @@ export default function KassaPage() {
     refetch: refetchExpenses,
   } = useApi(
     () =>
-      koshelok
-        ? cashRegistersApi.getTransactions(koshelok.id, {
-            type: "OUT",
-            limit: 50,
-            ...(dateFrom && { dateFrom }),
-            ...(dateTo && { dateTo }),
-          })
-        : Promise.resolve({ data: [], total: 0, page: 1, limit: 50, totalPages: 0 } as PaginatedResponse<CashTransaction>),
-    [koshelok?.id, dateFrom, dateTo],
-    { enabled: activeView === "expenses" && !!koshelok }
+      cashRegistersApi.getMyTransactions({
+        type: "OUT",
+        limit: 50,
+        ...(dateFrom && { dateFrom }),
+        ...(dateTo && { dateTo }),
+      }),
+    [dateFrom, dateTo],
+    { enabled: activeView === "expenses" && canViewKoshelok }
   );
 
   // Incomes list (for BUGALTERIYA)
@@ -317,40 +324,23 @@ export default function KassaPage() {
 
       {/* Date filters for history/expenses */}
       {(activeView === "history" || activeView === "expenses" || activeView === "incomes") && (
-        <Card>
-          <CardContent className="pt-4 pb-3">
-            <div className="flex flex-wrap items-end gap-3">
-              <div className="space-y-1">
-                <Label className="text-xs">Boshlanish</Label>
-                <Input
-                  type="date"
-                  value={dateFrom}
-                  onChange={(e) => setDateFrom(e.target.value)}
-                  className="w-40"
-                />
-              </div>
-              <div className="space-y-1">
-                <Label className="text-xs">Tugash</Label>
-                <Input
-                  type="date"
-                  value={dateTo}
-                  onChange={(e) => setDateTo(e.target.value)}
-                  className="w-40"
-                />
-              </div>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => {
-                  setDateFrom("");
-                  setDateTo("");
-                }}
-              >
-                Tozalash
-              </Button>
-            </div>
-          </CardContent>
-        </Card>
+        <div className="flex flex-wrap gap-2">
+          {([
+            { label: "Hammasi", value: "all" },
+            { label: "Bugun", value: "today" },
+            { label: "Oxirgi hafta", value: "week" },
+            { label: "Oxirgi oy", value: "month" },
+          ] as { label: string; value: "all" | "today" | "week" | "month" }[]).map((p) => (
+            <Button
+              key={p.value}
+              size="sm"
+              variant={periodFilter === p.value ? "default" : "outline"}
+              onClick={() => setPeriodFilter(p.value)}
+            >
+              {p.label}
+            </Button>
+          ))}
+        </div>
       )}
 
       {/* Content area */}
@@ -360,7 +350,7 @@ export default function KassaPage() {
       {activeView === "history" && (
         <TransactionList
           title="Koshelok tarixi"
-          subtitle="Kirim operatsiyalari"
+          subtitle="Barcha operatsiyalar"
           transactions={historyData?.data ?? []}
           loading={historyLoading}
           type="IN"
@@ -795,18 +785,20 @@ function TransactionList({
             ))}
           </div>
         ) : transactions.length > 0 ? (
-          transactions.map((t) => (
+          transactions.map((t) => {
+            const tIsIn = t.type === "IN";
+            return (
             <div
               key={t.id}
               className={`flex items-center justify-between p-3 rounded-lg border ${
-                isIn
+                tIsIn
                   ? "bg-success/5 border-success/10"
                   : "bg-destructive/5 border-destructive/10"
               }`}
             >
               <div>
                 <p className="font-medium text-sm">
-                  {t.note || (isIn ? "Kirim" : "Chiqim")}
+                  {t.note || (tIsIn ? "Kirim" : "Chiqim")}
                 </p>
                 <p className="text-xs text-muted-foreground">
                   {new Date(t.createdAt).toLocaleString("uz-UZ")}
@@ -814,14 +806,14 @@ function TransactionList({
               </div>
               <p
                 className={`font-semibold ${
-                  isIn ? "text-success" : "text-destructive"
+                  tIsIn ? "text-success" : "text-destructive"
                 }`}
               >
-                {isIn ? "+" : "-"}
+                {tIsIn ? "+" : "-"}
                 {formatMoney(t.amount)} so'm
               </p>
             </div>
-          ))
+          )})
         ) : (
           <p className="text-sm text-muted-foreground text-center py-4">
             Hozircha ma'lumot yo'q
@@ -933,15 +925,14 @@ function AddExpenseDialog({
   const [note, setNote] = useState("");
 
   const { mutate, loading } = useMutation(
-    (data: { cashRegisterId: string; type: "OUT"; amount: number; note?: string }) =>
-      cashRegistersApi.createTransaction(data)
+    (data: { type: "OUT"; amount: number; note?: string }) =>
+      cashRegistersApi.createMyTransaction(data)
   );
 
   const handleSubmit = async () => {
-    if (!koshelokId || !amount) return;
+    if (!amount) return;
     try {
       await mutate({
-        cashRegisterId: koshelokId,
         type: "OUT",
         amount: Number(amount),
         note: note || undefined,
@@ -989,7 +980,7 @@ function AddExpenseDialog({
           </Button>
           <Button
             onClick={handleSubmit}
-            disabled={loading || !amount || !koshelokId}
+            disabled={loading || !amount}
           >
             {loading ? "Saqlanmoqda..." : "Saqlash"}
           </Button>

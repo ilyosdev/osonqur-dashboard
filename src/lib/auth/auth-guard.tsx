@@ -1,18 +1,8 @@
 import { Navigate, useLocation } from 'react-router-dom';
 import { useAuth } from './auth-context';
 
-function canAccessByPageRoutes(pageRoutes: string[], pathname: string): boolean {
-  if (pathname === '/') return true;
-  return pageRoutes.some(route => {
-    // Match both /projects and /dashboard/projects formats
-    const normalizedRoute = route.replace('/dashboard', '');
-    return pathname === route || pathname.startsWith(route + '/')
-      || pathname === normalizedRoute || pathname.startsWith(normalizedRoute + '/');
-  });
-}
-
 export function AuthGuard({ children }: { children: React.ReactNode }) {
-  const { user, isAuthenticated, isLoading, isAdmin, pageRoutes } = useAuth();
+  const { user, isAuthenticated, isLoading } = useAuth();
   const location = useLocation();
 
   if (isLoading) {
@@ -34,11 +24,6 @@ export function AuthGuard({ children }: { children: React.ReactNode }) {
   const isPlatformAdmin = user?.platformRole === 'SUPER_ADMIN' || user?.platformRole === 'OPERATOR';
   if (isPlatformAdmin && !location.pathname.startsWith('/admin')) {
     return <Navigate to="/admin" replace />;
-  }
-
-  // Non-admin: block unauthorized routes
-  if (user && !isAdmin && !canAccessByPageRoutes(pageRoutes, location.pathname)) {
-    return <Navigate to="/" replace />;
   }
 
   return <>{children}</>;

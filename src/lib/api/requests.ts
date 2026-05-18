@@ -16,6 +16,7 @@ export interface UserRelation {
 
 export interface PurchaseRequest {
   id: string;
+  requestNumber?: number;
   smetaItemId: string;
   requestedQty: number;
   requestedAmount: number;
@@ -55,6 +56,8 @@ export interface GetPurchaseRequestsParams extends PaginationParams {
   requestedBy?: string;
   search?: string;
   projectId?: string;
+  dateFrom?: string;
+  dateTo?: string;
 }
 
 // Alias for backwards compatibility
@@ -93,6 +96,8 @@ export const requestsApi = {
     if (params?.requestedBy) searchParams.append('requestedBy', params.requestedBy);
     if (params?.search) searchParams.append('search', params.search);
     if (params?.projectId) searchParams.append('projectId', params.projectId);
+    if (params?.dateFrom) searchParams.append('dateFrom', params.dateFrom);
+    if (params?.dateTo) searchParams.append('dateTo', params.dateTo);
 
     const query = searchParams.toString();
     return apiClient<PaginatedResponse<PurchaseRequest>>(
@@ -104,6 +109,18 @@ export const requestsApi = {
   getById: (id: string) =>
     apiClient<PurchaseRequest>(`/vendor/requests/${id}`, {
       method: 'GET',
+    }),
+
+  parseText: (text: string) =>
+    apiClient<{ items: { name: string; qty: number; unit: string }[] }>('/vendor/requests/parse-text', {
+      method: 'POST',
+      body: JSON.stringify({ text }),
+    }),
+
+  submitText: (projectId: string, items: { name: string; qty: number; unit: string }[]) =>
+    apiClient<{ count: number }>('/vendor/requests/submit-text', {
+      method: 'POST',
+      body: JSON.stringify({ projectId, items }),
     }),
 
   create: (data: CreatePurchaseRequestRequest) =>

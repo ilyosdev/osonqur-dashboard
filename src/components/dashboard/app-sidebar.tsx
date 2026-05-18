@@ -77,27 +77,6 @@ const mainNavItems: NavItem[] = [
     permissions: ["smeta:view", "request:create", "request:view_all", "worker:view", "order:view", "warehouse:view", "driver:view_assigned", "moderator:view_pending", "statistics:view"],
   },
   {
-    title: "Smetalar",
-    url: "/smetas",
-    icon: FileText,
-    permissions: ["smeta:view", "smeta:edit"],
-    requiresProject: true,
-  },
-  {
-    title: "So'rovlar",
-    url: "/requests",
-    icon: ClipboardList,
-    permissions: ["request:view_all"],
-    requiresProject: true,
-  },
-  {
-    title: "Hisobotlar",
-    url: "/reports",
-    icon: ChartBar,
-    permissions: ["report:view"],
-    requiresProject: true,
-  },
-  {
     title: "Xodimlar",
     url: "/users",
     icon: Users,
@@ -105,39 +84,70 @@ const mainNavItems: NavItem[] = [
   },
 ];
 
-// Bot menyu itemlariga mos — qaysi permission yoqilgan bo'lsa shu ko'rinadi
-// Bir xil URLdagi itemlar deduplikatsiya qilinadi (faqat birinchisi ko'rsatiladi)
+// Bot PERMISSION_MENU_ITEMS bilan aynan bir xil tartib va permission mapping
 const roleNavItems: NavItem[] = [
+  // statistics:view → Statistika
   { title: "Statistika", url: "/direktor", icon: Crown, permissions: ["statistics:view"] },
-  { title: "Tasdiqlash", url: "/direktor", icon: CheckSquare, permissions: ["request:approve"] },
-  { title: "Qarzlar", url: "/direktor", icon: Wallet, permissions: ["debt:view"] },
-  { title: "Smeta vs Fakt", url: "/smeta-comparison", icon: BarChart3, permissions: ["smeta_comparison:view"] },
-  { title: "Hisobotlar", url: "/reports", icon: ChartBar, permissions: ["report:view"] },
-  { title: "Zayavka yaratish", url: "/foreman", icon: ClipboardList, permissions: ["request:create"] },
+  // report:view → Loyiha bajarilishi
+  { title: "Loyiha bajarilishi", url: "/reports", icon: ChartBar, permissions: ["report:view"] },
+  // request:view_all → Zayavkalar
+  { title: "Zayavkalar", url: "/requests", icon: ClipboardList, permissions: ["request:view_all"] },
+  // request:create → Zayavka yaratish
+  { title: "Zayavka yaratish", url: "/foreman", icon: Package, permissions: ["request:create"] },
+  // smeta:edit → Smeta yangilash
   { title: "Smeta yangilash", url: "/smetas", icon: FileText, permissions: ["smeta:edit"] },
-  { title: "Ustalar", url: "/workers", icon: UserCircle, permissions: ["worker:view"] },
-  { title: "Koshelok", url: "/kassa", icon: Banknote, permissions: ["kassa:view", "kassa:request_money", "kassa:add_expense"] },
+  // smeta_comparison:view → Smeta vs Fakt
+  { title: "Smeta vs Fakt", url: "/smeta-comparison", icon: BarChart3, permissions: ["smeta_comparison:view"] },
+  // request:approve → Tasdiqlash
+  { title: "Tasdiqlash", url: "/direktor", icon: CheckSquare, permissions: ["request:approve"] },
+  // order:view → Buyurtmalar
   { title: "Buyurtmalar", url: "/supply", icon: ShoppingCart, permissions: ["order:view"] },
+  // supplier:view → Postavshiklar
   { title: "Postavshiklar", url: "/suppliers", icon: Truck, permissions: ["supplier:view"] },
-  { title: "Postavshik qarzlari", url: "/supply", icon: Store, permissions: ["supplier_debt:view"] },
-  { title: "Kirim", url: "/finance", icon: TrendingUp, permissions: ["income:create"] },
+  // supplier_debt:view → Postavshik hajmi
+  { title: "Postavshik hajmi", url: "/supply", icon: Store, permissions: ["supplier_debt:view"] },
+  // debt:view → Qarzlar
+  { title: "Qarzlar", url: "/direktor", icon: Wallet, permissions: ["debt:view"] },
+  // expense:view → Umumiy rasxodlar
   { title: "Umumiy rasxodlar", url: "/finance", icon: TrendingDown, permissions: ["expense:view"] },
+  // income:create → Kirim
+  { title: "Kirim", url: "/finance", icon: TrendingUp, permissions: ["income:create"] },
+  // cash_request:approve → Pul zayavkalari
   { title: "Pul zayavkalari", url: "/finance", icon: DollarSign, permissions: ["cash_request:approve"] },
+  // kashlok:view_all → Kosheloklar
   { title: "Kosheloklar", url: "/finance", icon: CreditCard, permissions: ["kashlok:view_all"] },
-  { title: "Ombor", url: "/warehouse", icon: Package, permissions: ["warehouse:view"] },
+  // warehouse:receive → Kutilayotgan yetkazmalar
   { title: "Kutilayotgan yetkazmalar", url: "/warehouse", icon: Truck, permissions: ["warehouse:receive"] },
+  // warehouse:view → Ombor
+  { title: "Ombor", url: "/warehouse", icon: Package, permissions: ["warehouse:view"] },
+  // warehouse:transfer → Ko'chirish
   { title: "Ko'chirish", url: "/warehouse", icon: ArrowLeftRight, permissions: ["warehouse:transfer"] },
+  // driver:view_assigned → Tayinlangan zayavkalar
   { title: "Tayinlangan zayavkalar", url: "/driver", icon: Car, permissions: ["driver:view_assigned"] },
+  // driver:mark_collected → Faol yetkazma
   { title: "Faol yetkazma", url: "/driver", icon: Truck, permissions: ["driver:mark_collected"] },
+  // driver:mark_delivered → Yetkazma tarixi
   { title: "Yetkazma tarixi", url: "/driver", icon: History, permissions: ["driver:mark_delivered"] },
+  // moderator:view_pending → Mahsulot kiritish
   { title: "Mahsulot kiritish", url: "/moderator", icon: Shield, permissions: ["moderator:view_pending"] },
+  // moderator:finalize → Tarix
   { title: "Moderatsiya tarixi", url: "/moderator", icon: History, permissions: ["moderator:finalize"] },
-  { title: "Bajarilgan ishlar", url: "/worker-portal", icon: Briefcase, permissions: ["worker_portal:work_logs"] },
-  { title: "To'lovlar (ishchi)", url: "/worker-portal", icon: Wallet, permissions: ["worker_portal:payments"] },
+  // worker:view → Ustalar
+  { title: "Ustalar", url: "/workers", icon: UserCircle, permissions: ["worker:view"] },
+  // worker_portal:view → Hisob-kitob
   { title: "Hisob-kitob (ishchi)", url: "/worker-portal", icon: BarChart3, permissions: ["worker_portal:view"] },
-  { title: "Berilgan tovar", url: "/supplier-portal", icon: Package, permissions: ["supplier_portal:orders"] },
-  { title: "Olingan pullar", url: "/supplier-portal", icon: Wallet, permissions: ["supplier_portal:debts"] },
+  // worker_portal:work_logs → Bajarilgan ishlar
+  { title: "Bajarilgan ishlar", url: "/worker-portal", icon: Briefcase, permissions: ["worker_portal:work_logs"] },
+  // worker_portal:payments → To'lovlar
+  { title: "To'lovlar (ishchi)", url: "/worker-portal", icon: Wallet, permissions: ["worker_portal:payments"] },
+  // supplier_portal:view → Hisob-kitob (postavshik)
   { title: "Hisob-kitob (postavshik)", url: "/supplier-portal", icon: Store, permissions: ["supplier_portal:view"] },
+  // supplier_portal:orders → Berilgan tovar
+  { title: "Berilgan tovar", url: "/supplier-portal", icon: Package, permissions: ["supplier_portal:orders"] },
+  // supplier_portal:debts → Olingan pullar
+  { title: "Olingan pullar", url: "/supplier-portal", icon: Wallet, permissions: ["supplier_portal:debts"] },
+  // kassa:view / kassa:request_money / kassa:add_expense → Koshelok
+  { title: "Koshelok", url: "/kassa", icon: Banknote, permissions: ["kassa:view", "kassa:request_money", "kassa:add_expense"] },
 ];
 
 const settingsNavItems: NavItem[] = [
@@ -166,10 +176,7 @@ export function AppSidebar() {
   };
 
   const visibleMainItems = mainNavItems.filter(canSeeItem);
-  // Bir xil URLdan faqat birinchi ko'rinadigan itemni olish
-  const visibleRoleItems = roleNavItems.filter(canSeeItem).filter((item, _, arr) =>
-    arr.findIndex(i => i.url === item.url) === arr.indexOf(item)
-  );
+  const visibleRoleItems = roleNavItems.filter(canSeeItem);
   const visibleSettingsItems = settingsNavItems.filter(canSeeItem);
 
   // Items that require project selection are dimmed when no project is selected

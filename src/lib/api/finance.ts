@@ -370,6 +370,20 @@ export const cashRegistersApi = {
     }),
 
   // Transactions
+  getMyTransactions: (params?: GetCashTransactionsParams) => {
+    const searchParams = new URLSearchParams();
+    if (params?.page) searchParams.append('page', params.page.toString());
+    if (params?.limit) searchParams.append('limit', params.limit.toString());
+    if (params?.type) searchParams.append('type', params.type);
+    if (params?.dateFrom) searchParams.append('dateFrom', params.dateFrom);
+    if (params?.dateTo) searchParams.append('dateTo', params.dateTo);
+    const query = searchParams.toString();
+    return apiClient<PaginatedResponse<CashTransaction>>(
+      `/vendor/cash-registers/my/transactions${query ? `?${query}` : ''}`,
+      { method: 'GET' }
+    );
+  },
+
   getTransactions: (cashRegisterId: string, params?: GetCashTransactionsParams) => {
     const searchParams = new URLSearchParams();
     if (params?.page) searchParams.append('page', params.page.toString());
@@ -387,6 +401,12 @@ export const cashRegistersApi = {
 
   createTransaction: (data: CreateCashTransactionRequest) =>
     apiClient<CashTransaction>('/vendor/cash-registers/transactions', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    }),
+
+  createMyTransaction: (data: { type: 'IN' | 'OUT'; amount: number; note?: string }) =>
+    apiClient<CashTransaction>('/vendor/cash-registers/my/transactions', {
       method: 'POST',
       body: JSON.stringify(data),
     }),

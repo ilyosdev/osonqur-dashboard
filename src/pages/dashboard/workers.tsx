@@ -1,5 +1,8 @@
 import { useState } from "react";
-import { UserCircle, Wallet, ClipboardList, AlertTriangle, UserPlus, Loader2, PlusCircle } from "lucide-react";
+import {
+  UserCircle, Wallet, ClipboardList, AlertTriangle, UserPlus, Loader2,
+  ArrowLeft, ChevronLeft, ChevronRight, Phone, Briefcase, AlertCircle, Banknote,
+} from "lucide-react";
 import { StatsCard } from "@/components/dashboard/stats-card";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -21,135 +24,471 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { useApi } from "@/hooks/use-api";
-import { workersApi } from "@/lib/api/workers";
+import { workersApi, Worker } from "@/lib/api/workers";
 import { projectsApi } from "@/lib/api/projects";
 import { analyticsApi } from "@/lib/api/analytics";
 import { StatsSkeleton } from "@/components/ui/table-skeleton";
 import { ErrorMessage } from "@/components/ui/error-message";
 
-function formatNumber(num: number): string {
-  if (num >= 1000000) {
-    return (num / 1000000).toFixed(1) + "M";
-  }
+function fmt(num: number): string {
+  if (num >= 1000000) return (num / 1000000).toFixed(1) + "M";
   return num.toLocaleString("uz-UZ");
 }
 
+type Period = "bugun" | "hafta" | "oy" | "barchasi";
+// Views: main → ish-hajmi-list → worker-detail → ish-hajmi-logs
+type View = "main" | "ish-hajmi-list" | "worker-detail" | "ish-hajmi-logs";
+
+function getPeriodDates(period: Period): { startDate?: string; endDate?: string } {
+  const now = new Date();
+  const pad = (n: number) => String(n).padStart(2, "0");
+  const iso = (d: Date) => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+  if (period === "bugun") { const t = iso(now); return { startDate: t, endDate: t }; }
+  if (period === "hafta") { const f = new Date(now); f.setDate(now.getDate() - 7); return { startDate: iso(f), endDate: iso(now) }; }
+  if (period === "oy") { const f = new Date(now); f.setDate(now.getDate() - 30); return { startDate: iso(f), endDate: iso(now) }; }
+  return {};
+}
+
 const today = new Date().toISOString().split("T")[0];
+const PAGE = 10;
 
 export default function WorkersPage() {
-  const [showAddDialog, setShowAddDialog] = useState(false);
-  const [isCreating, setIsCreating] = useState(false);
-  const [createError, setCreateError] = useState<string | null>(null);
-  const [addForm, setAddForm] = useState({ firstName: "", lastName: "", phone: "", position: "" });
+  const [view, setView] = useState<View>("main");
 
-  const [showSmenaDialog, setShowSmenaDialog] = useState(false);
-  const [isCreatingSmena, setIsCreatingSmena] = useState(false);
-  const [smenaError, setSmenaError] = useState<string | null>(null);
-  const [smenaForm, setSmenaForm] = useState({
-    workerId: "",
-    projectId: "",
-    workType: "",
-    quantity: "",
-    unit: "m²",
-    unitPrice: "",
-    date: today,
+  // Ish hajmi state
+  const [ihPage, setIhPage] = useState(1);
+  const [ihWorker, setIhWorker] = useState<Worker | null>(null);
+  const [ihPeriod, setIhPeriod] = useState<Period>("bugun");
+  const [ihLogsPage, setIhLogsPage] = useState(1);
+
+  // Worker detail to'lov
+  const [detailPayAmount, setDetailPayAmount] = useState("");
+  const [detailPayLoading, setDetailPayLoading] = useState(false);
+  const [detailPayError, setDetailPayError] = useState<string | null>(null);
+  const [detailPaySuccess, setDetailPaySuccess] = useState(false);
+
+  // Yangi ish qo'shish dialog
+  const [showWorklogDialog, setShowWorklogDialog] = useState(false);
+  const [worklogForm, setWorklogForm] = useState({
+    projectId: "", workType: "", quantity: "", unit: "m²", unitPrice: "", date: today,
   });
+  const [worklogLoading, setWorklogLoading] = useState(false);
+  const [worklogError, setWorklogError] = useState<string | null>(null);
 
-  const {
-    data: workersResponse,
-    loading: workersLoading,
-    error: workersError,
-    refetch: refetchWorkers,
-  } = useApi(() => workersApi.getAll({ limit: 100 }), []);
+  // To'lov qo'shish dialog
+  const [showPayDialog, setShowPayDialog] = useState(false);
+  const [payWorkerId, setPayWorkerId] = useState("");
+  const [payAmount, setPayAmount] = useState("");
+  const [payLoading, setPayLoading] = useState(false);
+  const [payError, setPayError] = useState<string | null>(null);
 
-  const {
-    data: workLogsResponse,
-    loading: workLogsLoading,
-    refetch: refetchWorkLogs,
-  } = useApi(() => workersApi.getWorkLogs({ limit: 10 }), []);
+  // To'lov arxivi dialog
+  const [showArchiveDialog, setShowArchiveDialog] = useState(false);
 
-  const {
-    data: workerDebtsData,
-  } = useApi(() => analyticsApi.getWorkerDebts(), []);
+  // Add worker dialog
+  const [showAddDialog, setShowAddDialog] = useState(false);
+  const [addForm, setAddForm] = useState({ name: "", phone: "", specialty: "" });
+  const [addLoading, setAddLoading] = useState(false);
+  const [addError, setAddError] = useState<string | null>(null);
 
-  const {
-    data: projectsResponse,
-  } = useApi(() => projectsApi.getAll({ limit: 100 }), []);
+  // Main data
+  const { data: workersResponse, loading: workersLoading, error: workersError, refetch: refetchWorkers } =
+    useApi(() => workersApi.getAll({ limit: 100 }), []);
+  const { data: workLogsResponse, loading: workLogsLoading } =
+    useApi(() => workersApi.getWorkLogs({ limit: 10 }), []);
+  const { data: workerDebtsData } = useApi(() => analyticsApi.getWorkerDebts(), []);
+  const { data: projectsResponse } = useApi(() => projectsApi.getAll({ limit: 100 }), []);
 
-  const loading = workersLoading || workLogsLoading;
-  const error = workersError;
+  // Ish hajmi: worker list (paginated)
+  const { data: ihWorkersResp, loading: ihWorkersLoading } = useApi(
+    () => view === "ish-hajmi-list"
+      ? workersApi.getAll({ page: ihPage, limit: PAGE })
+      : Promise.resolve(null),
+    [view, ihPage]
+  );
+
+  // Ish hajmi: logs for selected worker + period
+  const periodDates = getPeriodDates(ihPeriod);
+  const { data: ihLogsResp, loading: ihLogsLoading } = useApi(
+    () => view === "ish-hajmi-logs" && ihWorker
+      ? workersApi.getWorkLogs({ workerId: ihWorker.id, page: ihLogsPage, limit: PAGE, ...periodDates })
+      : Promise.resolve(null),
+    [view, ihWorker?.id, ihPeriod, ihLogsPage]
+  );
+
+  // Worker detail: to'lanmagan ishlar
+  const { data: workerUnpaidResp, loading: workerUnpaidLoading } = useApi(
+    () => view === "worker-detail" && ihWorker
+      ? workersApi.getWorkLogs({ workerId: ihWorker.id, limit: 50, isPaid: false })
+      : Promise.resolve(null),
+    [view, ihWorker?.id]
+  );
+
+  // To'lov arxivi
+  const { data: paymentsResp, loading: paymentsLoading } = useApi(
+    () => showArchiveDialog ? workersApi.getPayments({ limit: 20 }) : Promise.resolve(null),
+    [showArchiveDialog]
+  );
 
   const workers = workersResponse?.data || [];
   const recentWorkLogs = workLogsResponse?.data || [];
   const projects = projectsResponse?.data || [];
-
-  const todayStr = new Date().toISOString().split('T')[0];
+  const todayStr = new Date().toISOString().split("T")[0];
   const todayWorkLogs = recentWorkLogs.filter((l) => l.date.startsWith(todayStr));
 
   const handleAddWorker = async () => {
-    if (!addForm.firstName.trim() || !addForm.lastName.trim()) {
-      setCreateError("Ism va familiya kiritilishi shart");
-      return;
-    }
-    setIsCreating(true);
-    setCreateError(null);
+    if (!addForm.name.trim()) { setAddError("Ism kiritilishi shart"); return; }
+    setAddLoading(true); setAddError(null);
     try {
-      await workersApi.create({
-        firstName: addForm.firstName.trim(),
-        lastName: addForm.lastName.trim(),
-        phone: addForm.phone.trim() || undefined,
-        position: addForm.position.trim() || undefined,
-      });
+      await workersApi.create({ name: addForm.name.trim(), phone: addForm.phone.trim() || undefined, specialty: addForm.specialty.trim() || undefined });
       setShowAddDialog(false);
-      setAddForm({ firstName: "", lastName: "", phone: "", position: "" });
+      setAddForm({ name: "", phone: "", specialty: "" });
       refetchWorkers();
     } catch (err) {
-      setCreateError(err instanceof Error ? err.message : "Usta qo'shishda xatolik");
-    } finally {
-      setIsCreating(false);
-    }
+      setAddError(err instanceof Error ? err.message : "Xatolik yuz berdi");
+    } finally { setAddLoading(false); }
   };
 
-  const handleAddSmena = async () => {
-    if (!smenaForm.workerId) { setSmenaError("Ishchini tanlang"); return; }
-    if (!smenaForm.projectId) { setSmenaError("Loyihani tanlang"); return; }
-    if (!smenaForm.workType.trim()) { setSmenaError("Ish turini kiriting"); return; }
-    if (!smenaForm.quantity || parseFloat(smenaForm.quantity) <= 0) { setSmenaError("Miqdorni kiriting"); return; }
-    if (!smenaForm.date) { setSmenaError("Sanani kiriting"); return; }
-
-    setIsCreatingSmena(true);
-    setSmenaError(null);
+  const handleWorklog = async () => {
+    if (!ihWorker) return;
+    if (!worklogForm.projectId) { setWorklogError("Loyihani tanlang"); return; }
+    if (!worklogForm.workType.trim()) { setWorklogError("Ish turini kiriting"); return; }
+    if (!worklogForm.quantity || parseFloat(worklogForm.quantity) <= 0) { setWorklogError("Miqdorni kiriting"); return; }
+    setWorklogLoading(true); setWorklogError(null);
     try {
       await workersApi.createWorkLog({
-        workerId: smenaForm.workerId,
-        projectId: smenaForm.projectId,
-        workType: smenaForm.workType.trim(),
-        quantity: parseFloat(smenaForm.quantity),
-        unit: smenaForm.unit,
-        unitPrice: smenaForm.unitPrice ? parseFloat(smenaForm.unitPrice) : undefined,
-        date: new Date(smenaForm.date).toISOString(),
+        workerId: ihWorker.id,
+        projectId: worklogForm.projectId,
+        workType: worklogForm.workType.trim(),
+        quantity: parseFloat(worklogForm.quantity),
+        unit: worklogForm.unit,
+        unitPrice: worklogForm.unitPrice ? parseFloat(worklogForm.unitPrice) : undefined,
+        date: new Date(worklogForm.date).toISOString(),
       });
-      setShowSmenaDialog(false);
-      setSmenaForm({ workerId: "", projectId: "", workType: "", quantity: "", unit: "m²", unitPrice: "", date: today });
-      refetchWorkLogs();
+      setShowWorklogDialog(false);
+      setWorklogForm({ projectId: "", workType: "", quantity: "", unit: "m²", unitPrice: "", date: today });
     } catch (err) {
-      setSmenaError(err instanceof Error ? err.message : "Smena qo'shishda xatolik");
-    } finally {
-      setIsCreatingSmena(false);
-    }
+      setWorklogError(err instanceof Error ? err.message : "Xatolik yuz berdi");
+    } finally { setWorklogLoading(false); }
   };
 
-  if (error) {
+  const handlePayment = async () => {
+    const amount = parseFloat(payAmount);
+    if (!payWorkerId) { setPayError("Ustani tanlang"); return; }
+    if (!payAmount || isNaN(amount) || amount <= 0) { setPayError("Summani kiriting"); return; }
+    setPayLoading(true); setPayError(null);
+    try {
+      await workersApi.createPayment({ workerId: payWorkerId, amount });
+      setShowPayDialog(false); setPayWorkerId(""); setPayAmount("");
+    } catch (err) {
+      setPayError(err instanceof Error ? err.message : "Xatolik yuz berdi");
+    } finally { setPayLoading(false); }
+  };
+
+  if (workersError) {
     return (
       <div className="space-y-6 animate-fade-in">
         <div className="flex flex-col gap-1">
           <h1 className="text-2xl font-bold tracking-tight">Ustalar</h1>
           <p className="text-muted-foreground">Ustalar va ish hisoboti</p>
         </div>
-        <ErrorMessage error={error} onRetry={refetchWorkers} />
+        <ErrorMessage error={workersError} onRetry={refetchWorkers} />
       </div>
     );
   }
+
+  // ===================== ISH HAJMI: WORKERS LIST =====================
+  if (view === "ish-hajmi-list") {
+    const ihWorkers = ihWorkersResp?.data || [];
+    const ihTotal = ihWorkersResp?.total || 0;
+    const ihTotalPages = Math.ceil(ihTotal / PAGE);
+
+    return (
+      <div className="space-y-6 animate-fade-in">
+        <div className="flex items-center gap-3">
+          <Button variant="ghost" size="icon" onClick={() => setView("main")}>
+            <ArrowLeft className="h-4 w-4" />
+          </Button>
+          <div>
+            <h1 className="text-2xl font-bold tracking-tight">📐 Ish hajmi</h1>
+            <p className="text-muted-foreground">Usta tanlang</p>
+          </div>
+        </div>
+
+        <Card className="animate-slide-up">
+          <CardContent className="pt-4 space-y-2">
+            {ihWorkersLoading ? (
+              <div className="space-y-3">
+                {[1, 2, 3].map((i) => <div key={i} className="h-16 bg-muted/50 rounded-lg animate-pulse" />)}
+              </div>
+            ) : ihWorkers.length === 0 ? (
+              <p className="text-center text-muted-foreground py-8">Ustalar topilmadi</p>
+            ) : (
+              ihWorkers.map((w) => (
+                <button
+                  key={w.id}
+                  onClick={() => { setIhWorker(w); setView("worker-detail"); }}
+                  className="w-full flex items-center justify-between p-4 rounded-lg border bg-card hover:bg-accent transition-colors text-left"
+                >
+                  <div>
+                    <p className="font-medium">👷 {w.name}</p>
+                    {w.phone && <p className="text-xs text-muted-foreground">📞 {w.phone}</p>}
+                    {w.specialty && <p className="text-xs text-muted-foreground">{w.specialty}</p>}
+                  </div>
+                  <ChevronRight className="h-4 w-4 text-muted-foreground shrink-0" />
+                </button>
+              ))
+            )}
+          </CardContent>
+        </Card>
+
+        {ihTotalPages > 1 && (
+          <div className="flex items-center justify-between">
+            <Button variant="outline" size="sm" disabled={ihPage <= 1} onClick={() => setIhPage((p) => p - 1)}>
+              <ChevronLeft className="h-4 w-4" />
+            </Button>
+            <span className="text-sm text-muted-foreground">{ihPage} / {ihTotalPages}</span>
+            <Button variant="outline" size="sm" disabled={ihPage >= ihTotalPages} onClick={() => setIhPage((p) => p + 1)}>
+              <ChevronRight className="h-4 w-4" />
+            </Button>
+          </div>
+        )}
+      </div>
+    );
+  }
+
+  // ===================== WORKER DETAIL =====================
+  if (view === "worker-detail") {
+    const unpaidLogs = workerUnpaidResp?.data || [];
+    const totalDebt = ihWorker.balance ?? 0;
+
+    const handleDetailPay = async () => {
+      const amount = parseFloat(detailPayAmount);
+      if (!detailPayAmount || isNaN(amount) || amount <= 0) { setDetailPayError("Summani kiriting"); return; }
+      setDetailPayLoading(true); setDetailPayError(null);
+      try {
+        await workersApi.createPayment({ workerId: ihWorker!.id, amount });
+        setDetailPaySuccess(true);
+        setDetailPayAmount("");
+      } catch (err) {
+        setDetailPayError(err instanceof Error ? err.message : "Xatolik yuz berdi");
+      } finally { setDetailPayLoading(false); }
+    };
+
+    return (
+      <div className="space-y-6 animate-fade-in">
+        <div className="flex items-center gap-3">
+          <Button variant="ghost" size="icon" onClick={() => setView("ish-hajmi-list")}>
+            <ArrowLeft className="h-4 w-4" />
+          </Button>
+          <div className="flex-1">
+            <h1 className="text-2xl font-bold tracking-tight">{ihWorker?.name}</h1>
+            <div className="flex items-center gap-3 text-muted-foreground text-sm mt-1">
+              {ihWorker?.phone && (
+                <span className="flex items-center gap-1"><Phone className="h-3.5 w-3.5" />{ihWorker.phone}</span>
+              )}
+              {ihWorker?.specialty && (
+                <span className="flex items-center gap-1"><Briefcase className="h-3.5 w-3.5" />{ihWorker.specialty}</span>
+              )}
+            </div>
+          </div>
+        </div>
+
+        {/* Jami qarz */}
+        {totalDebt > 0 && (
+          <div className="grid grid-cols-1">
+            <div className="p-5 rounded-xl border bg-card flex items-center justify-between shadow-sm">
+              <div>
+                <p className="text-sm text-muted-foreground">Jami qarz</p>
+                <p className="text-2xl font-bold mt-0.5">{fmt(totalDebt)} so'm</p>
+              </div>
+              <div className="h-12 w-12 rounded-full bg-orange-100 dark:bg-orange-900/30 flex items-center justify-center">
+                <Wallet className="h-6 w-6 text-orange-500" />
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* To'lanmagan ishlar */}
+        <Card className="animate-slide-up">
+          <CardHeader className="pb-2">
+            <CardTitle className="text-base font-semibold flex items-center gap-2">
+              <ClipboardList className="h-4 w-4 text-primary" />
+              To'lanmagan ishlar
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            {workerUnpaidLoading ? (
+              <div className="space-y-2">{[1,2,3].map(i => <div key={i} className="h-16 bg-muted/50 rounded-lg animate-pulse"/>)}</div>
+            ) : unpaidLogs.length === 0 ? (
+              <p className="text-sm text-muted-foreground text-center py-4">To'lanmagan ishlar yo'q</p>
+            ) : (
+              unpaidLogs.map((log) => (
+                <div key={log.id} className="p-4 rounded-lg border bg-card space-y-1">
+                  <div className="flex items-center justify-between">
+                    <p className="font-medium text-sm">{log.workType}</p>
+                    <Badge variant="secondary">{log.isValidated ? "Tasdiqlangan" : "Kutmoqda"}</Badge>
+                  </div>
+                  <div className="flex items-center justify-between text-sm text-muted-foreground">
+                    <span>{log.quantity} {log.unit}{log.totalAmount ? ` — ${fmt(log.totalAmount)} so'm` : ""}</span>
+                    <span>{new Date(log.date).toLocaleDateString("uz-UZ")}</span>
+                  </div>
+                  {log.project && <p className="text-xs text-muted-foreground">{log.project.name}</p>}
+                </div>
+              ))
+            )}
+          </CardContent>
+        </Card>
+
+        {/* To'lov qo'shish */}
+        <Card className="animate-slide-up">
+          <CardHeader className="pb-2">
+            <CardTitle className="text-base font-semibold flex items-center gap-2">
+              <Banknote className="h-4 w-4 text-primary" />
+              To'lov qo'shish
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            {detailPaySuccess && (
+              <div className="p-3 rounded-lg bg-green-500/10 text-green-600 text-sm font-medium">
+                To'lov muvaffaqiyatli qo'shildi!
+              </div>
+            )}
+            {detailPayError && (
+              <div className="p-3 rounded-lg bg-destructive/10 text-destructive text-sm">{detailPayError}</div>
+            )}
+            <div className="flex gap-2">
+              <Input
+                type="number"
+                placeholder="Summa (so'm)"
+                value={detailPayAmount}
+                onChange={(e) => { setDetailPayAmount(e.target.value); setDetailPaySuccess(false); }}
+                className="flex-1"
+              />
+              <Button onClick={handleDetailPay} disabled={detailPayLoading}>
+                {detailPayLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : "Tasdiqlash"}
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Ish hajmi ko'rish */}
+        <Button
+          variant="outline"
+          className="w-full"
+          onClick={() => { setIhPeriod("bugun"); setIhLogsPage(1); setView("ish-hajmi-logs"); }}
+        >
+          <ClipboardList className="h-4 w-4 mr-2" />
+          Ish hajmini ko'rish
+        </Button>
+      </div>
+    );
+  }
+
+  // ===================== ISH HAJMI: LOGS =====================
+  if (view === "ish-hajmi-logs") {
+    const logs = ihLogsResp?.data || [];
+    const logsTotal = ihLogsResp?.total || 0;
+    const logsTotalPages = Math.ceil(logsTotal / PAGE);
+    const periodTotal = logs.reduce((s, l) => s + (l.totalAmount || 0), 0);
+    const periods: { label: string; value: Period }[] = [
+      { label: "Bugun", value: "bugun" },
+      { label: "Oxirgi hafta", value: "hafta" },
+      { label: "Oxirgi oy", value: "oy" },
+      { label: "Barchasi", value: "barchasi" },
+    ];
+
+    return (
+      <div className="space-y-6 animate-fade-in">
+        <div className="flex items-center gap-3">
+          <Button variant="ghost" size="icon" onClick={() => setView("worker-detail")}>
+            <ArrowLeft className="h-4 w-4" />
+          </Button>
+          <div className="flex-1">
+            <h1 className="text-2xl font-bold tracking-tight">{ihWorker?.name}</h1>
+            {ihWorker?.phone && <p className="text-muted-foreground">{ihWorker.phone}</p>}
+          </div>
+          <Button size="sm" onClick={() => { setShowWorklogDialog(true); setWorklogError(null); }}>
+            📐 Yangi ish
+          </Button>
+        </div>
+
+        {/* Davr tanlash tabs */}
+        <div className="flex gap-2 flex-wrap">
+          {periods.map((p) => (
+            <Button
+              key={p.value}
+              size="sm"
+              variant={ihPeriod === p.value ? "default" : "outline"}
+              onClick={() => { setIhPeriod(p.value); setIhLogsPage(1); }}
+            >
+              {p.label}
+            </Button>
+          ))}
+        </div>
+
+        {periodTotal > 0 && (
+          <div className="p-4 rounded-xl border bg-card text-center animate-slide-up">
+            <p className="text-xs text-muted-foreground">Davr jami</p>
+            <p className="text-2xl font-bold">{fmt(periodTotal)} so'm</p>
+          </div>
+        )}
+
+        {ihLogsLoading ? (
+          <div className="space-y-3">
+            {[1, 2, 3].map((i) => <div key={i} className="h-20 bg-muted/50 rounded-lg animate-pulse" />)}
+          </div>
+        ) : logs.length === 0 ? (
+          <Card><CardContent className="py-8 text-center text-muted-foreground">Bu davrda ishlar topilmadi</CardContent></Card>
+        ) : (
+          <div className="space-y-3 animate-slide-up">
+            {logs.map((log) => (
+              <div key={log.id} className="p-4 rounded-lg border bg-card space-y-2">
+                <div className="flex items-center justify-between">
+                  <p className="font-medium">📌 {log.workType}</p>
+                  <Badge variant={log.isValidated ? "default" : "secondary"}>
+                    {log.isValidated ? "✓ Tasdiqlangan" : "Kutmoqda"}
+                  </Badge>
+                </div>
+                <div className="flex items-center justify-between text-sm text-muted-foreground">
+                  <span>{log.quantity} {log.unit}{log.totalAmount ? ` = ${fmt(log.totalAmount)} so'm` : ""}</span>
+                  <span>📅 {new Date(log.date).toLocaleDateString("uz-UZ")}</span>
+                </div>
+                {log.project && <p className="text-xs text-muted-foreground">🏗️ {log.project.name}</p>}
+              </div>
+            ))}
+          </div>
+        )}
+
+        {logsTotalPages > 1 && (
+          <div className="flex items-center justify-between">
+            <Button variant="outline" size="sm" disabled={ihLogsPage <= 1} onClick={() => setIhLogsPage((p) => p - 1)}>
+              <ChevronLeft className="h-4 w-4" />
+            </Button>
+            <span className="text-sm text-muted-foreground">{ihLogsPage} / {logsTotalPages} ({logsTotal} ta)</span>
+            <Button variant="outline" size="sm" disabled={ihLogsPage >= logsTotalPages} onClick={() => setIhLogsPage((p) => p + 1)}>
+              <ChevronRight className="h-4 w-4" />
+            </Button>
+          </div>
+        )}
+
+        <WorklogDialog
+          open={showWorklogDialog}
+          onClose={() => setShowWorklogDialog(false)}
+          worker={ihWorker}
+          projects={projects}
+          form={worklogForm}
+          setForm={setWorklogForm}
+          loading={worklogLoading}
+          error={worklogError}
+          onSubmit={handleWorklog}
+        />
+      </div>
+    );
+  }
+
+  // ===================== MAIN VIEW =====================
+  const loading = workersLoading || workLogsLoading;
 
   return (
     <div className="space-y-6 animate-fade-in">
@@ -162,333 +501,234 @@ export default function WorkersPage() {
         <StatsSkeleton />
       ) : (
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-          <StatsCard
-            title="Jami ustalar"
-            value={workers.length}
-            subtitle="faol"
-            icon={UserCircle}
-            variant="primary"
-            className="animate-slide-up stagger-1"
-          />
-          <StatsCard
-            title="Jami qarz"
-            value={formatNumber(workerDebtsData?.totalDebt ?? 0)}
-            subtitle="to'lanmagan"
-            icon={Wallet}
-            variant="danger"
-            className="animate-slide-up stagger-2"
-          />
-          <StatsCard
-            title="Qarzdorlar"
-            value={workerDebtsData?.workerCount ?? 0}
-            subtitle="ta usta"
-            icon={AlertTriangle}
-            variant="warning"
-            className="animate-slide-up stagger-3"
-          />
-          <StatsCard
-            title="Bugungi ishlar"
-            value={todayWorkLogs.length}
-            subtitle="ta hisobot"
-            icon={ClipboardList}
-            variant="success"
-            className="animate-slide-up stagger-4"
-          />
+          <StatsCard title="Jami ustalar" value={workers.length} subtitle="faol" icon={UserCircle} variant="primary" className="animate-slide-up stagger-1" />
+          <StatsCard title="Jami qarz" value={fmt(workerDebtsData?.totalDebt ?? 0)} subtitle="to'lanmagan" icon={Wallet} variant="danger" className="animate-slide-up stagger-2" />
+          <StatsCard title="Qarzdorlar" value={workerDebtsData?.workerCount ?? 0} subtitle="ta usta" icon={AlertTriangle} variant="warning" className="animate-slide-up stagger-3" />
+          <StatsCard title="Bugungi ishlar" value={todayWorkLogs.length} subtitle="ta hisobot" icon={ClipboardList} variant="success" className="animate-slide-up stagger-4" />
         </div>
       )}
 
+      <div className="flex flex-wrap gap-2">
+        <Button variant="outline" size="sm" onClick={() => { setIhPage(1); setView("ish-hajmi-list"); }}>
+          📐 Ish hajmi
+        </Button>
+        <Button variant="outline" size="sm" onClick={() => { setShowPayDialog(true); setPayWorkerId(""); setPayAmount(""); setPayError(null); }}>
+          💰 To'lov qo'shish
+        </Button>
+        <Button variant="outline" size="sm" onClick={() => setShowArchiveDialog(true)}>
+          📋 To'lov arxivi
+        </Button>
+        <Button size="sm" onClick={() => { setShowAddDialog(true); setAddError(null); }}>
+          <UserPlus className="h-4 w-4 mr-2" />
+          Usta qo'shish
+        </Button>
+      </div>
+
       <div className="grid gap-6 lg:grid-cols-3">
         <Card className="lg:col-span-2 animate-slide-up" style={{ animationDelay: "0.2s" }}>
-          <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <div>
-              <CardTitle className="text-base font-semibold flex items-center gap-2">
-                <UserCircle className="h-4 w-4 text-primary" />
-                Ustalar ro'yxati
-              </CardTitle>
-              <CardDescription>Barcha ustalar</CardDescription>
-            </div>
-            <Button variant="ghost" size="sm" onClick={() => setShowAddDialog(true)}>
-              <UserPlus className="h-4 w-4 mr-2" />
-              Yangi usta
-            </Button>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-base font-semibold flex items-center gap-2">
+              <UserCircle className="h-4 w-4 text-primary" />
+              Ustalar ro'yxati
+            </CardTitle>
+            <CardDescription>Barcha ustalar</CardDescription>
           </CardHeader>
-          <CardContent className="space-y-4">
+          <CardContent className="space-y-3">
             {workersLoading ? (
-              <div className="space-y-4">
-                {[1, 2, 3].map((i) => (
-                  <div key={i} className="h-20 bg-muted/50 rounded-lg animate-pulse" />
-                ))}
-              </div>
+              <div className="space-y-3">{[1, 2, 3].map((i) => <div key={i} className="h-16 bg-muted/50 rounded-lg animate-pulse" />)}</div>
             ) : workers.length > 0 ? (
               workers.map((worker) => (
-                <div key={worker.id} className="p-4 rounded-lg border bg-card space-y-3">
+                <div
+                  key={worker.id}
+                  className="p-4 rounded-lg border bg-card cursor-pointer hover:bg-muted/50 transition-colors"
+                  onClick={() => { setIhWorker(worker); setView("worker-detail"); }}
+                >
                   <div className="flex items-center justify-between">
                     <div>
-                      <p className="font-medium">{worker.firstName} {worker.lastName}</p>
-                      <p className="text-xs text-muted-foreground">{worker.position || "Usta"}</p>
+                      <p className="font-medium">{worker.name}</p>
+                      <p className="text-xs text-muted-foreground">{worker.specialty || "Usta"}</p>
                     </div>
-                    {worker.salary ? (
-                      <Badge variant="secondary">{formatNumber(worker.salary)} so'm/kun</Badge>
-                    ) : (
-                      <Badge variant="outline">Maosh ko'rsatilmagan</Badge>
-                    )}
+                    <ChevronRight className="h-4 w-4 text-muted-foreground" />
                   </div>
-                  {worker.phone && (
-                    <p className="text-xs text-muted-foreground">Tel: {worker.phone}</p>
-                  )}
+                  {worker.phone && <p className="text-xs text-muted-foreground mt-1">Tel: {worker.phone}</p>}
                 </div>
               ))
             ) : (
-              <p className="text-sm text-muted-foreground text-center py-4">
-                Hozircha ustalar yo'q
-              </p>
+              <p className="text-sm text-muted-foreground text-center py-4">Hozircha ustalar yo'q</p>
             )}
           </CardContent>
         </Card>
 
         <Card className="animate-slide-up" style={{ animationDelay: "0.3s" }}>
-          <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <div>
-              <CardTitle className="text-base font-semibold flex items-center gap-2">
-                <ClipboardList className="h-4 w-4 text-success" />
-                Oxirgi ishlar
-              </CardTitle>
-              <CardDescription>Bajarilgan ishlar</CardDescription>
-            </div>
-            <Button variant="ghost" size="sm" onClick={() => setShowSmenaDialog(true)}>
-              <PlusCircle className="h-4 w-4 mr-2" />
-              Smena
-            </Button>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-base font-semibold flex items-center gap-2">
+              <ClipboardList className="h-4 w-4 text-success" />
+              Oxirgi ishlar
+            </CardTitle>
+            <CardDescription>Bajarilgan ishlar</CardDescription>
           </CardHeader>
           <CardContent className="space-y-3">
             {workLogsLoading ? (
-              <div className="space-y-3">
-                {[1, 2, 3].map((i) => (
-                  <div key={i} className="h-20 bg-muted/50 rounded-lg animate-pulse" />
-                ))}
-              </div>
+              <div className="space-y-3">{[1, 2, 3].map((i) => <div key={i} className="h-16 bg-muted/50 rounded-lg animate-pulse" />)}</div>
             ) : recentWorkLogs.length > 0 ? (
               recentWorkLogs.map((log) => (
                 <div key={log.id} className="p-3 rounded-lg border">
-                  <div className="flex items-center justify-between mb-2">
+                  <div className="flex items-center justify-between mb-1">
                     <p className="font-medium text-sm">{log.worker?.name || log.loggedBy.name}</p>
-                    <Badge variant="secondary" className="bg-muted text-[10px]">
-                      {log.quantity} {log.unit}
-                    </Badge>
+                    <Badge variant="secondary" className="text-[10px]">{log.quantity} {log.unit}</Badge>
                   </div>
-                  {log.workType && (
-                    <p className="text-sm text-muted-foreground truncate">{log.workType}</p>
-                  )}
-                  <p className="text-xs text-muted-foreground">
-                    {new Date(log.date).toLocaleDateString("uz-UZ")}
-                  </p>
+                  {log.workType && <p className="text-sm text-muted-foreground truncate">{log.workType}</p>}
+                  <p className="text-xs text-muted-foreground">{new Date(log.date).toLocaleDateString("uz-UZ")}</p>
                 </div>
               ))
             ) : (
-              <p className="text-sm text-muted-foreground text-center py-4">
-                Hozircha ish hisoboti yo'q
-              </p>
+              <p className="text-sm text-muted-foreground text-center py-4">Hozircha ish hisoboti yo'q</p>
             )}
           </CardContent>
         </Card>
       </div>
 
-      {/* Add Worker Dialog */}
+      {/* Usta qo'shish */}
       <Dialog open={showAddDialog} onOpenChange={setShowAddDialog}>
         <DialogContent>
-          <DialogHeader>
-            <DialogTitle className="flex items-center gap-2">
-              <UserPlus className="h-5 w-5 text-primary" />
-              Yangi usta qo'shish
-            </DialogTitle>
-          </DialogHeader>
-
-          {createError && (
-            <div className="p-3 rounded-lg bg-destructive/10 text-destructive text-sm">
-              {createError}
-            </div>
-          )}
-
+          <DialogHeader><DialogTitle className="flex items-center gap-2"><UserPlus className="h-5 w-5 text-primary" />Yangi usta qo'shish</DialogTitle></DialogHeader>
+          {addError && <div className="p-3 rounded-lg bg-destructive/10 text-destructive text-sm">{addError}</div>}
           <div className="space-y-4">
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label htmlFor="firstName">Ism *</Label>
-                <Input
-                  id="firstName"
-                  placeholder="Ism"
-                  value={addForm.firstName}
-                  onChange={(e) => setAddForm((prev) => ({ ...prev, firstName: e.target.value }))}
-                />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="lastName">Familiya *</Label>
-                <Input
-                  id="lastName"
-                  placeholder="Familiya"
-                  value={addForm.lastName}
-                  onChange={(e) => setAddForm((prev) => ({ ...prev, lastName: e.target.value }))}
-                />
-              </div>
+            <div className="space-y-2">
+              <Label>Ism *</Label>
+              <Input placeholder="Usta ismi" value={addForm.name} onChange={(e) => setAddForm((p) => ({ ...p, name: e.target.value }))} />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="workerPhone">Telefon</Label>
-              <Input
-                id="workerPhone"
-                placeholder="+998 __ ___ __ __"
-                value={addForm.phone}
-                onChange={(e) => setAddForm((prev) => ({ ...prev, phone: e.target.value }))}
-              />
+              <Label>Telefon</Label>
+              <Input placeholder="+998 __ ___ __ __" value={addForm.phone} onChange={(e) => setAddForm((p) => ({ ...p, phone: e.target.value }))} />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="position">Lavozim</Label>
-              <Input
-                id="position"
-                placeholder="Masalan: Gʻishtchi"
-                value={addForm.position}
-                onChange={(e) => setAddForm((prev) => ({ ...prev, position: e.target.value }))}
-              />
+              <Label>Mutaxassislik</Label>
+              <Input placeholder="Masalan: G'ishtchi" value={addForm.specialty} onChange={(e) => setAddForm((p) => ({ ...p, specialty: e.target.value }))} />
             </div>
           </div>
-
           <DialogFooter>
-            <Button variant="outline" onClick={() => setShowAddDialog(false)} disabled={isCreating}>
-              Bekor qilish
-            </Button>
-            <Button onClick={handleAddWorker} disabled={isCreating}>
-              {isCreating ? (
-                <>
-                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                  Saqlanmoqda...
-                </>
-              ) : (
-                "Qo'shish"
-              )}
+            <Button variant="outline" onClick={() => setShowAddDialog(false)} disabled={addLoading}>Bekor qilish</Button>
+            <Button onClick={handleAddWorker} disabled={addLoading}>
+              {addLoading ? <><Loader2 className="h-4 w-4 mr-2 animate-spin" />Saqlanmoqda...</> : "Qo'shish"}
             </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
 
-      {/* Add Smena Dialog */}
-      <Dialog open={showSmenaDialog} onOpenChange={setShowSmenaDialog}>
-        <DialogContent className="max-w-md">
-          <DialogHeader>
-            <DialogTitle className="flex items-center gap-2">
-              <PlusCircle className="h-5 w-5 text-primary" />
-              Smena qo'shish
-            </DialogTitle>
-          </DialogHeader>
-
-          {smenaError && (
-            <div className="p-3 rounded-lg bg-destructive/10 text-destructive text-sm">
-              {smenaError}
-            </div>
-          )}
-
+      {/* To'lov qo'shish */}
+      <Dialog open={showPayDialog} onOpenChange={setShowPayDialog}>
+        <DialogContent>
+          <DialogHeader><DialogTitle>💰 To'lov qo'shish</DialogTitle></DialogHeader>
+          {payError && <div className="p-3 rounded-lg bg-destructive/10 text-destructive text-sm">{payError}</div>}
           <div className="space-y-4">
             <div className="space-y-2">
-              <Label>Ishchi *</Label>
-              <Select
-                value={smenaForm.workerId}
-                onValueChange={(v) => setSmenaForm((p) => ({ ...p, workerId: v }))}
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="Ishchini tanlang..." />
-                </SelectTrigger>
-                <SelectContent>
-                  {workers.map((w) => (
-                    <SelectItem key={w.id} value={w.id}>
-                      {w.firstName} {w.lastName}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
+              <Label>Usta *</Label>
+              <Select value={payWorkerId} onValueChange={setPayWorkerId}>
+                <SelectTrigger><SelectValue placeholder="Ustani tanlang..." /></SelectTrigger>
+                <SelectContent>{workers.map((w) => <SelectItem key={w.id} value={w.id}>{w.name}</SelectItem>)}</SelectContent>
               </Select>
             </div>
-
             <div className="space-y-2">
-              <Label>Loyiha *</Label>
-              <Select
-                value={smenaForm.projectId}
-                onValueChange={(v) => setSmenaForm((p) => ({ ...p, projectId: v }))}
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="Loyihani tanlang..." />
-                </SelectTrigger>
-                <SelectContent>
-                  {projects.map((p) => (
-                    <SelectItem key={p.id} value={p.id}>
-                      {p.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-
-            <div className="space-y-2">
-              <Label>Ish turi *</Label>
-              <Input
-                placeholder="Masalan: G'isht terish"
-                value={smenaForm.workType}
-                onChange={(e) => setSmenaForm((p) => ({ ...p, workType: e.target.value }))}
-              />
-            </div>
-
-            <div className="grid grid-cols-2 gap-3">
-              <div className="space-y-2">
-                <Label>Miqdor *</Label>
-                <Input
-                  type="number"
-                  placeholder="50"
-                  value={smenaForm.quantity}
-                  onChange={(e) => setSmenaForm((p) => ({ ...p, quantity: e.target.value }))}
-                />
-              </div>
-              <div className="space-y-2">
-                <Label>Birlik</Label>
-                <Input
-                  placeholder="m², soat, dona"
-                  value={smenaForm.unit}
-                  onChange={(e) => setSmenaForm((p) => ({ ...p, unit: e.target.value }))}
-                />
-              </div>
-            </div>
-
-            <div className="space-y-2">
-              <Label>Birlik narxi (ixtiyoriy)</Label>
-              <Input
-                type="number"
-                placeholder="15000"
-                value={smenaForm.unitPrice}
-                onChange={(e) => setSmenaForm((p) => ({ ...p, unitPrice: e.target.value }))}
-              />
-            </div>
-
-            <div className="space-y-2">
-              <Label>Sana *</Label>
-              <Input
-                type="date"
-                value={smenaForm.date}
-                onChange={(e) => setSmenaForm((p) => ({ ...p, date: e.target.value }))}
-              />
+              <Label>Summa (so'm) *</Label>
+              <Input type="number" placeholder="500000" value={payAmount} onChange={(e) => setPayAmount(e.target.value)} />
             </div>
           </div>
-
           <DialogFooter>
-            <Button variant="outline" onClick={() => setShowSmenaDialog(false)} disabled={isCreatingSmena}>
-              Bekor qilish
-            </Button>
-            <Button onClick={handleAddSmena} disabled={isCreatingSmena}>
-              {isCreatingSmena ? (
-                <>
-                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                  Saqlanmoqda...
-                </>
-              ) : (
-                "Qo'shish"
-              )}
+            <Button variant="outline" onClick={() => setShowPayDialog(false)} disabled={payLoading}>Bekor qilish</Button>
+            <Button onClick={handlePayment} disabled={payLoading}>
+              {payLoading ? <><Loader2 className="h-4 w-4 mr-2 animate-spin" />Saqlanmoqda...</> : "Tasdiqlash"}
             </Button>
           </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* To'lov arxivi */}
+      <Dialog open={showArchiveDialog} onOpenChange={setShowArchiveDialog}>
+        <DialogContent className="max-w-lg">
+          <DialogHeader><DialogTitle>📋 To'lov arxivi</DialogTitle></DialogHeader>
+          {paymentsLoading ? (
+            <div className="space-y-2">{[1, 2, 3].map((i) => <div key={i} className="h-12 bg-muted/50 rounded-lg animate-pulse" />)}</div>
+          ) : (paymentsResp?.data || []).length === 0 ? (
+            <p className="text-center text-muted-foreground py-6">To'lovlar yo'q</p>
+          ) : (
+            <div className="space-y-2 max-h-80 overflow-y-auto">
+              {(paymentsResp?.data || []).map((p) => (
+                <div key={p.id} className="flex items-center justify-between p-3 rounded-lg border text-sm">
+                  <div>
+                    <p className="font-medium">{fmt(p.amount)} so'm</p>
+                    <p className="text-xs text-muted-foreground">{new Date(p.paymentDate).toLocaleDateString("uz-UZ")} — {p.paymentType}</p>
+                  </div>
+                  <Badge variant="secondary">To'langan</Badge>
+                </div>
+              ))}
+            </div>
+          )}
+          <DialogFooter><Button variant="outline" onClick={() => setShowArchiveDialog(false)}>Yopish</Button></DialogFooter>
         </DialogContent>
       </Dialog>
     </div>
+  );
+}
+
+function WorklogDialog({
+  open, onClose, worker, projects, form, setForm, loading, error, onSubmit,
+}: {
+  open: boolean;
+  onClose: () => void;
+  worker: Worker | null;
+  projects: { id: string; name: string }[];
+  form: { projectId: string; workType: string; quantity: string; unit: string; unitPrice: string; date: string };
+  setForm: React.Dispatch<React.SetStateAction<typeof form>>;
+  loading: boolean;
+  error: string | null;
+  onSubmit: () => void;
+}) {
+  return (
+    <Dialog open={open} onOpenChange={onClose}>
+      <DialogContent className="max-w-md">
+        <DialogHeader>
+          <DialogTitle>📐 Yangi ish qo'shish{worker ? ` — ${worker.name}` : ""}</DialogTitle>
+        </DialogHeader>
+        {error && <div className="p-3 rounded-lg bg-destructive/10 text-destructive text-sm">{error}</div>}
+        <div className="space-y-4">
+          <div className="space-y-2">
+            <Label>Loyiha *</Label>
+            <Select value={form.projectId} onValueChange={(v) => setForm((p) => ({ ...p, projectId: v }))}>
+              <SelectTrigger><SelectValue placeholder="Loyihani tanlang..." /></SelectTrigger>
+              <SelectContent>{projects.map((p) => <SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>)}</SelectContent>
+            </Select>
+          </div>
+          <div className="space-y-2">
+            <Label>Ish turi *</Label>
+            <Input placeholder="Masalan: Suvoq" value={form.workType} onChange={(e) => setForm((p) => ({ ...p, workType: e.target.value }))} />
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            <div className="space-y-2">
+              <Label>Miqdor *</Label>
+              <Input type="number" placeholder="120" value={form.quantity} onChange={(e) => setForm((p) => ({ ...p, quantity: e.target.value }))} />
+            </div>
+            <div className="space-y-2">
+              <Label>Birlik</Label>
+              <Input placeholder="m², soat, dona" value={form.unit} onChange={(e) => setForm((p) => ({ ...p, unit: e.target.value }))} />
+            </div>
+          </div>
+          <div className="space-y-2">
+            <Label>Birlik narxi (ixtiyoriy)</Label>
+            <Input type="number" placeholder="45000" value={form.unitPrice} onChange={(e) => setForm((p) => ({ ...p, unitPrice: e.target.value }))} />
+          </div>
+          <div className="space-y-2">
+            <Label>Sana</Label>
+            <Input type="date" value={form.date} onChange={(e) => setForm((p) => ({ ...p, date: e.target.value }))} />
+          </div>
+        </div>
+        <DialogFooter>
+          <Button variant="outline" onClick={onClose} disabled={loading}>Bekor qilish</Button>
+          <Button onClick={onSubmit} disabled={loading}>
+            {loading ? <><Loader2 className="h-4 w-4 mr-2 animate-spin" />Saqlanmoqda...</> : "Qo'shish"}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   );
 }
