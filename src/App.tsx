@@ -1,4 +1,4 @@
-import { Routes, Route, Navigate } from 'react-router-dom';
+import { Routes, Route, Navigate } from 'react-router-dom'; // v2
 import { AuthGuard } from '@/lib/auth';
 import { PlatformRoute } from '@/components/guards/PlatformRoute';
 import AuthLayout from '@/layouts/AuthLayout';
