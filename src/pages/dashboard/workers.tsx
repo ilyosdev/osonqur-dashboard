@@ -259,7 +259,7 @@ export default function WorkersPage() {
   }
 
   // ===================== WORKER DETAIL =====================
-  if (view === "worker-detail") {
+  if (view === "worker-detail" && ihWorker) {
     const unpaidLogs = workerUnpaidResp?.data || [];
     const totalDebt = ihWorker.balance ?? 0;
 

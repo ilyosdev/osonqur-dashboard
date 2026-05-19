@@ -151,6 +151,12 @@ export const requestsApi = {
       body: JSON.stringify({ reason }),
     }),
 
+  assignSupplier: (id: string, supplierId: string) =>
+    apiClient<PurchaseRequest>(`/vendor/requests/${id}/assign-supplier`, {
+      method: 'POST',
+      body: JSON.stringify({ supplierId }),
+    }),
+
   // Delivery workflow methods
   assignDriver: (id: string, driverId: string) =>
     apiClient<PurchaseRequest>(`/vendor/requests/${id}/assign-driver`, {
