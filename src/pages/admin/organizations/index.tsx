@@ -2,7 +2,7 @@ import { useEffect, useState, useCallback } from "react";
 import { Link, Navigate } from "react-router-dom";
 import {
   Building2, Plus, Search, RefreshCw, Loader2, MoreVertical,
-  Edit, Trash2, AlertCircle, Users, FolderOpen, Eye, EyeOff, CheckCircle,
+  Edit, Trash2, AlertCircle, Users, FolderOpen, Eye, EyeOff, CheckCircle, TriangleAlert,
 } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -498,7 +498,7 @@ export default function OrganizationsPage() {
                     ))}
                   </div>
                   {selectedTemplateIds.size === 0 && (
-                    <p className="text-xs text-amber-600 mb-3">⚠️ Hech bir rol tanlanmagan — kampaniya rollarsiz yaratiladi</p>
+                    <p className="text-xs text-amber-600 mb-3 flex items-center gap-1"><TriangleAlert className="h-3.5 w-3.5" /> Hech bir rol tanlanmagan — kampaniya rollarsiz yaratiladi</p>
                   )}
                 </div>
 

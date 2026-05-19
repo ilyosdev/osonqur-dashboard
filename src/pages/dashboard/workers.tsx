@@ -2,6 +2,7 @@ import { useState } from "react";
 import {
   UserCircle, Wallet, ClipboardList, AlertTriangle, UserPlus, Loader2,
   ArrowLeft, ChevronLeft, ChevronRight, Phone, Briefcase, AlertCircle, Banknote,
+  HardHat, Building2, DollarSign, ClipboardCheck,
 } from "lucide-react";
 import { StatsCard } from "@/components/dashboard/stats-card";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -231,7 +232,7 @@ export default function WorkersPage() {
                   className="w-full flex items-center justify-between p-4 rounded-lg border bg-card hover:bg-accent transition-colors text-left"
                 >
                   <div>
-                    <p className="font-medium">👷 {w.name}</p>
+                    <p className="font-medium flex items-center gap-1"><HardHat className="h-3.5 w-3.5 text-muted-foreground" /> {w.name}</p>
                     {w.phone && <p className="text-xs text-muted-foreground">📞 {w.phone}</p>}
                     {w.specialty && <p className="text-xs text-muted-foreground">{w.specialty}</p>}
                   </div>
@@ -454,7 +455,7 @@ export default function WorkersPage() {
                   <span>{log.quantity} {log.unit}{log.totalAmount ? ` = ${fmt(log.totalAmount)} so'm` : ""}</span>
                   <span>📅 {new Date(log.date).toLocaleDateString("uz-UZ")}</span>
                 </div>
-                {log.project && <p className="text-xs text-muted-foreground">🏗️ {log.project.name}</p>}
+                {log.project && <p className="text-xs text-muted-foreground flex items-center gap-1"><Building2 className="h-3 w-3" /> {log.project.name}</p>}
               </div>
             ))}
           </div>
@@ -513,10 +514,10 @@ export default function WorkersPage() {
           📐 Ish hajmi
         </Button>
         <Button variant="outline" size="sm" onClick={() => { setShowPayDialog(true); setPayWorkerId(""); setPayAmount(""); setPayError(null); }}>
-          💰 To'lov qo'shish
+          <DollarSign className="h-4 w-4 mr-1" /> To'lov qo'shish
         </Button>
         <Button variant="outline" size="sm" onClick={() => setShowArchiveDialog(true)}>
-          📋 To'lov arxivi
+          <ClipboardCheck className="h-4 w-4 mr-1" /> To'lov arxivi
         </Button>
         <Button size="sm" onClick={() => { setShowAddDialog(true); setAddError(null); }}>
           <UserPlus className="h-4 w-4 mr-2" />
@@ -619,7 +620,7 @@ export default function WorkersPage() {
       {/* To'lov qo'shish */}
       <Dialog open={showPayDialog} onOpenChange={setShowPayDialog}>
         <DialogContent>
-          <DialogHeader><DialogTitle>💰 To'lov qo'shish</DialogTitle></DialogHeader>
+          <DialogHeader><DialogTitle className="flex items-center gap-2"><DollarSign className="h-5 w-5" /> To'lov qo'shish</DialogTitle></DialogHeader>
           {payError && <div className="p-3 rounded-lg bg-destructive/10 text-destructive text-sm">{payError}</div>}
           <div className="space-y-4">
             <div className="space-y-2">
@@ -646,7 +647,7 @@ export default function WorkersPage() {
       {/* To'lov arxivi */}
       <Dialog open={showArchiveDialog} onOpenChange={setShowArchiveDialog}>
         <DialogContent className="max-w-lg">
-          <DialogHeader><DialogTitle>📋 To'lov arxivi</DialogTitle></DialogHeader>
+          <DialogHeader><DialogTitle className="flex items-center gap-2"><ClipboardCheck className="h-5 w-5" /> To'lov arxivi</DialogTitle></DialogHeader>
           {paymentsLoading ? (
             <div className="space-y-2">{[1, 2, 3].map((i) => <div key={i} className="h-12 bg-muted/50 rounded-lg animate-pulse" />)}</div>
           ) : (paymentsResp?.data || []).length === 0 ? (
