@@ -105,7 +105,7 @@ const roleNavItems: NavItem[] = [
   // supplier:view → Postavshiklar
   { title: "Postavshiklar", url: "/suppliers", icon: Truck, permissions: ["supplier:view"] },
   // supplier_debt:view → Postavshik hajmi
-  { title: "Postavshik hajmi", url: "/supply", icon: Store, permissions: ["supplier_debt:view"] },
+  { title: "Postavshik hajmi", url: "/suppliers", icon: Store, permissions: ["supplier_debt:view"] },
   // debt:view → Qarzlar
   { title: "Qarzlar", url: "/direktor", icon: Wallet, permissions: ["debt:view"] },
   // expense:view → Umumiy rasxodlar
