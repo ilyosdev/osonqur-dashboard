@@ -1,4 +1,5 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { useLocation } from "react-router-dom";
 import {
   Briefcase,
   Clock,
@@ -20,7 +21,7 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Tabs, TabsContent } from "@/components/ui/tabs";
 import { useApi } from "@/hooks/use-api";
 import { useAuth } from "@/lib/auth";
 import { workersApi, WorkLog, WorkerPayment } from "@/lib/api/workers";
@@ -54,8 +55,14 @@ export default function WorkerPortalPage() {
   const canViewWorkLogs = hasPermission("worker_portal:work_logs");
   const canViewPayments = hasPermission("worker_portal:payments");
 
-  const firstTab = canViewWorkLogs ? "work-logs" : "payments";
-  const [activeTab, setActiveTab] = useState(firstTab);
+  const location = useLocation();
+  const urlTab = new URLSearchParams(location.search).get("tab");
+  const defaultTab = canViewWorkLogs ? "worklogs" : "payments";
+  const [activeTab, setActiveTab] = useState(urlTab || defaultTab);
+
+  useEffect(() => {
+    if (urlTab && urlTab !== activeTab) setActiveTab(urlTab);
+  }, [urlTab]);
 
   // Fetch work logs for this worker (user-specific)
   const {
@@ -100,10 +107,16 @@ export default function WorkerPortalPage() {
     );
   }
 
+  const tabTitle: Record<string, string> = {
+    summary: "Hisob-kitob",
+    worklogs: "Bajarilgan ishlar",
+    payments: "To'lovlar",
+  };
+
   return (
     <div className="space-y-6 animate-fade-in">
       <div className="flex flex-col gap-1">
-        <h1 className="text-2xl font-bold tracking-tight">Mening ishlarim</h1>
+        <h1 className="text-2xl font-bold tracking-tight">{tabTitle[activeTab] || "Mening ishlarim"}</h1>
         <p className="text-muted-foreground">Ish hisobotlari va to'lovlar</p>
       </div>
 
@@ -143,28 +156,50 @@ export default function WorkerPortalPage() {
         </div>
       )}
 
-      <Tabs value={activeTab} onValueChange={setActiveTab}>
-        <TabsList className={`grid w-full grid-cols-${[canViewWorkLogs, canViewPayments].filter(Boolean).length || 1}`}>
-          {canViewWorkLogs && (
-            <TabsTrigger value="work-logs" className="flex items-center gap-2">
-              <FileText className="h-4 w-4" />
-              Ish hisobotlari
-              {pendingCount > 0 && (
-                <Badge variant="secondary" className="ml-1 bg-warning/10 text-warning">
-                  {pendingCount}
-                </Badge>
-              )}
-            </TabsTrigger>
-          )}
-          {canViewPayments && (
-            <TabsTrigger value="payments" className="flex items-center gap-2">
-              <Wallet className="h-4 w-4" />
-              To'lovlar
-            </TabsTrigger>
-          )}
-        </TabsList>
+      <Tabs value={activeTab}>
+        <TabsContent value="summary" className="mt-0">
+          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+            <Card>
+              <CardContent className="pt-6">
+                <p className="text-sm text-muted-foreground">Jami ishlangan</p>
+                <p className="text-2xl font-bold text-success mt-1">{formatMoney(totalEarned)}</p>
+                <p className="text-xs text-muted-foreground mt-1">Tasdiqlangan ishlar bo'yicha</p>
+              </CardContent>
+            </Card>
+            <Card>
+              <CardContent className="pt-6">
+                <p className="text-sm text-muted-foreground">To'langan</p>
+                <p className="text-2xl font-bold text-primary mt-1">{formatMoney(totalPaid)}</p>
+                <p className="text-xs text-muted-foreground mt-1">Jami olingan to'lovlar</p>
+              </CardContent>
+            </Card>
+            <Card>
+              <CardContent className="pt-6">
+                <p className="text-sm text-muted-foreground">Qoldiq qarz</p>
+                <p className={`text-2xl font-bold mt-1 ${netBalance >= 0 ? "text-warning" : "text-destructive"}`}>{formatMoney(Math.abs(netBalance))}</p>
+                <p className="text-xs text-muted-foreground mt-1">{netBalance >= 0 ? "To'lanishi kerak" : "Ortiqcha to'langan"}</p>
+              </CardContent>
+            </Card>
+          </div>
+          <Card className="mt-4">
+            <CardContent className="pt-6">
+              <div className="flex items-center justify-between">
+                <span className="text-sm text-muted-foreground">Tasdiqlangan hisobotlar</span>
+                <span className="font-semibold">{validatedCount} ta</span>
+              </div>
+              <div className="flex items-center justify-between mt-2">
+                <span className="text-sm text-muted-foreground">Kutilayotgan</span>
+                <span className="font-semibold">{pendingCount} ta</span>
+              </div>
+              <div className="flex items-center justify-between mt-2">
+                <span className="text-sm text-muted-foreground">Jami to'lovlar</span>
+                <span className="font-semibold">{payments.length} ta</span>
+              </div>
+            </CardContent>
+          </Card>
+        </TabsContent>
 
-        <TabsContent value="work-logs" className="mt-4">
+        <TabsContent value="worklogs" className="mt-0">
           <Card>
             <CardHeader>
               <CardTitle className="text-base font-semibold flex items-center gap-2">
@@ -197,7 +232,7 @@ export default function WorkerPortalPage() {
           </Card>
         </TabsContent>
 
-        <TabsContent value="payments" className="mt-4">
+        <TabsContent value="payments" className="mt-0">
           <Card>
             <CardHeader>
               <CardTitle className="text-base font-semibold flex items-center gap-2">

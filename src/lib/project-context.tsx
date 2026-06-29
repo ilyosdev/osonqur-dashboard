@@ -29,10 +29,24 @@ export function ProjectProvider({ children }: { children: ReactNode }) {
     try {
       const result = await projectsApi.getAll({ limit: 100 });
       setProjects(result.data);
-      // If stored project no longer exists, clear selection
-      if (selectedProjectId && !result.data.find(p => p.id === selectedProjectId)) {
-        setSelectedProjectId(null);
+
+      const stored = localStorage.getItem(STORAGE_KEY);
+      if (stored && result.data.find(p => p.id === stored)) {
+        // Stored project still exists — keep it
+        setSelectedProjectId(stored);
+      } else if (stored) {
+        // Stored project no longer exists — clear and pick first
         localStorage.removeItem(STORAGE_KEY);
+        if (result.data.length > 0) {
+          setSelectedProjectId(result.data[0].id);
+          localStorage.setItem(STORAGE_KEY, result.data[0].id);
+        } else {
+          setSelectedProjectId(null);
+        }
+      } else if (!stored && result.data.length > 0) {
+        // Nothing stored — auto-select first project
+        setSelectedProjectId(result.data[0].id);
+        localStorage.setItem(STORAGE_KEY, result.data[0].id);
       }
     } catch (err) {
       console.warn('Failed to fetch projects:', err);

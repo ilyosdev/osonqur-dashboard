@@ -165,7 +165,7 @@ export default function OrgRolesPage() {
         adminApi.getOrgRoleDetails(selectedOrgId, role.id),
         adminApi.getOrgRoleBotMenu(selectedOrgId, role.id),
       ]);
-      setSelectedPermIds(new Set((details.permissions || []).map((p) => p.permissionId || p.permission?.id || p.id)));
+      setSelectedPermIds(new Set((details.permissions || []).map((p) => p.permissionId || p.permission?.id || '')));
       setSelectedAuthorityIds(new Set((details.canManage || []).map((a) => a.canManageId || a.managed?.id || '')));
       setBotMenuItems(menuItems || []);
     } catch {

@@ -1,4 +1,5 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
+import { useLocation, useNavigate } from "react-router-dom";
 import {
   Car,
   Package,
@@ -22,7 +23,7 @@ import {
 } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Tabs, TabsContent } from "@/components/ui/tabs";
 import {
   Dialog,
   DialogContent,
@@ -86,8 +87,15 @@ export default function DriverPage() {
   const canMarkCollected = hasPermission("driver:mark_collected");
   const canMarkDelivered = hasPermission("driver:mark_delivered");
 
-  const firstTab = canViewAssigned ? "assigned" : canMarkCollected ? "in-transit" : "history";
-  const [activeTab, setActiveTab] = useState(firstTab);
+  const location = useLocation();
+  const navigate = useNavigate();
+  const urlTab = new URLSearchParams(location.search).get("tab");
+  const defaultTab = canViewAssigned ? "assigned" : canMarkCollected ? "active" : "history";
+  const [activeTab, setActiveTab] = useState(urlTab || defaultTab);
+
+  useEffect(() => {
+    if (urlTab && urlTab !== activeTab) setActiveTab(urlTab);
+  }, [urlTab]);
   const [collectDialog, setCollectDialog] = useState<DriverDelivery | null>(null);
   const [deliverDialog, setDeliverDialog] = useState<DriverDelivery | null>(null);
   const [collectedQty, setCollectedQty] = useState("");
@@ -128,6 +136,12 @@ export default function DriverPage() {
 
   const loading = assignedLoading || inTransitLoading || completedLoading;
   const error = assignedError;
+
+  const tabTitle: Record<string, string> = {
+    assigned: "Tayinlangan zayavkalar",
+    active: "Faol yetkazma",
+    history: "Yetkazma tarixi",
+  };
 
   const assignedRequests = assignedResponse?.data || [];
   const inTransitRequests = inTransitResponse?.data || [];
@@ -187,7 +201,7 @@ export default function DriverPage() {
   return (
     <div className="space-y-6 animate-fade-in">
       <div className="flex flex-col gap-1">
-        <h1 className="text-2xl font-bold tracking-tight">Yetkazish</h1>
+        <h1 className="text-2xl font-bold tracking-tight">{tabTitle[activeTab] || "Yetkazish"}</h1>
         <p className="text-muted-foreground">Haydovchi uchun yetkazmalar boshqaruvi</p>
       </div>
 
@@ -222,39 +236,8 @@ export default function DriverPage() {
         </div>
       )}
 
-      <Tabs value={activeTab} onValueChange={setActiveTab}>
-        <TabsList className={`grid w-full grid-cols-${[canViewAssigned, canMarkCollected, canMarkDelivered].filter(Boolean).length || 1}`}>
-          {canViewAssigned && (
-            <TabsTrigger value="assigned" className="flex items-center gap-2">
-              <Package className="h-4 w-4" />
-              Tayinlangan
-              {assignedRequests.length > 0 && (
-                <Badge variant="secondary" className="ml-1">
-                  {assignedRequests.length}
-                </Badge>
-              )}
-            </TabsTrigger>
-          )}
-          {canMarkCollected && (
-            <TabsTrigger value="in-transit" className="flex items-center gap-2">
-              <Truck className="h-4 w-4" />
-              Yo'lda
-              {inTransitRequests.length > 0 && (
-                <Badge variant="secondary" className="ml-1">
-                  {inTransitRequests.length}
-                </Badge>
-              )}
-            </TabsTrigger>
-          )}
-          {canMarkDelivered && (
-            <TabsTrigger value="history" className="flex items-center gap-2">
-              <History className="h-4 w-4" />
-              Tarix
-            </TabsTrigger>
-          )}
-        </TabsList>
-
-        <TabsContent value="assigned" className="mt-4">
+      <Tabs value={activeTab}>
+        <TabsContent value="assigned" className="mt-0">
           <Card>
             <CardHeader>
               <CardTitle className="text-base font-semibold flex items-center gap-2">
@@ -359,7 +342,7 @@ export default function DriverPage() {
           </Card>
         </TabsContent>
 
-        <TabsContent value="in-transit" className="mt-4">
+        <TabsContent value="active" className="mt-0">
           <Card>
             <CardHeader>
               <CardTitle className="text-base font-semibold flex items-center gap-2">
@@ -465,7 +448,7 @@ export default function DriverPage() {
           </Card>
         </TabsContent>
 
-        <TabsContent value="history" className="mt-4">
+        <TabsContent value="history" className="mt-0">
           <Card>
             <CardHeader>
               <CardTitle className="text-base font-semibold flex items-center gap-2">

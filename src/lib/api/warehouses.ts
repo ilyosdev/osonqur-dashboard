@@ -215,4 +215,32 @@ export const warehousesApi = {
       method: 'POST',
       body: JSON.stringify(data),
     }),
+
+  getLogs: (params?: { projectId?: string; page?: number; limit?: number }) => {
+    const searchParams = new URLSearchParams();
+    if (params?.page) searchParams.append('page', params.page.toString());
+    if (params?.limit) searchParams.append('limit', params.limit.toString());
+    if (params?.projectId) searchParams.append('projectId', params.projectId);
+    const query = searchParams.toString();
+    return apiClient<{ data: WarehouseLog[]; total: number; page: number; limit: number }>(
+      `/vendor/warehouses/logs${query ? `?${query}` : ''}`,
+      { method: 'GET' }
+    );
+  },
 };
+
+export interface WarehouseLogItem {
+  id: string;
+  itemName: string;
+  unit: string;
+  quantity: number;
+  createdBy?: { id: string; name: string };
+}
+
+export interface WarehouseLog {
+  batchId: string;
+  type: 'IN' | 'OUT';
+  source: 'MANUAL' | 'REQUEST' | 'TRANSFER';
+  createdAt: string;
+  items: WarehouseLogItem[];
+}

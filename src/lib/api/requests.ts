@@ -17,6 +17,7 @@ export interface UserRelation {
 export interface PurchaseRequest {
   id: string;
   requestNumber?: number;
+  batchRequestNumber?: number;
   smetaItemId: string;
   requestedQty: number;
   requestedAmount: number;
@@ -34,10 +35,25 @@ export interface PurchaseRequest {
   updatedAt: string;
   // Batch grouping (for requests created together)
   batchId?: string;
+  approvedQty?: number;
+  approvedAmount?: number;
+  assignedDriverId?: string | null;
+  assignedAt?: string;
+  isSelfDelivery?: boolean;
+  collectedQty?: number;
+  collectedAt?: string;
+  deliveredQty?: number;
+  deliveredAt?: string;
+  receivedQty?: number;
+  receivedAt?: string;
+  finalAmount?: number;
+  finalUnitPrice?: number;
+  finalizedAt?: string;
   // Related data from JOINs
   smetaItem?: SmetaItemRelation;
   requestedBy?: UserRelation;
   approvedBy?: UserRelation | null;
+  assignedDriver?: UserRelation | null;
   // Project info
   project?: { id: string; name: string };
 }
@@ -145,6 +161,12 @@ export const requestsApi = {
       method: 'POST',
     }),
 
+  batchApprove: (ids: string[]) =>
+    apiClient<{ success: number; failed: number }>(`/vendor/requests/batch-approve`, {
+      method: 'POST',
+      body: JSON.stringify({ ids }),
+    }),
+
   reject: (id: string, reason: string) =>
     apiClient<RejectRequestResponse>(`/vendor/requests/${id}/reject`, {
       method: 'POST',
@@ -158,10 +180,10 @@ export const requestsApi = {
     }),
 
   // Delivery workflow methods
-  assignDriver: (id: string, driverId: string) =>
+  assignDriver: (id: string, driverId?: string) =>
     apiClient<PurchaseRequest>(`/vendor/requests/${id}/assign-driver`, {
       method: 'POST',
-      body: JSON.stringify({ driverId }),
+      body: JSON.stringify({ driverId: driverId || null }),
     }),
 
   markCollected: (id: string, data: { collectedQty: number; note?: string }) =>

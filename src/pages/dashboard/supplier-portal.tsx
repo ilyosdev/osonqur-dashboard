@@ -1,4 +1,5 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { useLocation } from "react-router-dom";
 import {
   Store,
   Package,
@@ -21,7 +22,7 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Tabs, TabsContent } from "@/components/ui/tabs";
 import { useApi } from "@/hooks/use-api";
 import { useAuth } from "@/lib/auth";
 import { suppliersApi, SupplierOrder, SupplierDebt } from "@/lib/api/suppliers";
@@ -50,8 +51,14 @@ export default function SupplierPortalPage() {
   const canViewDebts = hasPermission("supplier_portal:view");
   const canViewPayments = hasPermission("supplier_portal:debts");
 
-  const firstTab = canViewOrders ? "orders" : canViewDebts ? "debts" : "payments";
-  const [activeTab, setActiveTab] = useState(firstTab);
+  const location = useLocation();
+  const urlTab = new URLSearchParams(location.search).get("tab");
+  const defaultTab = canViewDebts ? "summary" : canViewOrders ? "orders" : "payments";
+  const [activeTab, setActiveTab] = useState(urlTab || defaultTab);
+
+  useEffect(() => {
+    if (urlTab && urlTab !== activeTab) setActiveTab(urlTab);
+  }, [urlTab]);
 
   // Fetch orders for this supplier (user-specific)
   const {
@@ -99,11 +106,17 @@ export default function SupplierPortalPage() {
     );
   }
 
+  const tabTitle: Record<string, string> = {
+    summary: "Hisob-kitob",
+    orders: "Berilgan tovar",
+    payments: "Olingan pullar",
+  };
+
   return (
     <div className="space-y-6 animate-fade-in">
       <div className="flex flex-col gap-1">
-        <h1 className="text-2xl font-bold tracking-tight">Ta'minotchi portali</h1>
-        <p className="text-muted-foreground">Buyurtmalar va qarzlar</p>
+        <h1 className="text-2xl font-bold tracking-tight">{tabTitle[activeTab] || "Ta'minotchi portali"}</h1>
+        <p className="text-muted-foreground">Buyurtmalar va to'lovlar</p>
       </div>
 
       {loading ? (
@@ -143,39 +156,33 @@ export default function SupplierPortalPage() {
         </div>
       )}
 
-      <Tabs value={activeTab} onValueChange={setActiveTab}>
-        <TabsList className={`grid w-full grid-cols-${[canViewOrders, canViewDebts, canViewPayments].filter(Boolean).length || 1}`}>
-          {canViewOrders && (
-            <TabsTrigger value="orders" className="flex items-center gap-2">
-              <Package className="h-4 w-4" />
-              Buyurtmalar
-              {pendingOrders > 0 && (
-                <Badge variant="secondary" className="ml-1 bg-warning/10 text-warning">
-                  {pendingOrders}
-                </Badge>
-              )}
-            </TabsTrigger>
-          )}
-          {canViewDebts && (
-            <TabsTrigger value="debts" className="flex items-center gap-2">
-              <CreditCard className="h-4 w-4" />
-              Qarzlar
-              {unpaidDebts.length > 0 && (
-                <Badge variant="secondary" className="ml-1 bg-destructive/10 text-destructive">
-                  {unpaidDebts.length}
-                </Badge>
-              )}
-            </TabsTrigger>
-          )}
-          {canViewPayments && (
-            <TabsTrigger value="payments" className="flex items-center gap-2">
-              <Wallet className="h-4 w-4" />
-              To'lovlar
-            </TabsTrigger>
-          )}
-        </TabsList>
+      <Tabs value={activeTab}>
+        <TabsContent value="summary" className="mt-0">
+          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+            <Card>
+              <CardContent className="pt-6">
+                <p className="text-sm text-muted-foreground">Jami ta'minlangan</p>
+                <p className="text-2xl font-bold text-success mt-1">{formatMoney(totalSupplied)}</p>
+              </CardContent>
+            </Card>
+            <Card>
+              <CardContent className="pt-6">
+                <p className="text-sm text-muted-foreground">To'lanmagan qarz</p>
+                <p className={`text-2xl font-bold mt-1 ${unpaidDebts.length > 0 ? "text-destructive" : "text-success"}`}>
+                  {formatMoney(unpaidDebts.reduce((s, d) => s + d.amount, 0))}
+                </p>
+              </CardContent>
+            </Card>
+            <Card>
+              <CardContent className="pt-6">
+                <p className="text-sm text-muted-foreground">Yetkazilgan buyurtmalar</p>
+                <p className="text-2xl font-bold text-primary mt-1">{completedOrders} ta</p>
+              </CardContent>
+            </Card>
+          </div>
+        </TabsContent>
 
-        <TabsContent value="orders" className="mt-4">
+        <TabsContent value="orders" className="mt-0">
           <Card>
             <CardHeader>
               <CardTitle className="text-base font-semibold flex items-center gap-2">
@@ -208,7 +215,7 @@ export default function SupplierPortalPage() {
           </Card>
         </TabsContent>
 
-        <TabsContent value="debts" className="mt-4">
+        <TabsContent value="debts" className="mt-0">
           <Card>
             <CardHeader>
               <CardTitle className="text-base font-semibold flex items-center gap-2">
@@ -235,7 +242,7 @@ export default function SupplierPortalPage() {
           </Card>
         </TabsContent>
 
-        <TabsContent value="payments" className="mt-4">
+        <TabsContent value="payments" className="mt-0">
           <Card>
             <CardHeader>
               <CardTitle className="text-base font-semibold flex items-center gap-2">

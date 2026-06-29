@@ -37,7 +37,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const fetchUserProfile = async (token: string): Promise<User> => {
     const response = await fetch(`${API_URL}/vendor/auth/profile`, {
-      headers: { Authorization: `Bearer ${token}` },
+      headers: { Authorization: `Bearer ${token}`, 'ngrok-skip-browser-warning': 'true' },
     });
     if (!response.ok) throw new Error('Failed to fetch user profile');
     const data = await response.json();
@@ -51,7 +51,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const fetchPermissions = useCallback(async (token: string) => {
     try {
       const response = await fetch(`${API_URL}/vendor/auth/me`, {
-        headers: { Authorization: `Bearer ${token}` },
+        headers: { Authorization: `Bearer ${token}`, 'ngrok-skip-browser-warning': 'true' },
       });
 
       if (!response.ok) {
@@ -90,7 +90,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     try {
       const response = await fetch(`${API_URL}/vendor/auth/refresh`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', 'ngrok-skip-browser-warning': 'true' },
         body: JSON.stringify({ refreshToken: refresh }),
       });
       if (!response.ok) return null;
@@ -145,7 +145,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const login = async (phone: string, password: string) => {
     const response = await fetch(`${API_URL}/vendor/auth/login`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'application/json', 'ngrok-skip-browser-warning': 'true' },
       body: JSON.stringify({ login: phone, password }),
     });
 

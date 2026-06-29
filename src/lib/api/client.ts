@@ -9,7 +9,7 @@ async function refreshAccessToken(): Promise<string | null> {
   try {
     const response = await fetch(`${API_URL}/vendor/auth/refresh`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'application/json', 'ngrok-skip-browser-warning': 'true' },
       body: JSON.stringify({ refreshToken }),
     });
 
@@ -37,6 +37,7 @@ export async function apiClient<T>(
     ...options,
     headers: {
       'Content-Type': 'application/json',
+      'ngrok-skip-browser-warning': 'true',
       ...(token && { Authorization: `Bearer ${token}` }),
       ...options.headers,
     },

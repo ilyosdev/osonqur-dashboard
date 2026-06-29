@@ -15,6 +15,10 @@ import {
   ChevronRight,
   Eye,
   FolderOpen,
+  Search,
+  RefreshCw,
+  Loader2,
+  PencilLine,
 } from "lucide-react";
 import { StatsCard } from "@/components/dashboard/stats-card";
 import {
@@ -44,6 +48,15 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Badge } from "@/components/ui/badge";
+import { TablePagination } from "@/components/shared/table-pagination";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
 import { useApi, useMutation } from "@/hooks/use-api";
 import { useAuth } from "@/lib/auth";
 import { requestsApi, PurchaseRequest } from "@/lib/api/requests";
@@ -66,6 +79,34 @@ function formatDate(dateStr: string): string {
   });
 }
 
+function formatDateFull(dateStr: string): string {
+  return new Date(dateStr).toLocaleDateString("uz-UZ");
+}
+
+function getWorkLogStatusBadge(log: WorkLog) {
+  if (log.isRejected) {
+    return (
+      <Badge className="rounded-full border border-[#ffd5d5] bg-[#fff0f0] px-[10px] py-1 text-[11px] font-medium text-[#ef4444] shadow-none">
+        Rad etilgan
+      </Badge>
+    );
+  }
+
+  if (log.isValidated) {
+    return (
+      <Badge className="rounded-full border border-[#c8efd8] bg-[#ecfbf1] px-[10px] py-1 text-[11px] font-medium text-[#1d9e75] shadow-none">
+        Tasdiqlangan
+      </Badge>
+    );
+  }
+
+  return (
+    <Badge className="rounded-full border border-[#f8e6bd] bg-[#fff6df] px-[10px] py-1 text-[11px] font-medium text-[#c88716] shadow-none">
+      Kutmoqda
+    </Badge>
+  );
+}
+
 type ActiveView = "requests" | "debts" | "validation" | "suppliers";
 
 const STORAGE_KEY = "direktor_selected_project";
@@ -76,8 +117,9 @@ export default function DirektorPage() {
 
   const canApproveRequests = hasPermission("request:approve") || hasPermission("request:view_all");
   const canViewDebts = hasPermission("debt:view");
-  const canValidate = hasPermission("smeta:validate");
+  const canValidate = hasPermission("worklog:validate") || hasPermission("smeta:validate");
   const canViewSuppliers = hasPermission("supplier:view");
+  const canViewStats = hasPermission("statistics:view");
 
   const firstView: ActiveView =
     canApproveRequests ? "requests"
@@ -115,7 +157,11 @@ export default function DirektorPage() {
   const [supplierDebtsDialogOpen, setSupplierDebtsDialogOpen] = useState(false);
   const [selectedSupplierForDebts, setSelectedSupplierForDebts] = useState<{ id: string; name: string } | null>(null);
   const [priceDialog, setPriceDialog] = useState<WorkLog | null>(null);
+  const [rejectWorkLogDialog, setRejectWorkLogDialog] = useState<WorkLog | null>(null);
   const [requestDetailDialog, setRequestDetailDialog] = useState<PurchaseRequest | null>(null);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [statusFilter, setStatusFilter] = useState("all");
+  const [page, setPage] = useState(1);
 
   // Batch selection for debt creation
   const [selectedBatchId, setSelectedBatchId] = useState<string | null>(null);
@@ -126,6 +172,11 @@ export default function DirektorPage() {
   // Price validation state
   const [unitPrice, setUnitPrice] = useState("");
   const [totalAmount, setTotalAmount] = useState("");
+  const [rejectReason, setRejectReason] = useState("");
+
+  useEffect(() => {
+    setPage(1);
+  }, [searchQuery, statusFilter, selectedProjectId]);
 
   // Get projectId for API calls (undefined means all projects)
   const projectIdParam = selectedProjectId !== "all" ? selectedProjectId : undefined;
@@ -197,7 +248,7 @@ export default function DirektorPage() {
   const {
     data: summaryData,
     loading: summaryLoading,
-  } = useApi(() => analyticsApi.getDashboardSummary(), []);
+  } = useApi(() => analyticsApi.getDashboardSummary(), [], { enabled: canViewStats });
 
   // Mutations
   const { mutate: approveRequest, loading: approving } = useMutation(
@@ -223,12 +274,40 @@ export default function DirektorPage() {
       workersApi.validateWithPrice(id, data)
   );
 
+  const { mutate: rejectWorkLog, loading: rejectingWorkLog } = useMutation(
+    ({ id, reason }: { id: string; reason?: string }) =>
+      workersApi.rejectWorkLog(id, { reason })
+  );
+
   const pendingRequests = pendingRequestsData?.data || [];
   const finalizedRequests = finalizedRequestsData?.data || [];
   const suppliers = suppliersData?.data || [];
   const supplierDebts = supplierDebtsData?.suppliers || [];
   const workerDebts = workerDebtsData?.workers || [];
   const unvalidatedWorkLogs = unvalidatedWorkLogsData?.data || [];
+  const pageSize = 4;
+  const filteredWorkLogs = unvalidatedWorkLogs.filter((log) => {
+    const query = searchQuery.trim().toLowerCase();
+    const matchesSearch = !query || [
+      log.workType,
+      log.worker?.name,
+      log.loggedBy?.name,
+      log.project?.name,
+      String(log.quantity),
+      log.unit,
+    ].some((value) => String(value || "").toLowerCase().includes(query));
+    const matchesStatus =
+      statusFilter === "all" ||
+      (statusFilter === "PENDING" && !log.isValidated && !log.isRejected) ||
+      (statusFilter === "APPROVED" && log.isValidated) ||
+      (statusFilter === "REJECTED" && log.isRejected);
+    return matchesSearch && matchesStatus;
+  });
+  const totalPages = Math.max(1, Math.ceil(filteredWorkLogs.length / pageSize));
+  const paginatedWorkLogs = filteredWorkLogs.slice((page - 1) * pageSize, page * pageSize);
+  const pendingWorkLogCount = unvalidatedWorkLogs.filter((log) => !log.isValidated && !log.isRejected).length;
+  const approvedWorkLogCount = unvalidatedWorkLogs.filter((log) => log.isValidated).length;
+  const rejectedWorkLogCount = unvalidatedWorkLogs.filter((log) => log.isRejected).length;
 
   // Group finalized requests by batchId
   const batchGroups = finalizedRequests.reduce((acc, req) => {
@@ -313,6 +392,21 @@ export default function DirektorPage() {
     }
   };
 
+  const handleRejectWorkLog = async () => {
+    if (!rejectWorkLogDialog) return;
+    try {
+      await rejectWorkLog({
+        id: rejectWorkLogDialog.id,
+        reason: rejectReason.trim() || undefined,
+      });
+      setRejectWorkLogDialog(null);
+      setRejectReason("");
+      refetchWorkLogs();
+    } catch {
+      // Error handled by useMutation
+    }
+  };
+
   const openPriceDialog = (log: WorkLog) => {
     setPriceDialog(log);
     setUnitPrice(String(log.unitPrice || 0));
@@ -330,178 +424,240 @@ export default function DirektorPage() {
     return (
       <div className="space-y-6 animate-fade-in">
         <div className="flex flex-col gap-1">
-          <h1 className="text-2xl font-bold tracking-tight">Direktor</h1>
-          <p className="text-muted-foreground">Boshqaruv paneli</p>
+          <h1 className="text-2xl font-bold tracking-tight">Tasdiqlash</h1>
+          <p className="text-muted-foreground">Usta ishlari tasdiqlash navbati</p>
         </div>
-        <ErrorMessage error={error} onRetry={refetchPendingRequests} />
+        <ErrorMessage error={error} onRetry={refetchWorkLogs} />
       </div>
     );
   }
 
   return (
     <div className="space-y-6 animate-fade-in">
-      {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-        <div className="flex flex-col gap-1">
-          <h1 className="text-2xl font-bold tracking-tight">Direktor</h1>
-          <p className="text-muted-foreground">
-            Xush kelibsiz, {user?.name || "Direktor"}
-          </p>
-        </div>
-
-        {/* Project Selector */}
-        {projects.length > 1 && (
-          <div className="w-full sm:w-auto">
-            <Select value={selectedProjectId} onValueChange={setSelectedProjectId}>
-              <SelectTrigger className="w-full sm:w-[280px]">
-                <FolderOpen className="h-4 w-4 mr-2 text-muted-foreground" />
-                <SelectValue placeholder="Loyihani tanlang" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">Barcha loyihalar</SelectItem>
-                {projects.map((p) => (
-                  <SelectItem key={p.id} value={p.id}>
-                    {p.name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-        )}
+      <div className="flex flex-col gap-2">
+        <h1 className="text-2xl font-bold tracking-tight flex items-center gap-2">
+          <ClipboardCheck className="h-6 w-6 text-primary" />
+          Tasdiqlash
+        </h1>
       </div>
 
-      {/* Stats */}
-      {loading ? (
+      {unvalidatedWorkLogsLoading ? (
         <StatsSkeleton />
       ) : (
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-          <StatsCard
-            title="Kutilayotgan zayavkalar"
-            value={pendingRequests.length}
-            subtitle="ta so'rov"
-            icon={Package}
-            variant="warning"
-            className="animate-slide-up stagger-1"
-          />
-          <StatsCard
-            title="Yetkazuvchi qarzlar"
-            value={formatMoney(supplierDebtsData?.totalDebt || 0)}
-            subtitle={`${supplierDebts.length} ta yetkazuvchi`}
-            icon={Truck}
-            variant="danger"
-            className="animate-slide-up stagger-2"
-          />
-          <StatsCard
-            title="Ishchi qarzlar"
-            value={formatMoney(workerDebtsData?.totalDebt || 0)}
-            subtitle={`${workerDebts.length} ta ishchi`}
-            icon={Users}
-            variant="danger"
-            className="animate-slide-up stagger-3"
-          />
-          <StatsCard
-            title="Tekshirilmagan ishlar"
-            value={unvalidatedWorkLogs.length}
-            subtitle="ta ish jurnali"
-            icon={ClipboardCheck}
-            variant="primary"
-            className="animate-slide-up stagger-4"
-          />
+          <div className="rounded-[12px] border border-[#dbe7f3] bg-white px-4 py-3 shadow-none">
+            <div className="flex items-center gap-2 text-[11px] font-semibold text-[#185fa5]">
+              <ClipboardCheck className="h-[13px] w-[13px] text-[#185fa5]" />
+              Jami ishlar
+            </div>
+            <div className="mt-2 text-[30px] font-semibold leading-none text-[#0c447c]">{unvalidatedWorkLogs.length}</div>
+          </div>
+          <div className="rounded-[12px] border border-[#dbe7f3] bg-white px-4 py-3 shadow-none">
+            <div className="flex items-center gap-2 text-[11px] font-semibold text-[#185fa5]">
+              <Clock className="h-[13px] w-[13px] text-[#ef9f27]" />
+              Kutmoqda
+            </div>
+            <div className="mt-2 text-[30px] font-semibold leading-none text-[#0c447c]">{pendingWorkLogCount}</div>
+          </div>
+          <div className="rounded-[12px] border border-[#dbe7f3] bg-white px-4 py-3 shadow-none">
+            <div className="flex items-center gap-2 text-[11px] font-semibold text-[#185fa5]">
+              <CheckCircle className="h-[13px] w-[13px] text-[#1d9e75]" />
+              Tasdiqlangan
+            </div>
+            <div className="mt-2 text-[30px] font-semibold leading-none text-[#0c447c]">{approvedWorkLogCount}</div>
+          </div>
+          <div className="rounded-[12px] border border-[#dbe7f3] bg-white px-4 py-3 shadow-none">
+            <div className="flex items-center gap-2 text-[11px] font-semibold text-[#185fa5]">
+              <XCircle className="h-[13px] w-[13px] text-[#ef4444]" />
+              Rad etilgan
+            </div>
+            <div className="mt-2 text-[30px] font-semibold leading-none text-[#0c447c]">{rejectedWorkLogCount}</div>
+          </div>
         </div>
       )}
 
-      {/* Action buttons */}
-      <div className="grid gap-3 grid-cols-2 sm:grid-cols-4">
-        {canApproveRequests && (
-          <ActionButton
-            icon={Package}
-            label="Zayavkalar"
-            active={activeView === "requests"}
-            onClick={() => setActiveView("requests")}
-            badge={pendingRequests.length}
-          />
-        )}
-        {canViewDebts && (
-          <ActionButton
-            icon={CreditCard}
-            label="Qarzlar"
-            active={activeView === "debts"}
-            onClick={() => setActiveView("debts")}
-          />
-        )}
-        {canValidate && (
-          <ActionButton
-            icon={ClipboardCheck}
-            label="Tasdiqlash"
-            active={activeView === "validation"}
-            onClick={() => setActiveView("validation")}
-            badge={unvalidatedWorkLogs.length}
-          />
-        )}
-        {canViewSuppliers && (
-          <ActionButton
-            icon={Building2}
-            label="Postavshiklar"
-            active={activeView === "suppliers"}
-            onClick={() => setActiveView("suppliers")}
-          />
-        )}
-      </div>
+      <Card className="flex min-h-[calc(100vh-220px)] flex-col overflow-hidden rounded-[12px] border border-[#dbe7f3] py-0 shadow-none">
+        <div className="flex flex-wrap items-center justify-between gap-4 border-b border-[#dbe7f3] bg-white px-5 py-3 md:px-6">
+          <div className="flex items-center gap-2">
+            <ClipboardCheck className="h-[18px] w-[18px] text-[#378add]" />
+            <div>
+              <h3 className="text-[14px] font-semibold tracking-tight text-[#0c447c]">Usta ishlari</h3>
+            </div>
+          </div>
+          <div className="flex w-full max-w-5xl flex-col items-stretch justify-end gap-3 lg:flex-row lg:items-center">
+            <div className="relative flex-1">
+              <Search className="absolute left-3 top-1/2 h-[14px] w-[14px] -translate-y-1/2 text-[#378add]" />
+              <Input
+                placeholder="Search"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                type="search"
+                spellCheck={false}
+                autoComplete="off"
+                autoCorrect="off"
+                autoCapitalize="none"
+                className="h-10 rounded-[8px] border border-[#dbe7f3] bg-white pl-9 text-[13px] text-[#0c447c] shadow-none placeholder:text-[#94a3b8]"
+              />
+            </div>
+            <Select value={statusFilter} onValueChange={setStatusFilter}>
+              <SelectTrigger className="h-10 w-full rounded-[8px] border-[#dbe7f3] bg-white text-[13px] text-[#0c447c] shadow-none lg:w-[170px]">
+                <SelectValue placeholder="Holat" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">Barcha holatlar</SelectItem>
+                <SelectItem value="PENDING">Kutmoqda</SelectItem>
+                <SelectItem value="APPROVED">Tasdiqlangan</SelectItem>
+                <SelectItem value="REJECTED">Rad etilgan</SelectItem>
+              </SelectContent>
+            </Select>
+            {projects.length > 1 && (
+              <Select value={selectedProjectId} onValueChange={setSelectedProjectId}>
+                <SelectTrigger className="h-10 w-full rounded-[8px] border-[#dbe7f3] bg-white text-[13px] text-[#0c447c] shadow-none lg:w-[110px]">
+                  <SelectValue placeholder="Loyiha" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Barcha loyihalar</SelectItem>
+                  {projects.map((project) => (
+                    <SelectItem key={project.id} value={project.id}>
+                      {project.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            )}
+            <Button
+              variant="outline"
+              size="icon"
+              onClick={refetchWorkLogs}
+              disabled={unvalidatedWorkLogsLoading}
+              className="h-10 w-10 rounded-[8px] border-[#dbe7f3] text-[#378add] shadow-none hover:bg-[#f0f7ff]"
+            >
+              <RefreshCw className={`h-4 w-4 ${unvalidatedWorkLogsLoading ? "animate-spin" : ""}`} />
+            </Button>
+          </div>
+        </div>
 
-      {/* Content sections */}
-      {activeView === "requests" && canApproveRequests && (
-        <RequestsSection
-          requests={pendingRequests}
-          loading={pendingRequestsLoading}
-          onApprove={handleApproveRequest}
-          onReject={handleRejectRequest}
-          onViewDetail={(req) => setRequestDetailDialog(req)}
-          approving={approving}
-          rejecting={rejecting}
+        <div className="flex flex-1 flex-col overflow-hidden bg-white">
+          <div className="flex-1 overflow-auto">
+            {unvalidatedWorkLogsLoading ? (
+              <div className="flex items-center justify-center py-20">
+                <Loader2 className="h-8 w-8 animate-spin text-[#378add]" />
+              </div>
+            ) : (
+              <Table>
+                <TableHeader>
+                  <TableRow className="bg-white hover:bg-white">
+                    <TableHead className="h-12 w-[150px] text-[11px] font-semibold uppercase tracking-[0.04em] text-[#378add]">Ish</TableHead>
+                    <TableHead className="text-[11px] font-semibold uppercase tracking-[0.04em] text-[#378add]">Usta</TableHead>
+                    <TableHead className="w-[130px] text-[11px] font-semibold uppercase tracking-[0.04em] text-[#378add]">Loyiha</TableHead>
+                    <TableHead className="w-[140px] text-[11px] font-semibold uppercase tracking-[0.04em] text-[#378add]">Miqdor</TableHead>
+                    <TableHead className="w-[140px] text-[11px] font-semibold uppercase tracking-[0.04em] text-[#378add]">Summa</TableHead>
+                    <TableHead className="w-[180px] text-[11px] font-semibold uppercase tracking-[0.04em] text-[#378add]">Holat</TableHead>
+                    <TableHead className="w-[140px] text-[11px] font-semibold uppercase tracking-[0.04em] text-[#378add]">Sana</TableHead>
+                    <TableHead className="w-[260px] text-right text-[11px] font-semibold uppercase tracking-[0.04em] text-[#378add]">Amallar</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody className="align-top">
+                  {paginatedWorkLogs.length === 0 ? (
+                    <>
+                      <TableRow className="h-20 border-b border-[#eef2f7] hover:bg-transparent">
+                        <TableCell colSpan={8} className="text-center text-[13px] text-[#85b7eb]">
+                          <div className="flex flex-col items-center gap-2">
+                            <ClipboardCheck className="h-8 w-8 opacity-30" />
+                            <p>Hozircha tasdiqlash kerak bo'lgan ishlar yo'q</p>
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                      {Array.from({ length: pageSize - 1 }).map((_, index) => (
+                        <TableRow key={`empty-filler-${index}`} className="h-20 border-b border-[#eef2f7] hover:bg-transparent last:border-b-0">
+                          <TableCell colSpan={8} />
+                        </TableRow>
+                      ))}
+                    </>
+                  ) : paginatedWorkLogs.map((log) => {
+                    const amount = log.totalAmount || (log.quantity * (log.unitPrice || 0));
+                    return (
+                      <TableRow
+                        key={log.id}
+                        className="h-20 border-b border-[#eef2f7] last:border-b-0 transition-colors hover:bg-[#f8fbff]"
+                      >
+                        <TableCell className="py-[13px]">
+                          <div className="space-y-0.5">
+                            <div className="text-[13px] font-semibold text-[#0c447c]">{log.workType}</div>
+                            <div className="text-[11px] text-[#64748b]">{formatDateFull(log.date)}</div>
+                          </div>
+                        </TableCell>
+                        <TableCell className="py-[13px] text-[13px] font-medium text-[#0c447c]">
+                          {log.worker?.name || log.loggedBy?.name || "—"}
+                        </TableCell>
+                        <TableCell className="py-[13px] text-[13px] text-[#64748b]">
+                          {log.project?.name || "—"}
+                        </TableCell>
+                        <TableCell className="py-[13px] text-[13px] text-[#64748b]">
+                          {formatMoney(log.quantity).replace(" so'm", "")} {log.unit}
+                        </TableCell>
+                        <TableCell className="py-[13px] text-[13px] font-semibold text-[#2f6bf2]">
+                          {formatMoney(amount)}
+                        </TableCell>
+                        <TableCell className="py-[13px]">
+                          {getWorkLogStatusBadge(log)}
+                        </TableCell>
+                        <TableCell className="py-[13px] text-[13px] text-[#64748b]">
+                          {formatDateFull(log.date)}
+                        </TableCell>
+                        <TableCell className="py-[13px] text-right">
+                          <div className="flex items-center justify-end gap-2">
+                            <Button
+                              size="sm"
+                              className="h-8 bg-[#185fa5] px-3 text-xs text-white hover:bg-[#0f4f90]"
+                              disabled={validatingWorkLog || log.isValidated || log.isRejected}
+                              onClick={() => openPriceDialog(log)}
+                            >
+                              <CheckCircle className="mr-1 h-3.5 w-3.5" />
+                              Tasdiqlash
+                            </Button>
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              className="h-8 px-3 text-xs text-destructive hover:text-destructive"
+                              disabled={rejectingWorkLog || log.isValidated || log.isRejected}
+                              onClick={() => setRejectWorkLogDialog(log)}
+                            >
+                              <XCircle className="mr-1 h-3.5 w-3.5" />
+                              Rad
+                            </Button>
+                            <Button
+                              variant="outline"
+                              size="icon"
+                              className="h-8 w-8 text-[#378add]"
+                              disabled={log.isValidated || log.isRejected}
+                              onClick={() => openPriceDialog(log)}
+                            >
+                              <PencilLine className="h-3.5 w-3.5" />
+                            </Button>
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                    );
+                  })}
+                  {paginatedWorkLogs.length < pageSize && Array.from({ length: pageSize - paginatedWorkLogs.length }).map((_, index) => (
+                    <TableRow key={`worklog-filler-${index}`} className="h-20 border-b border-[#eef2f7] hover:bg-transparent last:border-b-0">
+                      <TableCell colSpan={8} />
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            )}
+          </div>
+        </div>
+
+        <TablePagination
+          page={page}
+          totalPages={totalPages}
+          onPageChange={setPage}
+          summary={`Jami: ${filteredWorkLogs.length} ta ish`}
         />
-      )}
-      {activeView === "debts" && canViewDebts && (
-        <DebtsSection
-          supplierDebts={supplierDebts}
-          workerDebts={workerDebts}
-          loading={supplierDebtsLoading || workerDebtsLoading}
-          onAddDebt={() => setAddDebtDialogOpen(true)}
-          onViewSupplierDebts={(supplierId, supplierName) => {
-            setSelectedSupplierForDebts({ id: supplierId, name: supplierName });
-            setSupplierDebtsDialogOpen(true);
-          }}
-          totalSupplierDebt={supplierDebtsData?.totalDebt || 0}
-          totalWorkerDebt={workerDebtsData?.totalDebt || 0}
-        />
-      )}
-      {activeView === "validation" && canValidate && (
-        <ValidationSection
-          workLogs={unvalidatedWorkLogs}
-          loading={unvalidatedWorkLogsLoading}
-          onValidateWithPrice={openPriceDialog}
-          onQuickValidate={async (id) => {
-            const log = unvalidatedWorkLogs.find(l => l.id === id);
-            if (log) {
-              await validateWorkLog({
-                id,
-                data: {
-                  unitPrice: log.unitPrice || 0,
-                  totalAmount: log.totalAmount || 0,
-                },
-              });
-              refetchWorkLogs();
-            }
-          }}
-          validating={validatingWorkLog}
-        />
-      )}
-      {activeView === "suppliers" && canViewSuppliers && (
-        <SuppliersSection
-          suppliers={suppliers}
-          supplierDebts={supplierDebts}
-          loading={suppliersLoading}
-        />
-      )}
+      </Card>
 
       {/* Add Debt Dialog */}
       <Dialog open={addDebtDialogOpen} onOpenChange={setAddDebtDialogOpen}>
@@ -772,9 +928,63 @@ export default function DirektorPage() {
             </Button>
             <Button
               onClick={handleValidateWorkLog}
-              disabled={validatingWorkLog || !totalAmount}
+              disabled={validatingWorkLog || Number(totalAmount) <= 0}
             >
               {validatingWorkLog ? "Saqlanmoqda..." : "Tasdiqlash"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Reject Work Log Dialog */}
+      <Dialog open={!!rejectWorkLogDialog} onOpenChange={() => {
+        setRejectWorkLogDialog(null);
+        setRejectReason("");
+      }}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Ishni rad etish</DialogTitle>
+            <DialogDescription>
+              {rejectWorkLogDialog?.workType}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-2">
+            <div className="p-3 rounded-lg bg-muted/50 space-y-2">
+              <div className="flex items-center justify-between text-sm">
+                <span className="text-muted-foreground">Usta:</span>
+                <span className="font-medium">
+                  {rejectWorkLogDialog?.worker?.name || rejectWorkLogDialog?.loggedBy?.name || "Noma'lum"}
+                </span>
+              </div>
+              <div className="flex items-center justify-between text-sm">
+                <span className="text-muted-foreground">Miqdor:</span>
+                <span className="font-medium">
+                  {rejectWorkLogDialog?.quantity} {rejectWorkLogDialog?.unit}
+                </span>
+              </div>
+            </div>
+            <div className="space-y-2">
+              <Label>Rad etish sababi</Label>
+              <Textarea
+                placeholder="Sababini kiriting..."
+                value={rejectReason}
+                onChange={(e) => setRejectReason(e.target.value)}
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => {
+              setRejectWorkLogDialog(null);
+              setRejectReason("");
+            }}>
+              Bekor qilish
+            </Button>
+            <Button
+              variant="destructive"
+              onClick={handleRejectWorkLog}
+              disabled={rejectingWorkLog}
+            >
+              {rejectingWorkLog ? "Rad etilmoqda..." : "Rad etish"}
             </Button>
           </DialogFooter>
         </DialogContent>

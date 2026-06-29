@@ -119,7 +119,7 @@ export default function RoleTemplatesPage() {
     setManageDialogOpen(true);
     try {
       const details = await adminApi.getRoleTemplateDetails(t.id);
-      setSelectedPermIds(new Set((details.permissions || []).map((p) => p.permissionId || p.permission?.id || p.id)));
+      setSelectedPermIds(new Set((details.permissions || []).map((p) => p.permissionId || p.permission?.id || '')));
       setSelectedAuthorityIds(new Set((details.canManage || []).map((a) => a.canManageId || a.managed?.id || '')));
     } catch {
       setSelectedPermIds(new Set());

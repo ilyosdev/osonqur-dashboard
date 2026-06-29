@@ -19,6 +19,13 @@ import { WarehouseSection } from "@/components/dashboard/warehouse-section";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { useAuth } from "@/lib/auth";
 import { usePermission } from "@/hooks";
 import { useApi } from "@/hooks/use-api";
@@ -139,19 +146,20 @@ export default function HomePage() {
 
         {/* Period Selector */}
         {canViewStats && (
-          <div className="flex items-center gap-1 flex-wrap">
+          <div className="flex items-center gap-2">
             <CalendarDays className="h-4 w-4 text-muted-foreground mr-1" />
-            {(Object.keys(PERIOD_LABELS) as Period[]).map((p) => (
-              <Button
-                key={p}
-                variant={period === p ? "default" : "outline"}
-                size="sm"
-                onClick={() => setPeriod(p)}
-                className="text-xs"
-              >
-                {PERIOD_LABELS[p]}
-              </Button>
-            ))}
+            <Select value={period} onValueChange={(value) => setPeriod(value as Period)}>
+              <SelectTrigger className="h-9 w-[170px] rounded-[10px] border border-input bg-background text-sm shadow-none">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+              {(Object.keys(PERIOD_LABELS) as Period[]).map((p) => (
+                <SelectItem key={p} value={p}>
+                  {PERIOD_LABELS[p]}
+                </SelectItem>
+              ))}
+              </SelectContent>
+            </Select>
           </div>
         )}
       </div>

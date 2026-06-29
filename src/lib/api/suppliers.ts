@@ -68,6 +68,8 @@ export interface SupplierDebt {
   amount: number;
   dueDate?: string;
   description?: string;
+  reason?: string;
+  paidAmount?: number;
   isPaid: boolean;
   paidAt?: string;
   vendorId: string;
@@ -150,9 +152,10 @@ export const suppliersApi = {
       body: JSON.stringify(data),
     }),
 
-  payDebt: (id: string) =>
+  payDebt: (id: string, amount?: number, projectId?: string) =>
     apiClient<{ success: boolean }>(`/vendor/suppliers/debts/${id}/pay`, {
       method: 'POST',
+      body: JSON.stringify({ amount, projectId }),
     }),
 
   // Supply Orders

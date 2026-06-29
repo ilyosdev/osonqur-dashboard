@@ -45,11 +45,11 @@ export interface Income {
 }
 
 export interface CreateIncomeRequest {
-  accountId: string;
+  projectId: string;
   amount: number;
-  date: string;
-  category: string;
-  description?: string;
+  source: string;
+  paymentType: 'CASH' | 'CARD' | 'TRANSFER';
+  note?: string;
 }
 
 export interface UpdateIncomeRequest {
@@ -82,11 +82,12 @@ export interface Expense {
 }
 
 export interface CreateExpenseRequest {
-  accountId: string;
+  projectId: string;
   amount: number;
-  date: string;
+  recipient: string;
+  paymentType: 'CASH' | 'CARD' | 'TRANSFER';
   category: string;
-  description?: string;
+  note?: string;
 }
 
 export interface UpdateExpenseRequest {

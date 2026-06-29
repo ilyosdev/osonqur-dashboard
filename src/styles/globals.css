@@ -51,7 +51,7 @@
 
 :root {
   --radius: 0.625rem;
-  --background: #F8FAFC;
+  --background: #FFFFFF;
   --foreground: #0F172A;
   --card: #FFFFFF;
   --card-foreground: #0F172A;
@@ -63,8 +63,8 @@
   --secondary-foreground: #0F172A;
   --muted: #F1F5F9;
   --muted-foreground: #64748B;
-  --accent: #EFF6FF;
-  --accent-foreground: #2563EB;
+  --accent: #F8FAFC;
+  --accent-foreground: #185FA5;
   --destructive: #DC2626;
   --destructive-foreground: #FFFFFF;
   --success: #16A34A;
@@ -81,12 +81,12 @@
   --chart-5: #8B5CF6;
   --sidebar: #FFFFFF;
   --sidebar-foreground: #0F172A;
-  --sidebar-primary: #2563EB;
-  --sidebar-primary-foreground: #FFFFFF;
-  --sidebar-accent: #EFF6FF;
-  --sidebar-accent-foreground: #2563EB;
+  --sidebar-primary: #EFF6FF;
+  --sidebar-primary-foreground: #185FA5;
+  --sidebar-accent: #F8FAFC;
+  --sidebar-accent-foreground: #185FA5;
   --sidebar-border: #E2E8F0;
-  --sidebar-ring: #2563EB;
+  --sidebar-ring: #93C5FD;
 }
 
 .dark {

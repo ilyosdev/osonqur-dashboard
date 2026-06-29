@@ -148,6 +148,7 @@ export default function OrgUsersPage() {
         name: formData.name,
         phone: "+998" + formData.phone.replace(/\s/g, ""),
         password: formData.password,
+        role: formData.role,
         telegramId: formData.telegramId || undefined,
         orgRoleId: formData.orgRoleId || undefined,
       });
@@ -165,11 +166,11 @@ export default function OrgUsersPage() {
     setIsSubmitting(true);
     setFormError("");
     try {
-      const data: Record<string, string | boolean | string[] | undefined> = {};
+      const data: Record<string, string | boolean | string[] | null | undefined> = {};
       if (formData.name.trim()) data.name = formData.name;
       if (formData.phone.trim()) data.phone = "+998" + formData.phone.replace(/\s/g, "");
       if (formData.password.trim()) data.password = formData.password;
-      if (formData.telegramId !== undefined) data.telegramId = formData.telegramId || undefined;
+      data.telegramId = formData.telegramId.trim() ? formData.telegramId.trim() : null;
       if (formData.orgRoleId) { data.orgRoleId = formData.orgRoleId; data.role = formData.role; }
       // Always send allowedRoles (empty array clears them)
       data.allowedRoles = formData.allowedRoles;

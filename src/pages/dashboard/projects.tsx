@@ -15,6 +15,7 @@ import {
   RefreshCw,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { TablePagination } from "@/components/shared/table-pagination";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
@@ -129,8 +130,8 @@ export default function ProjectsPage() {
 
       const response = await projectsApi.getAll(params);
       setProjects(response.data);
-      setTotalPages(response.totalPages);
-      setTotal(response.total);
+      setTotalPages(response.totalPages || Math.max(1, Math.ceil((response.total || response.data.length || 0) / 10)));
+      setTotal(response.total ?? response.data.length ?? 0);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Loyihalarni yuklashda xatolik");
     } finally {
@@ -410,38 +411,7 @@ export default function ProjectsPage() {
         </div>
       )}
 
-      <div className="flex items-center justify-between pt-4">
-        <p className="text-sm text-muted-foreground">Jami: {total} loyiha</p>
-        <div className="flex items-center gap-2">
-          <Button
-            variant="outline"
-            size="sm"
-            disabled={page <= 1}
-            onClick={() => setPage((p) => p - 1)}
-          >
-            Oldingi
-          </Button>
-          {Array.from({ length: Math.min(totalPages, 5) }, (_, i) => i + 1).map((p) => (
-            <Button
-              key={p}
-              variant="outline"
-              size="sm"
-              className={page === p ? "bg-primary text-white hover:bg-primary/90" : ""}
-              onClick={() => setPage(p)}
-            >
-              {p}
-            </Button>
-          ))}
-          <Button
-            variant="outline"
-            size="sm"
-            disabled={page >= totalPages}
-            onClick={() => setPage((p) => p + 1)}
-          >
-            Keyingi
-          </Button>
-        </div>
-      </div>
+      <TablePagination page={page} totalPages={totalPages} onPageChange={setPage} summary={`Jami: ${total} loyiha`} />
 
       <Dialog open={addDialogOpen} onOpenChange={setAddDialogOpen}>
         <DialogContent className="max-w-md">

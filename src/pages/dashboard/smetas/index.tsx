@@ -1,19 +1,15 @@
 import { useState, useEffect, useCallback } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { useNavigate } from "react-router-dom";
+import { useAuth } from "@/lib/auth/auth-context";
 import {
   FileSpreadsheet,
   Search,
-  Plus,
   Building2,
-  Calendar,
   Loader2,
   AlertCircle,
-  RefreshCw,
-  TrendingUp,
-  Banknote,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent } from "@/components/ui/card";
+import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import {
@@ -23,10 +19,19 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
 import { smetasApi, Smeta, SmetaType, GetSmetasParams } from "@/lib/api/smetas";
 import { projectsApi, Project } from "@/lib/api/projects";
 import { ProgressBar } from "@/components/dashboard/progress-bar";
 import { useProject } from "@/lib/project-context";
+import { TablePagination } from "@/components/shared/table-pagination";
 
 const SMETA_TYPE_LABELS: Record<SmetaType, string> = {
   CONSTRUCTION: "Qurilish",
@@ -56,6 +61,8 @@ function formatDate(dateStr: string): string {
 
 export default function SmetasPage() {
   const navigate = useNavigate();
+  const { hasPermission } = useAuth();
+  const canCreate = hasPermission("smeta:edit");
   const { selectedProjectId } = useProject();
   const [smetas, setSmetas] = useState<Smeta[]>([]);
   const [projects, setProjects] = useState<Project[]>([]);
@@ -101,8 +108,8 @@ export default function SmetasPage() {
 
       const response = await smetasApi.getAll(params);
       setSmetas(response.data);
-      setTotalPages(response.totalPages);
-      setTotal(response.total);
+      setTotalPages(response.totalPages || Math.max(1, Math.ceil((response.total || response.data.length || 0) / 10)));
+      setTotal(response.total ?? response.data.length ?? 0);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Smetalarni yuklashda xatolik");
     } finally {
@@ -142,68 +149,6 @@ export default function SmetasPage() {
 
   return (
     <div className="space-y-6 animate-fade-in">
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-        <div>
-          <h1 className="text-2xl font-bold tracking-tight flex items-center gap-2">
-            <FileSpreadsheet className="h-6 w-6 text-primary" />
-            Smetalar
-          </h1>
-          <p className="text-muted-foreground">Barcha smetalarni boshqaring va kuzating</p>
-        </div>
-        <Button
-          className="bg-primary hover:bg-primary/90 shadow-lg shadow-primary/25"
-          onClick={() => navigate("/smetas/new")}
-        >
-          <Plus className="h-4 w-4 mr-2" />
-          Smeta qo'shish
-        </Button>
-      </div>
-
-      <Card className="p-4">
-        <div className="flex flex-col sm:flex-row gap-3">
-          <div className="relative flex-1">
-            <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-            <Input
-              placeholder="Smeta nomi bo'yicha qidirish..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="pl-9 bg-muted/50 border-0"
-            />
-          </div>
-          <div className="flex gap-2">
-            <Select value={projectFilter} onValueChange={setProjectFilter}>
-              <SelectTrigger className="w-[180px] bg-muted/50 border-0">
-                <SelectValue placeholder="Loyiha" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">Barcha loyihalar</SelectItem>
-                {projects.map((project) => (
-                  <SelectItem key={project.id} value={project.id}>
-                    {project.name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-            <Select value={typeFilter} onValueChange={setTypeFilter}>
-              <SelectTrigger className="w-[140px] bg-muted/50 border-0">
-                <SelectValue placeholder="Turi" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">Barcha turlar</SelectItem>
-                {(Object.keys(SMETA_TYPE_LABELS) as SmetaType[]).map((type) => (
-                  <SelectItem key={type} value={type}>
-                    {SMETA_TYPE_LABELS[type]}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-            <Button variant="outline" size="icon" onClick={fetchSmetas} disabled={isLoading}>
-              <RefreshCw className={`h-4 w-4 ${isLoading ? "animate-spin" : ""}`} />
-            </Button>
-          </div>
-        </div>
-      </Card>
-
       {error && (
         <Card className="p-4 border-destructive bg-destructive/10">
           <div className="flex items-center gap-2 text-destructive">
@@ -213,145 +158,127 @@ export default function SmetasPage() {
         </Card>
       )}
 
-      {isLoading ? (
-        <div className="flex items-center justify-center py-12">
-          <Loader2 className="h-8 w-8 animate-spin text-primary" />
-        </div>
-      ) : smetas.length === 0 ? (
-        <Card className="p-8 text-center">
-          <FileSpreadsheet className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
-          <h3 className="text-lg font-semibold mb-2">Smetalar topilmadi</h3>
-          <p className="text-muted-foreground mb-4">
-            {searchQuery || projectFilter !== "all" || typeFilter !== "all"
-              ? "Qidiruv mezonlariga mos smetalar topilmadi"
-              : "Hozircha smetalar yo'q"}
-          </p>
-          <Button onClick={() => navigate("/smetas/new")}>
-            <Plus className="h-4 w-4 mr-2" />
-            Birinchi smetani qo'shing
-          </Button>
-        </Card>
-      ) : (
-        <div className="grid gap-4">
-          {smetas.map((smeta, index) => (
-            <Link
-              key={smeta.id}
-              to={`/smetas/${smeta.id}`}
-              className="block"
-            >
-              <Card
-                className="overflow-hidden transition-all duration-200 hover:shadow-md hover:border-primary/50 animate-slide-up cursor-pointer"
-                style={{ animationDelay: `${index * 0.05}s` }}
+      <Card className="flex min-h-[calc(100vh-120px)] flex-col overflow-hidden rounded-[12px] border border-[#dbe7f3] py-0 shadow-none">
+        <div className="flex flex-wrap items-center justify-between gap-4 border-b border-[#dbe7f3] bg-white px-5 py-3 md:px-6">
+          <div className="flex items-center gap-2">
+            <FileSpreadsheet className="h-[18px] w-[18px] text-[#378add]" />
+            <h3 className="text-[14px] font-semibold tracking-tight text-[#0c447c]">Smetalar</h3>
+          </div>
+          <div className="flex w-full max-w-5xl flex-col items-stretch justify-end gap-3 lg:flex-row lg:items-center">
+            <div className="relative min-w-[260px] flex-1">
+              <Search className="absolute left-3 top-1/2 h-[14px] w-[14px] -translate-y-1/2 text-[#378add]" />
+              <Input
+                placeholder="Smeta nomi bo'yicha qidirish..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                spellCheck={false}
+                className="h-10 rounded-[8px] border border-[#dbe7f3] bg-white pl-9 text-[13px] text-[#0c447c] shadow-none placeholder:text-[#94a3b8]"
+              />
+            </div>
+            {canCreate && (
+              <Button
+                onClick={() => navigate("/smetas/new")}
+                className="h-10 rounded-[8px] bg-[#185fa5] px-4 text-[13px] font-medium text-white hover:bg-[#144f8f]"
               >
-                <CardContent className="p-4">
-                  <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
-                    <div className="space-y-2">
-                      <div className="flex items-center gap-2 flex-wrap">
-                        <h3 className="font-semibold text-lg">{smeta.name}</h3>
-                        <Badge className={SMETA_TYPE_COLORS[smeta.type]}>
-                          {SMETA_TYPE_LABELS[smeta.type]}
-                        </Badge>
-                        {isOverBudget(smeta) && (
-                          <Badge variant="destructive">Byudjetdan oshdi</Badge>
-                        )}
-                        {isDeadlinePassed(smeta) && (
-                          <Badge variant="destructive">Muddat o'tdi</Badge>
-                        )}
-                        {isDeadlineSoon(smeta) && !isDeadlinePassed(smeta) && (
-                          <Badge variant="outline" className="border-warning text-warning">
-                            Muddat yaqin
+                + Yangi smeta
+              </Button>
+            )}
+          </div>
+        </div>
+
+        <div className="flex flex-1 flex-col">
+          <div className="flex flex-1 flex-col overflow-hidden bg-white">
+            <div className="flex-1 overflow-auto">
+              <Table>
+                <TableHeader>
+                  <TableRow className="bg-white hover:bg-white">
+                    <TableHead className="h-12 text-[11px] font-semibold uppercase tracking-[0.04em] text-[#378add]">Smeta</TableHead>
+                    <TableHead className="text-[11px] font-semibold uppercase tracking-[0.04em] text-[#378add]">Loyiha</TableHead>
+                    <TableHead className="text-[11px] font-semibold uppercase tracking-[0.04em] text-[#378add]">Turi</TableHead>
+                    <TableHead className="text-[11px] font-semibold uppercase tracking-[0.04em] text-[#378add]">Byudjet</TableHead>
+                    <TableHead className="text-[11px] font-semibold uppercase tracking-[0.04em] text-[#378add]">Haqiqiy</TableHead>
+                    <TableHead className="w-[180px] text-[11px] font-semibold uppercase tracking-[0.04em] text-[#378add]">Bajarildi</TableHead>
+                    <TableHead className="w-[140px] text-[11px] font-semibold uppercase tracking-[0.04em] text-[#378add]">Muddat</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody className="align-top">
+                  {isLoading ? (
+                    <TableRow>
+                      <TableCell colSpan={7} className="py-20 text-center">
+                        <Loader2 className="mx-auto h-8 w-8 animate-spin text-[#378add]" />
+                      </TableCell>
+                    </TableRow>
+                  ) : smetas.length === 0 ? (
+                    <TableRow>
+                      <TableCell colSpan={7} className="py-20 text-center">
+                        <div className="flex flex-col items-center gap-2 text-[#85b7eb]">
+                          <FileSpreadsheet className="h-10 w-10 opacity-30" />
+                          <p className="text-sm">
+                            {searchQuery || projectFilter !== "all" || typeFilter !== "all"
+                              ? "Qidiruv mezonlariga mos smetalar topilmadi"
+                              : "Hozircha smetalar yo'q"}
+                          </p>
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  ) : (
+                    smetas.map((smeta) => (
+                      <TableRow
+                        key={smeta.id}
+                        className="h-20 cursor-pointer border-b border-[#eef2f7] last:border-b-0 transition-colors hover:bg-[#f8fbff]"
+                        onClick={() => navigate(`/smetas/${smeta.id}`)}
+                      >
+                        <TableCell className="py-4">
+                          <div className="space-y-0.5">
+                            <div className="text-[15px] font-semibold text-[#0c447c]">{smeta.name}</div>
+                            <div className="text-sm text-[#64748b]">v{smeta.currentVersion}</div>
+                          </div>
+                        </TableCell>
+                        <TableCell className="py-4">
+                          <span className="flex items-center gap-2 text-sm text-[#64748b]">
+                            <Building2 className="h-4 w-4 text-[#64748b]" />
+                            {smeta.projectName || "Loyiha"}
+                          </span>
+                        </TableCell>
+                        <TableCell className="py-4">
+                          <Badge className={`${SMETA_TYPE_COLORS[smeta.type]} shadow-none`}>
+                            {SMETA_TYPE_LABELS[smeta.type]}
                           </Badge>
-                        )}
-                      </div>
-                      <div className="flex items-center gap-4 text-sm text-muted-foreground">
-                        <span className="flex items-center gap-1">
-                          <Building2 className="h-3.5 w-3.5" />
-                          {smeta.projectName || "Loyiha"}
-                        </span>
-                        {smeta.deadline && (
-                          <span className="flex items-center gap-1">
-                            <Calendar className="h-3.5 w-3.5" />
-                            {formatDate(smeta.deadline)}
-                          </span>
-                        )}
-                      </div>
-                    </div>
-
-                    <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4 lg:gap-6">
-                      <div className="space-y-1 min-w-[200px]">
-                        <div className="flex justify-between text-sm">
-                          <span className="text-muted-foreground flex items-center gap-1">
-                            <Banknote className="h-3.5 w-3.5" />
-                            Byudjet
-                          </span>
-                          <span className="font-medium">
-                            {formatNumber(smeta.grandTotal)} so'm
-                          </span>
-                        </div>
-                        <div className="flex justify-between text-sm">
-                          <span className="text-muted-foreground flex items-center gap-1">
-                            <TrendingUp className="h-3.5 w-3.5" />
-                            Haqiqiy
-                          </span>
-                          <span className={`font-medium ${isOverBudget(smeta) ? "text-destructive" : ""}`}>
-                            {formatNumber(smeta.totalUsedAmount)} so'm
-                          </span>
-                        </div>
-                      </div>
-
-                      <div className="w-full sm:w-[150px] space-y-1">
-                        <div className="flex justify-between text-xs text-muted-foreground">
-                          <span>Bajarildi</span>
-                          <span>{getProgressPercent(smeta)}%</span>
-                        </div>
-                        <ProgressBar
-                          value={smeta.totalUsedAmount}
-                          max={smeta.grandTotal || 1}
-                          size="sm"
-                          variant={isOverBudget(smeta) ? "destructive" : "default"}
-                        />
-                      </div>
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-            </Link>
-          ))}
+                        </TableCell>
+                        <TableCell className="py-4 font-medium text-[#0c447c]">
+                          {formatNumber(smeta.grandTotal)} so'm
+                        </TableCell>
+                        <TableCell className={`py-4 font-medium ${isOverBudget(smeta) ? "text-destructive" : "text-[#0c447c]"}`}>
+                          {formatNumber(smeta.totalUsedAmount)} so'm
+                        </TableCell>
+                        <TableCell className="py-4">
+                          <div className="space-y-1">
+                            <div className="flex justify-between text-xs text-[#64748b]">
+                              <span>{getProgressPercent(smeta)}%</span>
+                              {isOverBudget(smeta) && <span className="text-destructive">Oshgan</span>}
+                            </div>
+                            <ProgressBar
+                              value={smeta.totalUsedAmount}
+                              max={smeta.grandTotal || 1}
+                              size="sm"
+                              variant={isOverBudget(smeta) ? "destructive" : "default"}
+                            />
+                          </div>
+                        </TableCell>
+                        <TableCell className="py-4 text-sm text-[#64748b]">
+                          {smeta.deadline ? formatDate(smeta.deadline) : "—"}
+                        </TableCell>
+                      </TableRow>
+                    ))
+                  )}
+                </TableBody>
+              </Table>
+            </div>
+          </div>
         </div>
-      )}
 
-      <div className="flex items-center justify-between pt-4">
-        <p className="text-sm text-muted-foreground">Jami: {total} smeta</p>
-        <div className="flex items-center gap-2">
-          <Button
-            variant="outline"
-            size="sm"
-            disabled={page <= 1}
-            onClick={() => setPage((p) => p - 1)}
-          >
-            Oldingi
-          </Button>
-          {Array.from({ length: Math.min(totalPages, 5) }, (_, i) => i + 1).map((p) => (
-            <Button
-              key={p}
-              variant="outline"
-              size="sm"
-              className={page === p ? "bg-primary text-white hover:bg-primary/90" : ""}
-              onClick={() => setPage(p)}
-            >
-              {p}
-            </Button>
-          ))}
-          <Button
-            variant="outline"
-            size="sm"
-            disabled={page >= totalPages}
-            onClick={() => setPage((p) => p + 1)}
-          >
-            Keyingi
-          </Button>
-        </div>
-      </div>
+        <TablePagination page={page} totalPages={totalPages} onPageChange={setPage} summary={`Sahifa ${page} / ${totalPages}`} />
+      </Card>
     </div>
   );
 }

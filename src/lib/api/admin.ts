@@ -29,6 +29,7 @@ export interface CreateOrganizationRequest {
   inn?: string;
   address?: string;
   logo?: string;
+  templateIds?: string[];
 }
 
 export interface CreateOrganizationResponse {
@@ -58,6 +59,7 @@ export interface AdminOrgUser {
   email?: string;
   telegramId?: string;
   role: string;
+  orgRoleId?: string;
   allowedRoles?: string[];
   isActive: boolean;
   createdAt: string;
@@ -130,12 +132,17 @@ export interface AdminPermission {
   groupId?: string;
 }
 
+export type AdminPermissionEntry = AdminPermission & {
+  permissionId?: string;
+  permission?: AdminPermission;
+};
+
 export interface AdminPermissionGroup {
   id: string;
   name: string;
   description?: string;
   sortOrder: number;
-  permissions: AdminPermission[];
+  permissions: AdminPermissionEntry[];
   createdAt: string;
   updatedAt: string;
 }
@@ -146,7 +153,7 @@ export interface AdminRoleTemplate {
   description?: string;
   isSystem: boolean;
   isActive: boolean;
-  permissions: AdminPermission[];
+  permissions: { permissionId: string; permission: AdminPermission }[];
   canManage?: { canManageId: string; managed?: { id: string; name: string } }[];
   createdAt: string;
   updatedAt: string;
@@ -171,7 +178,7 @@ export interface AdminOrgRole {
   templateName?: string;
   isActive: boolean;
   userCount: number;
-  permissions: AdminPermission[];
+  permissions: { permissionId: string; permission: AdminPermission }[];
   canManage?: { canManageId: string; managed?: { id: string; name: string } }[];
   createdAt: string;
   updatedAt: string;
@@ -274,13 +281,13 @@ export const adminApi = {
       { method: 'GET' },
     ),
 
-  createOrgUser: (orgId: string, data: { name: string; phone: string; password: string; role: string; allowedRoles?: string[]; telegramId?: string }) =>
+  createOrgUser: (orgId: string, data: { name: string; phone: string; password: string; role: string; allowedRoles?: string[]; telegramId?: string | null; orgRoleId?: string }) =>
     apiClient<AdminOrgUser>(`/admin/organizations/${orgId}/users`, {
       method: 'POST',
       body: JSON.stringify(data),
     }),
 
-  updateOrgUser: (orgId: string, userId: string, data: { name?: string; phone?: string; password?: string; role?: string; orgRoleId?: string; allowedRoles?: string[]; isActive?: boolean; telegramId?: string }) =>
+  updateOrgUser: (orgId: string, userId: string, data: { name?: string; phone?: string; password?: string; role?: string; orgRoleId?: string; allowedRoles?: string[]; isActive?: boolean; telegramId?: string | null }) =>
     apiClient<AdminOrgUser>(`/admin/organizations/${orgId}/users/${userId}`, {
       method: 'PATCH',
       body: JSON.stringify(data),

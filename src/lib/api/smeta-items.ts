@@ -56,6 +56,7 @@ export interface UpdateSmetaItemRequest {
 
 export interface GetSmetaItemsParams extends PaginationParams {
   smetaId?: string;
+  projectId?: string;
   itemType?: SmetaItemType;
   category?: string;
   search?: string;
@@ -67,6 +68,7 @@ export const smetaItemsApi = {
     if (params?.page) searchParams.append('page', params.page.toString());
     if (params?.limit) searchParams.append('limit', params.limit.toString());
     if (params?.smetaId) searchParams.append('smetaId', params.smetaId);
+    if (params?.projectId) searchParams.append('projectId', params.projectId);
     if (params?.itemType) searchParams.append('itemType', params.itemType);
     if (params?.category) searchParams.append('category', params.category);
     if (params?.search) searchParams.append('search', params.search);
@@ -109,6 +111,11 @@ export const smetaItemsApi = {
   deleteAllBySmeta: (smetaId: string) =>
     apiClient<{ success: boolean; deleted: number }>(`/vendor/smeta-items/smeta/${smetaId}/all`, {
       method: 'DELETE',
+    }),
+
+  getStats: (id: string) =>
+    apiClient<{ planned: number; usedQty: number; requestedQty: number; remaining: number; overrun: boolean; overrunQty: number; unit: string }>(`/vendor/smeta-items/${id}/stats`, {
+      method: 'GET',
     }),
 
   // Smeta comparison

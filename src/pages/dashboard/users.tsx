@@ -17,6 +17,7 @@ import {
   X,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { TablePagination } from "@/components/shared/table-pagination";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
@@ -186,8 +187,8 @@ export default function UsersPage() {
 
       const response = await usersApi.getAll(params);
       setUsers(response.data);
-      setTotalPages(response.totalPages);
-      setTotal(response.total);
+      setTotalPages(response.totalPages || Math.max(1, Math.ceil((response.total || response.data.length || 0) / 10)));
+      setTotal(response.total ?? response.data.length ?? 0);
 
       // Fetch projects for all users
       if (response.data.length > 0) {
@@ -606,38 +607,7 @@ export default function UsersPage() {
         </Card>
       )}
 
-      <div className="flex items-center justify-between pt-4">
-        <p className="text-sm text-muted-foreground">Jami: {total} xodim</p>
-        <div className="flex items-center gap-2">
-          <Button
-            variant="outline"
-            size="sm"
-            disabled={page <= 1}
-            onClick={() => setPage((p) => p - 1)}
-          >
-            Oldingi
-          </Button>
-          {Array.from({ length: Math.min(totalPages, 5) }, (_, i) => i + 1).map((p) => (
-            <Button
-              key={p}
-              variant="outline"
-              size="sm"
-              className={page === p ? "bg-primary text-white hover:bg-primary/90" : ""}
-              onClick={() => setPage(p)}
-            >
-              {p}
-            </Button>
-          ))}
-          <Button
-            variant="outline"
-            size="sm"
-            disabled={page >= totalPages}
-            onClick={() => setPage((p) => p + 1)}
-          >
-            Keyingi
-          </Button>
-        </div>
-      </div>
+      <TablePagination page={page} totalPages={totalPages} onPageChange={setPage} summary={`Jami: ${total} xodim`} />
 
       {/* Add User Dialog */}
       <Dialog open={addDialogOpen} onOpenChange={setAddDialogOpen}>
