@@ -12,6 +12,8 @@ import {
   Calculator,
   Wallet,
   CalendarDays,
+  CheckCircle,
+  XCircle,
 } from "lucide-react";
 import { StatsCard } from "@/components/dashboard/stats-card";
 import { DebtsSection } from "@/components/dashboard/debts-section";
@@ -29,7 +31,7 @@ import {
 import { useAuth } from "@/lib/auth";
 import { usePermission } from "@/hooks";
 import { useApi } from "@/hooks/use-api";
-import { projectsApi, requestsApi, analyticsApi } from "@/lib/api";
+import { projectsApi, requestsApi, analyticsApi, cashRegistersApi } from "@/lib/api";
 import { StatsSkeleton } from "@/components/ui/table-skeleton";
 import { useProject } from "@/lib/project-context";
 
@@ -132,6 +134,28 @@ export default function HomePage() {
     data: requestsResponse,
     loading: requestsLoading,
   } = useApi(() => requestsApi.getAll({ limit: 5, status: "PENDING" }), [], { enabled: canViewRequests });
+
+  // Role-specific stats
+  const canViewKoshelok = hasPermission('cash_register:view') || hasPermission('cash_register:manage');
+  const canViewWorkers = hasPermission('worker:view');
+  const canViewSmetas = hasPermission('smeta:view');
+
+  const { data: myKoshelok, loading: koshelokLoading } = useApi(
+    () => cashRegistersApi.getMyKoshelok(),
+    [],
+    { enabled: canViewKoshelok }
+  );
+
+  const { data: approvedRequestsRes } = useApi(
+    () => requestsApi.getAll({ limit: 1, status: "APPROVED" }),
+    [],
+    { enabled: canViewRequests }
+  );
+  const { data: rejectedRequestsRes } = useApi(
+    () => requestsApi.getAll({ limit: 1, status: "REJECTED" }),
+    [],
+    { enabled: canViewRequests }
+  );
 
   const projects = projectsResponse?.data || [];
   const pendingRequests = requestsResponse?.data || [];
@@ -303,6 +327,115 @@ export default function HomePage() {
             </Card>
           </div>
         )}
+
+      {/* Role-specific stats + Koshelok */}
+      {(canViewKoshelok || canViewRequests || canViewWorkers || canViewSmetas) && !canViewStats && (
+        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+          {/* Koshelok card — visible to any user with cash_register permission */}
+          {canViewKoshelok && (
+            <Card className="animate-slide-up">
+              <CardContent className="pt-5">
+                <div className="flex items-center justify-between mb-3">
+                  <p className="text-sm font-medium text-muted-foreground">Mening koshelogim</p>
+                  <div className="h-9 w-9 rounded-lg bg-[#dbe7f3] flex items-center justify-center">
+                    <Wallet className="h-4 w-4 text-[#185fa5]" />
+                  </div>
+                </div>
+                {koshelokLoading ? (
+                  <div className="h-7 w-24 bg-muted/50 rounded animate-pulse" />
+                ) : (
+                  <>
+                    <p className="text-2xl font-bold text-[#185fa5]">
+                      {formatNumber(myKoshelok?.balance || 0)} <span className="text-sm font-normal text-muted-foreground">so'm</span>
+                    </p>
+                    <div className="flex gap-3 mt-2 text-xs text-muted-foreground">
+                      <span className="text-green-600">+{formatNumber(myKoshelok?.totalIn || 0)}</span>
+                      <span className="text-red-500">−{formatNumber(myKoshelok?.totalOut || 0)}</span>
+                    </div>
+                  </>
+                )}
+              </CardContent>
+            </Card>
+          )}
+
+          {/* Pending requests count */}
+          {canViewRequests && (
+            <Card className="animate-slide-up">
+              <CardContent className="pt-5">
+                <div className="flex items-center justify-between mb-3">
+                  <p className="text-sm font-medium text-muted-foreground">Kutayotgan</p>
+                  <div className="h-9 w-9 rounded-lg bg-amber-50 flex items-center justify-center">
+                    <Clock className="h-4 w-4 text-amber-500" />
+                  </div>
+                </div>
+                <p className="text-2xl font-bold">{requestsResponse?.total ?? 0}</p>
+                <p className="text-xs text-muted-foreground mt-1">zayavka</p>
+              </CardContent>
+            </Card>
+          )}
+
+          {/* Approved requests */}
+          {canViewRequests && (
+            <Card className="animate-slide-up">
+              <CardContent className="pt-5">
+                <div className="flex items-center justify-between mb-3">
+                  <p className="text-sm font-medium text-muted-foreground">Tasdiqlangan</p>
+                  <div className="h-9 w-9 rounded-lg bg-green-50 flex items-center justify-center">
+                    <CheckCircle className="h-4 w-4 text-green-500" />
+                  </div>
+                </div>
+                <p className="text-2xl font-bold text-green-600">{approvedRequestsRes?.total ?? 0}</p>
+                <p className="text-xs text-muted-foreground mt-1">zayavka</p>
+              </CardContent>
+            </Card>
+          )}
+
+          {/* Rejected requests */}
+          {canViewRequests && (
+            <Card className="animate-slide-up">
+              <CardContent className="pt-5">
+                <div className="flex items-center justify-between mb-3">
+                  <p className="text-sm font-medium text-muted-foreground">Rad etilgan</p>
+                  <div className="h-9 w-9 rounded-lg bg-red-50 flex items-center justify-center">
+                    <XCircle className="h-4 w-4 text-red-500" />
+                  </div>
+                </div>
+                <p className="text-2xl font-bold text-red-500">{rejectedRequestsRes?.total ?? 0}</p>
+                <p className="text-xs text-muted-foreground mt-1">zayavka</p>
+              </CardContent>
+            </Card>
+          )}
+        </div>
+      )}
+
+      {/* Koshelok card for users who CAN see finance stats but also have koshelok */}
+      {canViewStats && canViewKoshelok && (
+        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+          <Card className="animate-slide-up">
+            <CardContent className="pt-5">
+              <div className="flex items-center justify-between mb-3">
+                <p className="text-sm font-medium text-muted-foreground">Mening koshelogim</p>
+                <div className="h-9 w-9 rounded-lg bg-[#dbe7f3] flex items-center justify-center">
+                  <Wallet className="h-4 w-4 text-[#185fa5]" />
+                </div>
+              </div>
+              {koshelokLoading ? (
+                <div className="h-7 w-24 bg-muted/50 rounded animate-pulse" />
+              ) : (
+                <>
+                  <p className="text-2xl font-bold text-[#185fa5]">
+                    {formatNumber(myKoshelok?.balance || 0)} <span className="text-sm font-normal text-muted-foreground">so'm</span>
+                  </p>
+                  <div className="flex gap-3 mt-2 text-xs text-muted-foreground">
+                    <span className="text-green-600">+{formatNumber(myKoshelok?.totalIn || 0)}</span>
+                    <span className="text-red-500">−{formatNumber(myKoshelok?.totalOut || 0)}</span>
+                  </div>
+                </>
+              )}
+            </CardContent>
+          </Card>
+        </div>
+      )}
 
       {/* Main Content Grid */}
       {(canViewProjects || canViewRequests) && (
