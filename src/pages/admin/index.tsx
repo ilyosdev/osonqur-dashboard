@@ -1,10 +1,17 @@
 import { useEffect, useState } from "react";
 import { Link, Navigate } from "react-router-dom";
 import { Building2, FolderOpen, Users, UserCog, Plus, Loader2 } from "lucide-react";
-import { Card, CardContent } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
 import { useAuth } from "@/lib/auth";
 import { adminApi, AdminStats } from "@/lib/api/admin";
+
+const C = {
+  blue: "#185fa5",
+  blueDark: "#0c447c",
+  blueLight: "#eff6ff",
+  border: "#dbe7f3",
+  muted: "#64748b",
+  text: "#0f172a",
+};
 
 export default function AdminHomePage() {
   const { user } = useAuth();
@@ -12,130 +19,76 @@ export default function AdminHomePage() {
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
-    const fetchStats = async () => {
-      try {
-        const data = await adminApi.getStats();
-        setStats(data);
-      } catch {
-        // ignore
-      } finally {
-        setIsLoading(false);
-      }
-    };
-    fetchStats();
+    adminApi.getStats().then(setStats).catch(() => {}).finally(() => setIsLoading(false));
   }, []);
 
   const isSuperAdmin = user?.role === "SUPER_ADMIN";
 
-  // ADMIN users can't use the admin dashboard - redirect to their org
   if (user?.role === "ADMIN" && user?.orgId) {
     return <Navigate to={`/admin/organizations/${user.orgId}/users`} replace />;
   }
 
   const statCards = [
-    {
-      title: "Kompaniyalar",
-      value: stats?.totalOrganizations ?? 0,
-      icon: Building2,
-      color: "from-blue-500 to-blue-600",
-      bgColor: "bg-blue-500/10",
-      textColor: "text-blue-600",
-    },
-    ...(isSuperAdmin
-      ? [
-          {
-            title: "Operatorlar",
-            value: stats?.totalOperators ?? 0,
-            icon: UserCog,
-            color: "from-purple-500 to-purple-600",
-            bgColor: "bg-purple-500/10",
-            textColor: "text-purple-600",
-          },
-        ]
-      : []),
-    {
-      title: "Foydalanuvchilar",
-      value: stats?.totalUsers ?? 0,
-      icon: Users,
-      color: "from-green-500 to-green-600",
-      bgColor: "bg-green-500/10",
-      textColor: "text-green-600",
-    },
-    {
-      title: "Loyihalar",
-      value: stats?.totalProjects ?? 0,
-      icon: FolderOpen,
-      color: "from-orange-500 to-orange-600",
-      bgColor: "bg-orange-500/10",
-      textColor: "text-orange-600",
-    },
+    { title: "Kompaniyalar", value: stats?.totalOrganizations ?? 0, icon: Building2, color: C.blue },
+    ...(isSuperAdmin ? [{ title: "Operatorlar", value: stats?.totalOperators ?? 0, icon: UserCog, color: "#7c3aed" }] : []),
+    { title: "Foydalanuvchilar", value: stats?.totalUsers ?? 0, icon: Users, color: "#059669" },
+    { title: "Loyihalar", value: stats?.totalProjects ?? 0, icon: FolderOpen, color: "#d97706" },
   ];
 
   return (
-    <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-bold tracking-tight">
+    <div style={{ fontFamily: "-apple-system, BlinkMacSystemFont, 'Inter', sans-serif" }}>
+      {/* Header */}
+      <div style={{ marginBottom: 24 }}>
+        <h1 style={{ fontSize: 22, fontWeight: 700, color: C.blueDark, margin: 0 }}>
           Xush kelibsiz, {user?.name}!
         </h1>
-        <p className="text-muted-foreground">
-          {isSuperAdmin
-            ? "Tizim boshqaruvi — operatorlar va kompaniyalarni boshqaring"
-            : "Kompaniyalar va foydalanuvchilarni boshqaring"}
+        <p style={{ fontSize: 13, color: C.muted, marginTop: 4 }}>
+          {isSuperAdmin ? "Tizim boshqaruvi — operatorlar va kompaniyalarni boshqaring" : "Kompaniyalar va foydalanuvchilarni boshqaring"}
         </p>
       </div>
 
       {isLoading ? (
-        <div className="flex items-center justify-center py-12">
-          <Loader2 className="h-8 w-8 animate-spin text-primary" />
+        <div style={{ display: "flex", justifyContent: "center", padding: "48px 0" }}>
+          <Loader2 style={{ width: 32, height: 32, color: C.blue, animation: "spin 1s linear infinite" }} />
         </div>
       ) : (
-        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-          {statCards.map((card) => (
-            <Card key={card.title} className="overflow-hidden transition-all duration-300 hover:shadow-md group">
-              <CardContent className="p-5">
-                <div className="flex items-start justify-between">
-                  <div className="space-y-2">
-                    <p className="text-sm font-medium text-muted-foreground">{card.title}</p>
-                    <h3 className="text-2xl font-bold tracking-tight">{card.value}</h3>
-                  </div>
-                  <div className={`flex h-11 w-11 items-center justify-center rounded-xl transition-transform duration-300 group-hover:scale-110 ${card.bgColor}`}>
-                    <card.icon className={`h-5 w-5 ${card.textColor}`} />
-                  </div>
+        <>
+          {/* Stats */}
+          <div style={{ display: "grid", gridTemplateColumns: `repeat(${statCards.length}, 1fr)`, gap: 16, marginBottom: 24 }}>
+            {statCards.map((card) => (
+              <div key={card.title} style={{ background: "#fff", border: `1px solid ${C.border}`, borderRadius: 14, padding: "20px 24px", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+                <div>
+                  <p style={{ fontSize: 12, fontWeight: 600, color: C.muted, textTransform: "uppercase", letterSpacing: "0.04em", margin: 0 }}>{card.title}</p>
+                  <p style={{ fontSize: 32, fontWeight: 700, color: C.blueDark, margin: "6px 0 0" }}>{card.value}</p>
                 </div>
-              </CardContent>
-            </Card>
-          ))}
-        </div>
-      )}
+                <div style={{ width: 48, height: 48, borderRadius: 12, background: card.color + "18", display: "flex", alignItems: "center", justifyContent: "center" }}>
+                  <card.icon style={{ width: 22, height: 22, color: card.color }} />
+                </div>
+              </div>
+            ))}
+          </div>
 
-      <div className="grid gap-4 sm:grid-cols-2">
-        {isSuperAdmin && (
-          <Card className="p-6">
-            <h3 className="font-semibold mb-2">Operator qo'shish</h3>
-            <p className="text-sm text-muted-foreground mb-4">
-              Yangi operator yarating va kompaniyalarni tayinlang
-            </p>
-            <Button asChild>
-              <Link to="/admin/operators">
-                <Plus className="h-4 w-4 mr-2" />
-                Operatorlar
+          {/* Action cards */}
+          <div style={{ display: "grid", gridTemplateColumns: isSuperAdmin ? "1fr 1fr" : "1fr", gap: 16 }}>
+            {isSuperAdmin && (
+              <div style={{ background: "#fff", border: `1px solid ${C.border}`, borderRadius: 14, padding: 24 }}>
+                <h3 style={{ fontSize: 15, fontWeight: 600, color: C.blueDark, margin: "0 0 6px" }}>Operator qo'shish</h3>
+                <p style={{ fontSize: 13, color: C.muted, margin: "0 0 20px" }}>Yangi operator yarating va kompaniyalarni tayinlang</p>
+                <Link to="/admin/operators" style={{ display: "inline-flex", alignItems: "center", gap: 6, height: 38, padding: "0 20px", background: C.blue, color: "#fff", borderRadius: 8, fontSize: 13, fontWeight: 600, textDecoration: "none" }}>
+                  <Plus style={{ width: 15, height: 15 }} /> Operatorlar
+                </Link>
+              </div>
+            )}
+            <div style={{ background: "#fff", border: `1px solid ${C.border}`, borderRadius: 14, padding: 24 }}>
+              <h3 style={{ fontSize: 15, fontWeight: 600, color: C.blueDark, margin: "0 0 6px" }}>Kompaniya qo'shish</h3>
+              <p style={{ fontSize: 13, color: C.muted, margin: "0 0 20px" }}>Yangi kompaniya yarating va boshqaring</p>
+              <Link to="/admin/organizations" style={{ display: "inline-flex", alignItems: "center", gap: 6, height: 38, padding: "0 20px", background: C.blue, color: "#fff", borderRadius: 8, fontSize: 13, fontWeight: 600, textDecoration: "none" }}>
+                <Plus style={{ width: 15, height: 15 }} /> Kompaniyalar
               </Link>
-            </Button>
-          </Card>
-        )}
-        <Card className="p-6">
-          <h3 className="font-semibold mb-2">Kompaniya qo'shish</h3>
-          <p className="text-sm text-muted-foreground mb-4">
-            Yangi kompaniya yarating va boshqaring
-          </p>
-          <Button asChild>
-            <Link to="/admin/organizations">
-              <Plus className="h-4 w-4 mr-2" />
-              Kompaniyalar
-            </Link>
-          </Button>
-        </Card>
-      </div>
+            </div>
+          </div>
+        </>
+      )}
     </div>
   );
 }

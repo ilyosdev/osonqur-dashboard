@@ -29,7 +29,7 @@ export function AdminHeader() {
 
   const roleBadge = user?.platformRole === 'SUPER_ADMIN' ? 'Super Admin' : user?.platformRole === 'OPERATOR' ? 'Operator' : 'User';
   const roleBadgeColor = user?.platformRole === 'SUPER_ADMIN'
-    ? 'bg-destructive/10 text-destructive'
+    ? 'bg-[#eff6ff] text-[#185fa5]'
     : user?.platformRole === 'OPERATOR'
       ? 'bg-orange-500/10 text-orange-600'
       : 'bg-primary/10 text-primary';
@@ -57,8 +57,8 @@ export function AdminHeader() {
               variant="ghost"
               className="flex items-center gap-2 px-2 hover:bg-muted"
             >
-              <Avatar className="h-8 w-8 border-2 border-orange-500/20">
-                <AvatarFallback className="bg-gradient-to-br from-orange-500 to-red-600 text-white text-xs font-semibold">
+              <Avatar className="h-8 w-8 border-2 border-[#dbe7f3]">
+                <AvatarFallback className="bg-[#185fa5] text-white text-xs font-semibold">
                   {user?.name ? getInitials(user.name) : 'A'}
                 </AvatarFallback>
               </Avatar>

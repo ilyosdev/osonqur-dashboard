@@ -93,7 +93,7 @@ export function AdminSidebar() {
     <Sidebar collapsible="icon" className="border-r border-sidebar-border">
       <SidebarHeader className="h-16 flex items-center justify-center border-b border-sidebar-border">
         <Link to="/admin" className="flex items-center gap-2.5 px-2 group-data-[collapsible=icon]:px-0">
-          <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-gradient-to-br from-orange-500 to-red-600 text-white shadow-md shadow-orange-500/25">
+          <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-[#185fa5] text-white shadow-md shadow-blue-500/20">
             <HardHat className="h-5 w-5" />
           </div>
           <div className="flex flex-col group-data-[collapsible=icon]:hidden">

@@ -88,12 +88,16 @@ interface ProjectFormData {
   name: string;
   address: string;
   description: string;
+  startDate: string;
+  buildingsCount: string;
 }
 
 const initialFormData: ProjectFormData = {
   name: "",
   address: "",
   description: "",
+  startDate: "",
+  buildingsCount: "",
 };
 
 export default function ProjectsPage() {
@@ -162,6 +166,8 @@ export default function ProjectsPage() {
         name: formData.name.trim(),
         address: formData.address.trim() || undefined,
         description: formData.description.trim() || undefined,
+        startDate: formData.startDate || undefined,
+        buildingsCount: formData.buildingsCount ? parseInt(formData.buildingsCount) : undefined,
       };
 
       setUploadProgress("Loyiha yaratilmoqda...");
@@ -251,6 +257,8 @@ export default function ProjectsPage() {
       name: project.name || "",
       address: project.address || "",
       description: project.description || "",
+      startDate: project.startDate || "",
+      buildingsCount: project.buildingsCount ? String(project.buildingsCount) : "",
     });
     setFormError(null);
     setEditDialogOpen(true);
@@ -459,6 +467,29 @@ export default function ProjectsPage() {
                 onChange={(e) => setFormData((prev) => ({ ...prev, description: e.target.value }))}
                 rows={3}
               />
+            </div>
+
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-2">
+                <Label htmlFor="startDate">Boshlanish sanasi</Label>
+                <Input
+                  id="startDate"
+                  type="date"
+                  value={formData.startDate}
+                  onChange={(e) => setFormData((prev) => ({ ...prev, startDate: e.target.value }))}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="buildingsCount">Binolar soni</Label>
+                <Input
+                  id="buildingsCount"
+                  type="number"
+                  min="1"
+                  placeholder="1"
+                  value={formData.buildingsCount}
+                  onChange={(e) => setFormData((prev) => ({ ...prev, buildingsCount: e.target.value }))}
+                />
+              </div>
             </div>
 
             <div className="space-y-2 border-t pt-4">

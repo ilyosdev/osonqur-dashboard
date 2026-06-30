@@ -8,6 +8,8 @@ export interface Project {
   budget?: number;
   status: string;
   floors?: number;
+  buildingsCount?: number;
+  startDate?: string;
   createdAt: string;
   updatedAt: string;
 }
@@ -19,6 +21,8 @@ export interface CreateProjectRequest {
   budget?: number;
   status?: string;
   floors?: number;
+  buildingsCount?: number;
+  startDate?: string;
 }
 
 export interface UpdateProjectRequest {
@@ -28,6 +32,8 @@ export interface UpdateProjectRequest {
   budget?: number;
   status?: string;
   floors?: number;
+  buildingsCount?: number;
+  startDate?: string;
 }
 
 export interface GetProjectsParams extends PaginationParams {
