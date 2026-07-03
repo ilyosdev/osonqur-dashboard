@@ -22,7 +22,10 @@ export interface WarehouseItem {
   id: string;
   warehouseId: string;
   smetaItemId: string;
+  name: string;
+  unit: string;
   quantity: number;
+  unitPrice?: number;
   vendorId: string;
   createdAt: string;
   updatedAt: string;

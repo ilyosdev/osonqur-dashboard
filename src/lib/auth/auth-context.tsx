@@ -10,6 +10,7 @@ interface User {
   role: string;
   platformRole?: string;
   orgRoleId?: string;
+  orgRoleName?: string;
   orgId: string;
 }
 

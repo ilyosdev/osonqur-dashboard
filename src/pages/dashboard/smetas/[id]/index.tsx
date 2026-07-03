@@ -1,12 +1,12 @@
 import { useState, useEffect, useCallback, useRef } from "react";
-import { useParams, useNavigate } from "react-router-dom";
+import { useParams, useNavigate, useSearchParams } from "react-router-dom";
 import {
   FileSpreadsheet, ChevronLeft, Download, Calendar, Loader2, Package,
   Banknote, TrendingUp, Plus, Edit2, Check, X, Building2, AlertCircle,
-  Upload, Trash2,
+  Upload, Trash2, Save,
 } from "lucide-react";
 import { smetasApi, Smeta, SmetaType } from "@/lib/api/smetas";
-import { smetaItemsApi, SmetaItem, SmetaItemType } from "@/lib/api/smeta-items";
+import { smetaItemsApi, SmetaItem, SmetaItemType, CreateSmetaItemRequest } from "@/lib/api/smeta-items";
 import { uploadApi, ParsedSmetaItem } from "@/lib/api/upload";
 import { ExcelUpload } from "@/components/dashboard/excel-upload";
 import { useAuth } from "@/lib/auth";
@@ -87,6 +87,14 @@ function StatsRow({ itemId }: { itemId: string }) {
 export default function SmetaDetailPage() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const isAdmin = window.location.pathname.startsWith("/admin");
+  const prefix = isAdmin ? "/admin" : "";
+  const backOrgId = searchParams.get("orgId");
+  const backProjectId = searchParams.get("projectId");
+  const backUrl = isAdmin && backOrgId && backProjectId
+    ? `/admin/organizations/${backOrgId}/projects/${backProjectId}`
+    : null;
   const { user } = useAuth();
   const [smeta, setSmeta] = useState<Smeta | null>(null);
   const [items, setItems] = useState<SmetaItem[]>([]);
@@ -104,8 +112,16 @@ export default function SmetaDetailPage() {
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
 
+  // Add item modal
+  const [showAddModal, setShowAddModal] = useState(false);
+  const [addForm, setAddForm] = useState({ itemType: "MATERIAL" as SmetaItemType, category: "", code: "", name: "", unit: "", quantity: 0, quantityDisplay: "", unitPrice: 0, unitPriceDisplay: "" });
+  const [addError, setAddError] = useState<string | null>(null);
+  const [isAddLoading, setIsAddLoading] = useState(false);
+  // Excel modal
+  const [showExcelModal, setShowExcelModal] = useState(false);
+
   const canEditProgress = ["PRORAB", "DIREKTOR", "BOSS"].includes(user?.role ?? "");
-  const canUpload = ["DIREKTOR", "BOSS", "PTO", "OPERATOR", "ADMIN"].includes(user?.role ?? "");
+  const canUpload = isAdmin || ["DIREKTOR", "BOSS", "PTO", "OPERATOR", "ADMIN"].includes(user?.role ?? "");
 
   const fetchData = useCallback(async () => {
     if (!id) return;
@@ -172,6 +188,76 @@ export default function SmetaDetailPage() {
     } finally { setIsDeleting(false); }
   };
 
+  const parseNum = (v: string) => parseFloat(v.replace(/[^\d.]/g, "")) || 0;
+  const fmtNum = (n: number) => n === 0 ? "" : n.toLocaleString("uz-UZ");
+
+  const openAddModal = () => {
+    setAddForm({ itemType: "MATERIAL", category: "", code: "", name: "", unit: "", quantity: 0, quantityDisplay: "", unitPrice: 0, unitPriceDisplay: "" });
+    setAddError(null);
+    setShowAddModal(true);
+  };
+
+  const handleAddSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!id) return;
+    if (!addForm.name.trim()) { setAddError("Element nomini kiriting"); return; }
+    if (!addForm.unit.trim()) { setAddError("O'lchov birligini kiriting"); return; }
+    if (addForm.quantity <= 0) { setAddError("Miqdorni kiriting"); return; }
+    if (addForm.unitPrice <= 0) { setAddError("Narxni kiriting"); return; }
+    setIsAddLoading(true);
+    setAddError(null);
+    try {
+      const payload: CreateSmetaItemRequest = {
+        smetaId: id,
+        itemType: addForm.itemType,
+        category: addForm.category.trim() || addForm.itemType,
+        code: addForm.code.trim() || undefined,
+        name: addForm.name.trim(),
+        unit: addForm.unit.trim(),
+        quantity: addForm.quantity,
+        unitPrice: addForm.unitPrice,
+      };
+      await smetaItemsApi.create(payload);
+      setShowAddModal(false);
+      fetchData();
+    } catch (err) {
+      setAddError(err instanceof Error ? err.message : "Xatolik");
+    } finally {
+      setIsAddLoading(false);
+    }
+  };
+
+  const openExcelModal = () => {
+    setParsedItems([]); setUploadedFile(null); setImportError(null); setImportProgress(null);
+    setShowExcelModal(true);
+  };
+
+  const handleExcelImport = async () => {
+    if (!id || parsedItems.length === 0) return;
+    setIsImporting(true);
+    setImportError(null);
+    try {
+      if (parsedItems.length >= 1000 && uploadedFile) {
+        setImportProgress(`Import qilinmoqda (${parsedItems.length} ta)...`);
+        const result = await uploadApi.directImport(id, uploadedFile, "auto");
+        console.log("directImport result:", result);
+        if (result.errors && result.errors.length > 0) setImportError(result.errors.join("; "));
+        await fetchData();
+        setParsedItems([]); setUploadedFile(null); setShowExcelModal(false);
+      } else {
+        setImportProgress(`Import qilinmoqda (${parsedItems.length} ta)...`);
+        const result = await uploadApi.importSmetaItems(id, parsedItems);
+        console.log("importSmetaItems result:", result);
+        if (result.errors && result.errors.length > 0) setImportError(result.errors.join("; "));
+        await fetchData();
+        setParsedItems([]); setUploadedFile(null); setShowExcelModal(false);
+      }
+    } catch (err) {
+      console.error("Import error:", err);
+      setImportError(err instanceof Error ? err.message : "Import xatoligi");
+    } finally { setIsImporting(false); setImportProgress(null); }
+  };
+
   const plannedBudget = items.reduce((s, i) => s + i.totalAmount, 0);
   const totalUsed = items.reduce((s, i) => s + i.usedAmount, 0);
   const overallPct = plannedBudget > 0 ? Math.min(100, Math.round((totalUsed / plannedBudget) * 100)) : 0;
@@ -190,7 +276,7 @@ export default function SmetaDetailPage() {
 
   if (error || !smeta) return (
     <div style={{ fontFamily: "-apple-system, BlinkMacSystemFont, 'Inter', sans-serif" }}>
-      <button onClick={() => navigate("/smetas")} style={{ display: "flex", alignItems: "center", gap: 4, fontSize: 13, color: C.blue, background: "none", border: "none", cursor: "pointer", marginBottom: 16 }}>
+      <button onClick={() => navigate(backUrl ?? (smeta ? `${prefix}/projects/${smeta.projectId}` : -1 as any))} style={{ display: "flex", alignItems: "center", gap: 4, fontSize: 13, color: C.blue, background: "none", border: "none", cursor: "pointer", marginBottom: 16 }}>
         <ChevronLeft size={16} /> Ortga
       </button>
       <div style={{ background: "#fef2f2", border: "1px solid #fecaca", borderRadius: 10, padding: 16, color: C.red, fontSize: 13 }}>
@@ -201,18 +287,15 @@ export default function SmetaDetailPage() {
 
   return (
     <div style={{ fontFamily: "-apple-system, BlinkMacSystemFont, 'Inter', sans-serif" }}>
-      {/* Back */}
-      <div style={{ marginBottom: 16 }}>
-        <button onClick={() => navigate("/smetas")} style={{ display: "flex", alignItems: "center", gap: 4, fontSize: 13, color: C.blue, background: "none", border: "none", cursor: "pointer", padding: "6px 10px", borderRadius: 8 }}>
-          <ChevronLeft size={16} /> Ortga
-        </button>
-      </div>
-
       {/* Header + Stats */}
       <div style={{ background: "#fff", border: `1px solid ${C.border}`, borderRadius: 16, overflow: "hidden", marginBottom: 16 }}>
         <div style={{ padding: "20px 24px", background: "#f8fbff", borderBottom: `1px solid ${C.border}`, display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 16 }}>
           <div>
             <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8 }}>
+              <button onClick={() => navigate(backUrl ?? (smeta ? `${prefix}/projects/${smeta.projectId}` : -1 as any))} style={{ display: "flex", alignItems: "center", gap: 4, fontSize: 13, color: C.blue, background: "none", border: "none", cursor: "pointer", padding: 0 }}>
+                <ChevronLeft size={16} /> Ortga
+              </button>
+              <span style={{ color: C.border }}>|</span>
               <FileSpreadsheet size={16} color={C.blue} />
               <span style={{ fontSize: 13, color: C.muted }}>Smeta</span>
               <span style={{ fontSize: 12, fontWeight: 600, background: C.blueLight, color: C.blue, borderRadius: 6, padding: "2px 8px" }}>{SMETA_TYPE_LABELS[smeta.type]}</span>
@@ -267,39 +350,6 @@ export default function SmetaDetailPage() {
         </div>
       </div>
 
-      {/* Excel upload */}
-      {showUpload && canUpload && (
-        <div style={{ marginBottom: 16 }}>
-          <ExcelUpload<ParsedSmetaItem>
-            title="Excel dan smeta elementlarini yuklash"
-            description="Smeta elementlarini o'z ichiga olgan Excel faylini yuklang"
-            onParsed={(data, warnings, file) => { setParsedItems(data); if (file) setUploadedFile(file); if (warnings.length) console.log(warnings); }}
-            parseFunction={uploadApi.parseSmetaItems}
-            supportsAi={true}
-          />
-          {parsedItems.length > 0 && (
-            <div style={{ background: "#fff", border: `1px solid ${C.border}`, borderRadius: 14, padding: 20, marginTop: 12 }}>
-              <div style={{ fontSize: 14, fontWeight: 600, color: C.blueDark, marginBottom: 12 }}>{parsedItems.length} ta element topildi</div>
-              <div style={{ maxHeight: 200, overflowY: "auto", marginBottom: 12 }}>
-                {parsedItems.slice(0, 10).map((item, i) => (
-                  <div key={i} style={{ display: "flex", justifyContent: "space-between", fontSize: 12, padding: "6px 8px", background: "#f8fbff", borderRadius: 6, marginBottom: 4 }}>
-                    <span style={{ fontWeight: 500 }}>{item.name}</span>
-                    <span style={{ color: C.muted }}>{item.quantity} {item.unit} × {fmt(item.unitPrice)}</span>
-                  </div>
-                ))}
-                {parsedItems.length > 10 && <p style={{ fontSize: 12, color: C.muted, textAlign: "center" }}>... va yana {parsedItems.length - 10} ta</p>}
-              </div>
-              {importError && <div style={{ fontSize: 12, color: C.red, marginBottom: 12 }}>{importError}</div>}
-              <div style={{ display: "flex", justifyContent: "flex-end", gap: 8 }}>
-                <button onClick={() => { setParsedItems([]); setUploadedFile(null); setShowUpload(false); }} style={{ height: 36, padding: "0 16px", borderRadius: 8, border: `1px solid ${C.border}`, background: "#fff", fontSize: 13, color: C.muted, cursor: "pointer" }}>Bekor qilish</button>
-                <button onClick={handleImport} disabled={isImporting} style={{ height: 36, padding: "0 16px", borderRadius: 8, border: "none", background: isImporting ? "#94a3b8" : C.blue, fontSize: 13, fontWeight: 600, color: "#fff", cursor: isImporting ? "not-allowed" : "pointer" }}>
-                  {isImporting ? (importProgress || "Import qilinmoqda...") : `Import qilish (${parsedItems.length})`}
-                </button>
-              </div>
-            </div>
-          )}
-        </div>
-      )}
 
       {/* Delete confirm */}
       {showDeleteConfirm && (
@@ -334,11 +384,11 @@ export default function SmetaDetailPage() {
               </button>
             )}
             {canUpload && (
-              <button onClick={() => setShowUpload(!showUpload)} style={{ height: 34, padding: "0 12px", borderRadius: 8, border: `1px solid ${C.border}`, background: showUpload ? C.blueLight : "#fff", fontSize: 12, color: C.blue, cursor: "pointer", display: "flex", alignItems: "center", gap: 6 }}>
+              <button onClick={openExcelModal} style={{ height: 34, padding: "0 12px", borderRadius: 8, border: "none", background: C.blue, fontSize: 12, fontWeight: 600, color: "#fff", cursor: "pointer", display: "flex", alignItems: "center", gap: 6 }}>
                 <Upload size={13} /> Excel yuklash
               </button>
             )}
-            <button onClick={() => navigate(`/smetas/${id}/add-item`)} style={{ height: 34, padding: "0 14px", borderRadius: 8, border: "none", background: C.blue, fontSize: 12, fontWeight: 600, color: "#fff", cursor: "pointer", display: "flex", alignItems: "center", gap: 6 }}>
+            <button onClick={openAddModal} style={{ height: 34, padding: "0 14px", borderRadius: 8, border: "none", background: C.blue, fontSize: 12, fontWeight: 600, color: "#fff", cursor: "pointer", display: "flex", alignItems: "center", gap: 6 }}>
               <Plus size={13} /> Element qo'shish
             </button>
           </div>
@@ -349,7 +399,7 @@ export default function SmetaDetailPage() {
             <div style={{ textAlign: "center", padding: "40px 0", color: C.muted }}>
               <Package size={40} color="#dbe7f3" style={{ margin: "0 auto 12px" }} />
               <p style={{ fontSize: 14, marginBottom: 16 }}>Bu smetada hali elementlar yo'q</p>
-              <button onClick={() => navigate(`/smetas/${id}/add-item`)} style={{ height: 38, padding: "0 18px", borderRadius: 8, border: "none", background: C.blue, fontSize: 13, fontWeight: 600, color: "#fff", cursor: "pointer", display: "inline-flex", alignItems: "center", gap: 6 }}>
+              <button onClick={openAddModal} style={{ height: 38, padding: "0 18px", borderRadius: 8, border: "none", background: C.blue, fontSize: 13, fontWeight: 600, color: "#fff", cursor: "pointer", display: "inline-flex", alignItems: "center", gap: 6 }}>
                 <Plus size={14} /> Birinchi elementni qo'shing
               </button>
             </div>
@@ -451,6 +501,121 @@ export default function SmetaDetailPage() {
           )}
         </div>
       </div>
+
+      {/* Add Item Modal */}
+      {showAddModal && (
+        <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.4)", zIndex: 50, display: "flex", alignItems: "center", justifyContent: "center", padding: 16 }}>
+          <div style={{ background: "#fff", borderRadius: 16, width: "100%", maxWidth: 560, boxShadow: "0 20px 60px rgba(0,0,0,0.15)", overflow: "hidden" }}>
+            <div style={{ padding: "18px 24px", borderBottom: `1px solid ${C.border}`, background: "#f8fbff", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                <Package size={18} color={C.blue} />
+                <span style={{ fontSize: 15, fontWeight: 700, color: C.blueDark }}>Yangi element qo'shish</span>
+              </div>
+              <button onClick={() => setShowAddModal(false)} style={{ background: "none", border: "none", cursor: "pointer", color: C.muted, fontSize: 22, lineHeight: 1 }}>×</button>
+            </div>
+            <form onSubmit={handleAddSubmit} style={{ padding: 24 }}>
+              {addError && <div style={{ display: "flex", alignItems: "center", gap: 8, background: "#fef2f2", border: "1px solid #fecaca", borderRadius: 8, padding: "10px 14px", marginBottom: 16, fontSize: 13, color: C.red }}><AlertCircle size={14} /> {addError}</div>}
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14, marginBottom: 14 }}>
+                <div>
+                  <label style={{ fontSize: 11, fontWeight: 600, color: C.muted, marginBottom: 5, display: "block", textTransform: "uppercase", letterSpacing: "0.04em" }}>Element turi</label>
+                  <select value={addForm.itemType} onChange={e => setAddForm(p => ({ ...p, itemType: e.target.value as SmetaItemType }))} style={{ width: "100%", height: 38, border: `1px solid ${C.border}`, borderRadius: 8, padding: "0 10px", fontSize: 13, color: C.blueDark, background: "#fff" }}>
+                    {[{ value: "MATERIAL", label: "Material" }, { value: "WORK", label: "Ish" }, { value: "MACHINE", label: "Texnika" }, { value: "OTHER", label: "Boshqa" }].map(t => <option key={t.value} value={t.value}>{t.label}</option>)}
+                  </select>
+                </div>
+                <div>
+                  <label style={{ fontSize: 11, fontWeight: 600, color: C.muted, marginBottom: 5, display: "block", textTransform: "uppercase", letterSpacing: "0.04em" }}>Kategoriya</label>
+                  <input style={{ width: "100%", height: 38, border: `1px solid ${C.border}`, borderRadius: 8, padding: "0 10px", fontSize: 13, color: C.blueDark, background: "#fff", boxSizing: "border-box" }} placeholder="Masalan: Beton ishlari" value={addForm.category} onChange={e => setAddForm(p => ({ ...p, category: e.target.value }))} />
+                </div>
+              </div>
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14, marginBottom: 14 }}>
+                <div>
+                  <label style={{ fontSize: 11, fontWeight: 600, color: C.muted, marginBottom: 5, display: "block", textTransform: "uppercase", letterSpacing: "0.04em" }}>Kod (ixtiyoriy)</label>
+                  <input style={{ width: "100%", height: 38, border: `1px solid ${C.border}`, borderRadius: 8, padding: "0 10px", fontSize: 13, color: C.blueDark, background: "#fff", boxSizing: "border-box" }} placeholder="EP-01-001" value={addForm.code} onChange={e => setAddForm(p => ({ ...p, code: e.target.value }))} />
+                </div>
+                <div>
+                  <label style={{ fontSize: 11, fontWeight: 600, color: C.muted, marginBottom: 5, display: "block", textTransform: "uppercase", letterSpacing: "0.04em" }}>Nomi *</label>
+                  <input style={{ width: "100%", height: 38, border: `1px solid ${C.border}`, borderRadius: 8, padding: "0 10px", fontSize: 13, color: C.blueDark, background: "#fff", boxSizing: "border-box" }} placeholder="Masalan: Beton M200" value={addForm.name} onChange={e => setAddForm(p => ({ ...p, name: e.target.value }))} />
+                </div>
+              </div>
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14, marginBottom: 14 }}>
+                <div>
+                  <label style={{ fontSize: 11, fontWeight: 600, color: C.muted, marginBottom: 5, display: "block", textTransform: "uppercase", letterSpacing: "0.04em" }}>Miqdor + O'lchov</label>
+                  <div style={{ display: "flex", gap: 6 }}>
+                    <input style={{ flex: 1, height: 38, border: `1px solid ${C.border}`, borderRadius: 8, padding: "0 10px", fontSize: 13, color: C.blueDark, background: "#fff", boxSizing: "border-box" }} placeholder="0" value={addForm.quantityDisplay} onChange={e => { const n = parseNum(e.target.value); setAddForm(p => ({ ...p, quantity: n, quantityDisplay: fmtNum(n) })); }} />
+                    <input style={{ width: 80, height: 38, border: `1px solid ${C.border}`, borderRadius: 8, padding: "0 8px", fontSize: 13, color: C.blueDark, background: "#fff", textAlign: "center", boxSizing: "border-box" }} placeholder="dona" value={addForm.unit} onChange={e => setAddForm(p => ({ ...p, unit: e.target.value }))} />
+                  </div>
+                </div>
+                <div>
+                  <label style={{ fontSize: 11, fontWeight: 600, color: C.muted, marginBottom: 5, display: "block", textTransform: "uppercase", letterSpacing: "0.04em" }}>Birlik narxi *</label>
+                  <div style={{ position: "relative" }}>
+                    <input style={{ width: "100%", height: 38, border: `1px solid ${C.border}`, borderRadius: 8, padding: "0 44px 0 10px", fontSize: 13, color: C.blueDark, background: "#fff", boxSizing: "border-box" }} placeholder="0" value={addForm.unitPriceDisplay} onChange={e => { const n = parseNum(e.target.value); setAddForm(p => ({ ...p, unitPrice: n, unitPriceDisplay: fmtNum(n) })); }} />
+                    <span style={{ position: "absolute", right: 10, top: "50%", transform: "translateY(-50%)", fontSize: 11, color: C.muted }}>so'm</span>
+                  </div>
+                </div>
+              </div>
+              {addForm.quantity > 0 && addForm.unitPrice > 0 && (
+                <div style={{ background: C.blueLight, border: `1px solid ${C.border}`, borderRadius: 8, padding: "10px 14px", marginBottom: 16, display: "flex", justifyContent: "space-between" }}>
+                  <span style={{ fontSize: 13, color: C.muted }}>Jami:</span>
+                  <span style={{ fontSize: 14, fontWeight: 700, color: C.blueDark }}>{fmt(addForm.quantity * addForm.unitPrice)} so'm</span>
+                </div>
+              )}
+              <div style={{ display: "flex", justifyContent: "flex-end", gap: 10 }}>
+                <button type="button" onClick={() => setShowAddModal(false)} style={{ height: 38, padding: "0 18px", borderRadius: 8, border: `1px solid ${C.border}`, background: "#fff", fontSize: 13, color: C.muted, cursor: "pointer" }}>Bekor qilish</button>
+                <button type="submit" disabled={isAddLoading} style={{ height: 38, padding: "0 20px", borderRadius: 8, border: "none", background: isAddLoading ? "#94a3b8" : C.blue, fontSize: 13, fontWeight: 600, color: "#fff", cursor: isAddLoading ? "not-allowed" : "pointer", display: "flex", alignItems: "center", gap: 8 }}>
+                  <Save size={14} />{isAddLoading ? "Qo'shilmoqda..." : "Qo'shish"}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Excel Upload Modal */}
+      {showExcelModal && (
+        <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.4)", zIndex: 50, display: "flex", alignItems: "center", justifyContent: "center", padding: 16 }}>
+          <div style={{ background: "#fff", borderRadius: 16, width: "100%", maxWidth: 960, boxShadow: "0 20px 60px rgba(0,0,0,0.15)", overflow: "hidden" }}>
+            <div style={{ padding: "18px 24px", borderBottom: `1px solid ${C.border}`, background: "#f8fbff", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                <Upload size={18} color={C.blue} />
+                <span style={{ fontSize: 15, fontWeight: 700, color: C.blueDark }}>Excel yuklash</span>
+              </div>
+              <button onClick={() => setShowExcelModal(false)} style={{ background: "none", border: "none", cursor: "pointer", color: C.muted, fontSize: 22, lineHeight: 1 }}>×</button>
+            </div>
+            <div style={{ padding: 24, maxHeight: "calc(85vh - 70px)", overflowY: "auto" }}>
+              {parsedItems.length === 0 ? (
+                <ExcelUpload<ParsedSmetaItem>
+                  title="Smeta elementlarini yuklash"
+                  description="Smeta elementlarini o'z ichiga olgan Excel faylini yuklang"
+                  onParsed={(data, warnings, file) => { setParsedItems(data); if (file) setUploadedFile(file); if (warnings.length) console.log(warnings); }}
+                  parseFunction={uploadApi.parseSmetaItems}
+                  supportsAi={true}
+                />
+              ) : (
+                <div>
+                  <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 12 }}>
+                    <div style={{ fontSize: 14, fontWeight: 600, color: C.blueDark }}>{parsedItems.length} ta element topildi</div>
+                    <button onClick={() => { setParsedItems([]); setUploadedFile(null); }} style={{ height: 30, padding: "0 12px", borderRadius: 6, border: `1px solid ${C.border}`, background: "#fff", fontSize: 12, color: C.muted, cursor: "pointer" }}>Tozalash</button>
+                  </div>
+                  <div style={{ overflowY: "auto", maxHeight: "calc(85vh - 200px)", border: `1px solid ${C.border}`, borderRadius: 8, marginBottom: 12 }}>
+                    {parsedItems.map((item, i) => (
+                      <div key={i} style={{ display: "flex", justifyContent: "space-between", fontSize: 12, padding: "7px 12px", borderBottom: i < parsedItems.length - 1 ? `1px solid ${C.border}` : "none" }}>
+                        <span style={{ fontWeight: 500 }}>{item.name}</span>
+                        <span style={{ color: C.muted, whiteSpace: "nowrap", marginLeft: 8 }}>{item.quantity} {item.unit} × {fmt(item.unitPrice)}</span>
+                      </div>
+                    ))}
+                  </div>
+                  {importError && <div style={{ fontSize: 12, color: C.red, marginBottom: 10 }}>{importError}</div>}
+                  <div style={{ display: "flex", justifyContent: "flex-end" }}>
+                    <button onClick={handleExcelImport} disabled={isImporting} style={{ height: 38, padding: "0 24px", borderRadius: 8, border: "none", background: isImporting ? "#94a3b8" : C.blue, fontSize: 13, fontWeight: 600, color: "#fff", cursor: isImporting ? "not-allowed" : "pointer" }}>
+                      {isImporting ? (importProgress || "Import qilinmoqda...") : `Import qilish (${parsedItems.length})`}
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

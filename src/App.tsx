@@ -44,6 +44,7 @@ import OrganizationsPage from '@/pages/admin/organizations/index';
 import OrgUsersPage from '@/pages/admin/organizations/users';
 import OrgProjectsPage from '@/pages/admin/organizations/projects';
 import OrgProjectDetailPage from '@/pages/admin/organizations/project-detail';
+import BuildingDetailPage from '@/pages/admin/organizations/building-detail';
 import PermissionGroupsPage from '@/pages/admin/permission-groups';
 import RoleTemplatesPage from '@/pages/admin/role-templates';
 import OrgRolesPage from '@/pages/admin/org-roles';
@@ -71,6 +72,7 @@ function App() {
         <Route path="/admin/organizations/:orgId/users" element={<OrgUsersPage />} />
         <Route path="/admin/organizations/:orgId/projects" element={<OrgProjectsPage />} />
         <Route path="/admin/organizations/:orgId/projects/:projectId" element={<OrgProjectDetailPage />} />
+        <Route path="/admin/organizations/:orgId/projects/:projectId/buildings/:buildingId" element={<BuildingDetailPage />} />
         <Route path="/admin/smetas/:id" element={<SmetaDetailPage />} />
         <Route path="/admin/smetas/:id/add-item" element={<AddSmetaItemPage />} />
         <Route path="/admin/permission-groups" element={<PermissionGroupsPage />} />

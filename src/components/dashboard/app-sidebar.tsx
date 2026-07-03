@@ -55,6 +55,7 @@ import {
 } from "@/components/ui/select";
 import { useAuth } from "@/lib/auth";
 import { useProject } from "@/lib/project-context";
+import { useBuilding } from "@/lib/building-context";
 
 type NavItem = {
   title: string;
@@ -76,7 +77,7 @@ const mainNavItems: NavItem[] = [
     title: "Loyihalar",
     url: "/projects",
     icon: Building2,
-    permissions: ["smeta:view", "request:create", "request:view_all", "worker:view", "order:view", "warehouse:view", "driver:view_assigned", "moderator:view_pending", "statistics:view"],
+    permissions: ["project:create", "project:edit", "project:view"],
   },
   {
     title: "Xodimlar",
@@ -165,6 +166,7 @@ export function AppSidebar() {
   const pathname = location.pathname;
   const { user, hasPermission, logout } = useAuth();
   const { projects, selectedProject, selectedProjectId, selectProject } = useProject();
+  const { buildings, selectedBuildingId, selectBuilding } = useBuilding();
 
   const isActive = (url: string) => {
     if (url === "/") return pathname === "/";
@@ -261,6 +263,29 @@ export function AppSidebar() {
             <p className="rounded-md bg-slate-100 px-2.5 py-1.5 text-xs text-sidebar-foreground/60">
               Avval loyihani tanlang
             </p>
+          </div>
+        )}
+
+        {/* Building Selector — only shown if selected project has buildings */}
+        {hasProject && buildings.length > 0 && (
+          <div className="px-2 pb-1 group-data-[collapsible=icon]:hidden">
+            <Select
+              value={selectedBuildingId || "__all__"}
+              onValueChange={(v) => selectBuilding(v === "__all__" ? null : v)}
+            >
+              <SelectTrigger className="h-9 w-full rounded-lg border-sidebar-border bg-white text-sidebar-foreground shadow-none text-[13px]">
+                <div className="flex items-center gap-2 truncate">
+                  <Building2 className="h-3.5 w-3.5 shrink-0 text-sidebar-foreground/55" />
+                  <SelectValue placeholder="Bino tanlang..." />
+                </div>
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="__all__" className="text-[13px] text-muted-foreground">— Barcha binolar</SelectItem>
+                {buildings.map((b) => (
+                  <SelectItem key={b.id} value={b.id} className="text-[13px]">{b.name}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           </div>
         )}
 

@@ -56,6 +56,8 @@ function formatNumberInput(value: number): string {
 export default function AddSmetaItemPage() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
+  const isAdmin = window.location.pathname.startsWith("/admin");
+  const prefix = isAdmin ? "/admin" : "";
   const [smeta, setSmeta] = useState<Smeta | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -111,7 +113,7 @@ export default function AddSmetaItemPage() {
         unitPrice: formData.unitPrice,
       };
       await smetaItemsApi.create(payload);
-      navigate(`/smetas/${id}`);
+      navigate(`${prefix}/smetas/${id}`);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Element qo'shishda xatolik");
     } finally {
@@ -124,7 +126,7 @@ export default function AddSmetaItemPage() {
       {/* Back */}
       <div style={{ marginBottom: 20 }}>
         <button
-          onClick={() => navigate(`/smetas/${id}`)}
+          onClick={() => navigate(`${prefix}/smetas/${id}`)}
           style={{ display: "flex", alignItems: "center", gap: 4, fontSize: 13, color: C.blue, background: "none", border: "none", cursor: "pointer", padding: "6px 10px", borderRadius: 8 }}
         >
           <ChevronLeft size={16} /> Ortga
@@ -243,7 +245,7 @@ export default function AddSmetaItemPage() {
           <div style={{ display: "flex", justifyContent: "flex-end", gap: 10 }}>
             <button
               type="button"
-              onClick={() => navigate(`/smetas/${id}`)}
+              onClick={() => navigate(`${prefix}/smetas/${id}`)}
               style={{ height: 40, padding: "0 20px", borderRadius: 8, border: `1px solid ${C.border}`, background: "#fff", fontSize: 13, color: C.muted, cursor: "pointer" }}
             >
               Bekor qilish

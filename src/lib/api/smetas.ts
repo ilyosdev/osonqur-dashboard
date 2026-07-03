@@ -6,6 +6,7 @@ export interface Smeta {
   id: string;
   name: string;
   projectId: string;
+  buildingId?: string;
   projectName?: string;
   type: SmetaType;
   description?: string;
@@ -85,4 +86,10 @@ export const smetasApi = {
     apiClient<void>(`/vendor/smetas/${id}`, {
       method: 'DELETE',
     }),
+
+  getProjectBuildings: (projectId: string) =>
+    apiClient<{ id: string; name: string; endDate?: string }[]>(
+      `/vendor/projects/${projectId}/buildings`,
+      { method: 'GET' }
+    ),
 };

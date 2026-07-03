@@ -3,6 +3,7 @@ import ReactDOM from 'react-dom/client';
 import { BrowserRouter } from 'react-router-dom';
 import { AuthProvider } from '@/lib/auth';
 import { ProjectProvider } from '@/lib/project-context';
+import { BuildingProvider } from '@/lib/building-context';
 import App from './App';
 import './styles/globals.css';
 
@@ -11,7 +12,9 @@ ReactDOM.createRoot(document.getElementById('root')!).render(
     <BrowserRouter>
       <AuthProvider>
         <ProjectProvider>
-          <App />
+          <BuildingProvider>
+            <App />
+          </BuildingProvider>
         </ProjectProvider>
       </AuthProvider>
     </BrowserRouter>

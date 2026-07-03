@@ -35,6 +35,7 @@ import { requestsApi, PurchaseRequest } from "@/lib/api/requests";
 import { smetaItemsApi, SmetaItem } from "@/lib/api/smeta-items";
 import { smetasApi } from "@/lib/api/smetas";
 import { useProject } from "@/lib/project-context";
+import { useBuilding } from "@/lib/building-context";
 import { TablePagination } from "@/components/shared/table-pagination";
 
 type View = "menu" | "history" | "detail" | "create";
@@ -456,11 +457,17 @@ function InlineCreateRequest({ projectId, onClose: _onClose, onSuccess }: { proj
   const [smetaItems, setSmetaItems] = useState<SmetaItem[]>([]);
   const [smetaItemSearch, setSmetaItemSearch] = useState<Record<number, string>>({});
 
-  const [smetas, setSmetas] = useState<{ id: string; name: string }[]>([]);
+  const { selectedBuildingId, buildings } = useBuilding();
+  const [smetas, setSmetas] = useState<{ id: string; name: string; buildingId?: string }[]>([]);
   useEffect(() => {
     if (!projectId) return;
     smetasApi.getAll({ projectId, limit: 100 }).then(res => setSmetas(res.data ?? [])).catch(() => {});
   }, [projectId]);
+
+  // Filter smetas by selected building
+  const visibleSmetas = selectedBuildingId
+    ? smetas.filter(s => s.buildingId === selectedBuildingId)
+    : smetas;
 
   const handleSmetaChange = async (smetaId: string) => {
     setSelectedSmetaId(smetaId);
@@ -525,7 +532,7 @@ function InlineCreateRequest({ projectId, onClose: _onClose, onSuccess }: { proj
 
       {!parsed ? (
         <div className="space-y-4">
-          {smetas.length > 0 && (
+          {visibleSmetas.length > 0 && (
             <div className="space-y-2">
               <Label>Smeta (ixtiyoriy)</Label>
               <Select value={selectedSmetaId} onValueChange={handleSmetaChange}>
@@ -534,9 +541,35 @@ function InlineCreateRequest({ projectId, onClose: _onClose, onSuccess }: { proj
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="__none__" className="text-[12px] text-muted-foreground">— Smetasiz</SelectItem>
-                  {smetas.map(s => (
-                    <SelectItem key={s.id} value={s.id} className="text-[13px]">{s.name}</SelectItem>
-                  ))}
+                  {/* If no building selected — group by buildings */}
+                  {!selectedBuildingId && buildings.length > 0 ? (
+                    <>
+                      {buildings.map(b => {
+                        const bSmetas = visibleSmetas.filter(s => s.buildingId === b.id);
+                        if (bSmetas.length === 0) return null;
+                        return (
+                          <SelectGroup key={b.id}>
+                            <SelectLabel className="text-[11px] text-[#185fa5] font-semibold">🏢 {b.name}</SelectLabel>
+                            {bSmetas.map(s => (
+                              <SelectItem key={s.id} value={s.id} className="text-[13px] pl-6">{s.name}</SelectItem>
+                            ))}
+                          </SelectGroup>
+                        );
+                      })}
+                      {visibleSmetas.filter(s => !s.buildingId).length > 0 && (
+                        <SelectGroup>
+                          <SelectLabel className="text-[11px] text-muted-foreground font-semibold">📋 Binoga biriktirilmagan</SelectLabel>
+                          {visibleSmetas.filter(s => !s.buildingId).map(s => (
+                            <SelectItem key={s.id} value={s.id} className="text-[13px] pl-6">{s.name}</SelectItem>
+                          ))}
+                        </SelectGroup>
+                      )}
+                    </>
+                  ) : (
+                    visibleSmetas.map(s => (
+                      <SelectItem key={s.id} value={s.id} className="text-[13px]">{s.name}</SelectItem>
+                    ))
+                  )}
                 </SelectContent>
               </Select>
               {selectedSmetaId && smetaItems.length > 0 && (

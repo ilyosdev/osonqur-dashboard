@@ -1,4 +1,10 @@
 import { useState, useMemo } from "react";
+import { ProrabDashboard } from "@/components/dashboard/prorab-dashboard";
+import { SnabjeniyaDashboard } from "@/components/dashboard/snabjeniya-dashboard";
+import { SkladDashboard } from "@/components/dashboard/sklad-dashboard";
+import { BugalteriyaDashboard } from "@/components/dashboard/bugalteriya-dashboard";
+import { HaydovchiDashboard } from "@/components/dashboard/haydovchi-dashboard";
+import { ModeratorDashboard } from "@/components/dashboard/moderator-dashboard";
 import { Link } from "react-router-dom";
 import {
   FolderKanban,
@@ -14,6 +20,7 @@ import {
   CalendarDays,
   CheckCircle,
   XCircle,
+  Users,
 } from "lucide-react";
 import { StatsCard } from "@/components/dashboard/stats-card";
 import { DebtsSection } from "@/components/dashboard/debts-section";
@@ -31,7 +38,7 @@ import {
 import { useAuth } from "@/lib/auth";
 import { usePermission } from "@/hooks";
 import { useApi } from "@/hooks/use-api";
-import { projectsApi, requestsApi, analyticsApi, cashRegistersApi } from "@/lib/api";
+import { projectsApi, requestsApi, analyticsApi, cashRegistersApi, warehousesApi, driversApi, workersApi, smetasApi } from "@/lib/api";
 import { StatsSkeleton } from "@/components/ui/table-skeleton";
 import { useProject } from "@/lib/project-context";
 
@@ -135,10 +142,18 @@ export default function HomePage() {
     loading: requestsLoading,
   } = useApi(() => requestsApi.getAll({ limit: 5, status: "PENDING" }), [], { enabled: canViewRequests });
 
-  // Role-specific stats
+  // Role detection
+  const orgRole = user?.orgRoleName?.toUpperCase() ?? "";
+  const isProrab = orgRole === "PRORAB";
+  const isSnab = orgRole === "SNABJENIYA";
+  const isSklad = orgRole === "SKLAD";
+  const isDirektor = orgRole === "DIREKTOR" || orgRole === "BOSS";
+  const isBugalteriya = orgRole === "BUGALTERIYA";
+  const isHaydovchi = orgRole === "HAYDOVCHI";
+  const isModerator = orgRole === "MODERATOR";
+  const hasRoleStats = isProrab || isSnab || isSklad || isBugalteriya || isHaydovchi || isModerator;
+
   const canViewKoshelok = hasPermission('cash_register:view') || hasPermission('cash_register:manage');
-  const canViewWorkers = hasPermission('worker:view');
-  const canViewSmetas = hasPermission('smeta:view');
 
   const { data: myKoshelok, loading: koshelokLoading } = useApi(
     () => cashRegistersApi.getMyKoshelok(),
@@ -146,15 +161,52 @@ export default function HomePage() {
     { enabled: canViewKoshelok }
   );
 
+  // PRORAB: workers count, smetas count, pending requests
+  const { data: workersRes } = useApi(
+    () => workersApi.getAll({ limit: 1 }),
+    [],
+    { enabled: isProrab }
+  );
+  const { data: smetasRes } = useApi(
+    () => smetasApi.getAll({ limit: 1 }),
+    [],
+    { enabled: isProrab }
+  );
+
+  // SNABJENIYA: pending + approved requests
   const { data: approvedRequestsRes } = useApi(
     () => requestsApi.getAll({ limit: 1, status: "APPROVED" }),
     [],
-    { enabled: canViewRequests }
+    { enabled: isSnab || isProrab }
   );
   const { data: rejectedRequestsRes } = useApi(
     () => requestsApi.getAll({ limit: 1, status: "REJECTED" }),
     [],
-    { enabled: canViewRequests }
+    { enabled: isSnab }
+  );
+
+  // SKLAD: warehouse items total
+  const { data: warehousesRes } = useApi(
+    () => warehousesApi.getAll({ limit: 100 }),
+    [],
+    { enabled: isSklad }
+  );
+  const { data: warehouseItemsRes } = useApi(
+    () => warehousesApi.getAllItems({ limit: 1 }),
+    [],
+    { enabled: isSklad }
+  );
+
+  // HAYDOVCHI: pending + delivered deliveries
+  const { data: pendingDeliveriesRes } = useApi(
+    () => driversApi.getMyDeliveries({ status: "PENDING" }),
+    [],
+    { enabled: isHaydovchi }
+  );
+  const { data: deliveredRes } = useApi(
+    () => driversApi.getMyDeliveries({ status: "DELIVERED" }),
+    [],
+    { enabled: isHaydovchi }
   );
 
   const projects = projectsResponse?.data || [];
@@ -328,10 +380,19 @@ export default function HomePage() {
           </div>
         )}
 
-      {/* Role-specific stats + Koshelok */}
-      {(canViewKoshelok || canViewRequests || canViewWorkers || canViewSmetas) && !canViewStats && (
+      {/* Role-specific dashboards with charts */}
+      {isProrab && <ProrabDashboard />}
+      {isSnab && <SnabjeniyaDashboard />}
+      {isSklad && <SkladDashboard />}
+      {isBugalteriya && <BugalteriyaDashboard />}
+      {isHaydovchi && <HaydovchiDashboard />}
+      {isModerator && <ModeratorDashboard />}
+
+      {/* Generic stats for unrecognized roles */}
+      {!isProrab && !isSnab && !isSklad && !isBugalteriya && !isHaydovchi && !isModerator && (hasRoleStats || (canViewKoshelok && !canViewStats) || (canViewStats && canViewKoshelok && isDirektor)) && (
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-          {/* Koshelok card — visible to any user with cash_register permission */}
+
+          {/* KOSHELOK — shown for all roles that have it */}
           {canViewKoshelok && (
             <Card className="animate-slide-up">
               <CardContent className="pt-5">
@@ -348,7 +409,7 @@ export default function HomePage() {
                     <p className="text-2xl font-bold text-[#185fa5]">
                       {formatNumber(myKoshelok?.balance || 0)} <span className="text-sm font-normal text-muted-foreground">so'm</span>
                     </p>
-                    <div className="flex gap-3 mt-2 text-xs text-muted-foreground">
+                    <div className="flex gap-3 mt-2 text-xs">
                       <span className="text-green-600">+{formatNumber(myKoshelok?.totalIn || 0)}</span>
                       <span className="text-red-500">−{formatNumber(myKoshelok?.totalOut || 0)}</span>
                     </div>
@@ -358,87 +419,209 @@ export default function HomePage() {
             </Card>
           )}
 
-          {/* Pending requests count */}
-          {canViewRequests && (
-            <Card className="animate-slide-up">
-              <CardContent className="pt-5">
-                <div className="flex items-center justify-between mb-3">
-                  <p className="text-sm font-medium text-muted-foreground">Kutayotgan</p>
-                  <div className="h-9 w-9 rounded-lg bg-amber-50 flex items-center justify-center">
-                    <Clock className="h-4 w-4 text-amber-500" />
+          {/* PRORAB: kutayotgan zayavkalar, ustalar, smetalar */}
+          {isProrab && (
+            <>
+              <Card className="animate-slide-up">
+                <CardContent className="pt-5">
+                  <div className="flex items-center justify-between mb-3">
+                    <p className="text-sm font-medium text-muted-foreground">Kutayotgan zayavkalar</p>
+                    <div className="h-9 w-9 rounded-lg bg-amber-50 flex items-center justify-center">
+                      <Clock className="h-4 w-4 text-amber-500" />
+                    </div>
                   </div>
-                </div>
-                <p className="text-2xl font-bold">{requestsResponse?.total ?? 0}</p>
-                <p className="text-xs text-muted-foreground mt-1">zayavka</p>
-              </CardContent>
-            </Card>
+                  <p className="text-2xl font-bold">{requestsResponse?.total ?? 0}</p>
+                  <p className="text-xs text-muted-foreground mt-1">ta zayavka</p>
+                </CardContent>
+              </Card>
+              <Card className="animate-slide-up">
+                <CardContent className="pt-5">
+                  <div className="flex items-center justify-between mb-3">
+                    <p className="text-sm font-medium text-muted-foreground">Ustalar</p>
+                    <div className="h-9 w-9 rounded-lg bg-[#dbe7f3] flex items-center justify-center">
+                      <Users className="h-4 w-4 text-[#185fa5]" />
+                    </div>
+                  </div>
+                  <p className="text-2xl font-bold">{workersRes?.total ?? 0}</p>
+                  <p className="text-xs text-muted-foreground mt-1">ta usta</p>
+                </CardContent>
+              </Card>
+              <Card className="animate-slide-up">
+                <CardContent className="pt-5">
+                  <div className="flex items-center justify-between mb-3">
+                    <p className="text-sm font-medium text-muted-foreground">Smetalar</p>
+                    <div className="h-9 w-9 rounded-lg bg-purple-50 flex items-center justify-center">
+                      <Calculator className="h-4 w-4 text-purple-500" />
+                    </div>
+                  </div>
+                  <p className="text-2xl font-bold">{smetasRes?.total ?? 0}</p>
+                  <p className="text-xs text-muted-foreground mt-1">ta smeta</p>
+                </CardContent>
+              </Card>
+            </>
           )}
 
-          {/* Approved requests */}
-          {canViewRequests && (
-            <Card className="animate-slide-up">
-              <CardContent className="pt-5">
-                <div className="flex items-center justify-between mb-3">
-                  <p className="text-sm font-medium text-muted-foreground">Tasdiqlangan</p>
-                  <div className="h-9 w-9 rounded-lg bg-green-50 flex items-center justify-center">
-                    <CheckCircle className="h-4 w-4 text-green-500" />
+          {/* SNABJENIYA: kutayotgan, tasdiqlangan, rad etilgan */}
+          {isSnab && (
+            <>
+              <Card className="animate-slide-up">
+                <CardContent className="pt-5">
+                  <div className="flex items-center justify-between mb-3">
+                    <p className="text-sm font-medium text-muted-foreground">Kutayotgan</p>
+                    <div className="h-9 w-9 rounded-lg bg-amber-50 flex items-center justify-center">
+                      <Clock className="h-4 w-4 text-amber-500" />
+                    </div>
                   </div>
-                </div>
-                <p className="text-2xl font-bold text-green-600">{approvedRequestsRes?.total ?? 0}</p>
-                <p className="text-xs text-muted-foreground mt-1">zayavka</p>
-              </CardContent>
-            </Card>
+                  <p className="text-2xl font-bold">{requestsResponse?.total ?? 0}</p>
+                  <p className="text-xs text-muted-foreground mt-1">zayavka</p>
+                </CardContent>
+              </Card>
+              <Card className="animate-slide-up">
+                <CardContent className="pt-5">
+                  <div className="flex items-center justify-between mb-3">
+                    <p className="text-sm font-medium text-muted-foreground">Tasdiqlangan</p>
+                    <div className="h-9 w-9 rounded-lg bg-green-50 flex items-center justify-center">
+                      <CheckCircle className="h-4 w-4 text-green-500" />
+                    </div>
+                  </div>
+                  <p className="text-2xl font-bold text-green-600">{approvedRequestsRes?.total ?? 0}</p>
+                  <p className="text-xs text-muted-foreground mt-1">zayavka</p>
+                </CardContent>
+              </Card>
+              <Card className="animate-slide-up">
+                <CardContent className="pt-5">
+                  <div className="flex items-center justify-between mb-3">
+                    <p className="text-sm font-medium text-muted-foreground">Rad etilgan</p>
+                    <div className="h-9 w-9 rounded-lg bg-red-50 flex items-center justify-center">
+                      <XCircle className="h-4 w-4 text-red-500" />
+                    </div>
+                  </div>
+                  <p className="text-2xl font-bold text-red-500">{rejectedRequestsRes?.total ?? 0}</p>
+                  <p className="text-xs text-muted-foreground mt-1">zayavka</p>
+                </CardContent>
+              </Card>
+            </>
           )}
 
-          {/* Rejected requests */}
-          {canViewRequests && (
-            <Card className="animate-slide-up">
-              <CardContent className="pt-5">
-                <div className="flex items-center justify-between mb-3">
-                  <p className="text-sm font-medium text-muted-foreground">Rad etilgan</p>
-                  <div className="h-9 w-9 rounded-lg bg-red-50 flex items-center justify-center">
-                    <XCircle className="h-4 w-4 text-red-500" />
+          {/* SKLAD: omborlar soni, materiallar soni */}
+          {isSklad && (
+            <>
+              <Card className="animate-slide-up">
+                <CardContent className="pt-5">
+                  <div className="flex items-center justify-between mb-3">
+                    <p className="text-sm font-medium text-muted-foreground">Omborlar</p>
+                    <div className="h-9 w-9 rounded-lg bg-[#dbe7f3] flex items-center justify-center">
+                      <Package className="h-4 w-4 text-[#185fa5]" />
+                    </div>
                   </div>
-                </div>
-                <p className="text-2xl font-bold text-red-500">{rejectedRequestsRes?.total ?? 0}</p>
-                <p className="text-xs text-muted-foreground mt-1">zayavka</p>
-              </CardContent>
-            </Card>
+                  <p className="text-2xl font-bold">{warehousesRes?.total ?? 0}</p>
+                  <p className="text-xs text-muted-foreground mt-1">ta ombor</p>
+                </CardContent>
+              </Card>
+              <Card className="animate-slide-up">
+                <CardContent className="pt-5">
+                  <div className="flex items-center justify-between mb-3">
+                    <p className="text-sm font-medium text-muted-foreground">Materiallar</p>
+                    <div className="h-9 w-9 rounded-lg bg-purple-50 flex items-center justify-center">
+                      <Package className="h-4 w-4 text-purple-500" />
+                    </div>
+                  </div>
+                  <p className="text-2xl font-bold">{warehouseItemsRes?.total ?? 0}</p>
+                  <p className="text-xs text-muted-foreground mt-1">ta material</p>
+                </CardContent>
+              </Card>
+              <Card className="animate-slide-up">
+                <CardContent className="pt-5">
+                  <div className="flex items-center justify-between mb-3">
+                    <p className="text-sm font-medium text-muted-foreground">Kutayotgan zayavkalar</p>
+                    <div className="h-9 w-9 rounded-lg bg-amber-50 flex items-center justify-center">
+                      <Clock className="h-4 w-4 text-amber-500" />
+                    </div>
+                  </div>
+                  <p className="text-2xl font-bold">{requestsResponse?.total ?? 0}</p>
+                  <p className="text-xs text-muted-foreground mt-1">zayavka</p>
+                </CardContent>
+              </Card>
+            </>
           )}
-        </div>
-      )}
 
-      {/* Koshelok card for users who CAN see finance stats but also have koshelok */}
-      {canViewStats && canViewKoshelok && (
-        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-          <Card className="animate-slide-up">
-            <CardContent className="pt-5">
-              <div className="flex items-center justify-between mb-3">
-                <p className="text-sm font-medium text-muted-foreground">Mening koshelogim</p>
-                <div className="h-9 w-9 rounded-lg bg-[#dbe7f3] flex items-center justify-center">
-                  <Wallet className="h-4 w-4 text-[#185fa5]" />
-                </div>
-              </div>
-              {koshelokLoading ? (
-                <div className="h-7 w-24 bg-muted/50 rounded animate-pulse" />
-              ) : (
-                <>
-                  <p className="text-2xl font-bold text-[#185fa5]">
-                    {formatNumber(myKoshelok?.balance || 0)} <span className="text-sm font-normal text-muted-foreground">so'm</span>
-                  </p>
-                  <div className="flex gap-3 mt-2 text-xs text-muted-foreground">
-                    <span className="text-green-600">+{formatNumber(myKoshelok?.totalIn || 0)}</span>
-                    <span className="text-red-500">−{formatNumber(myKoshelok?.totalOut || 0)}</span>
+          {/* BUGALTERIYA: kirim, chiqim */}
+          {isBugalteriya && (
+            <>
+              <Card className="animate-slide-up">
+                <CardContent className="pt-5">
+                  <div className="flex items-center justify-between mb-3">
+                    <p className="text-sm font-medium text-muted-foreground">Kirim</p>
+                    <div className="h-9 w-9 rounded-lg bg-green-50 flex items-center justify-center">
+                      <TrendingUp className="h-4 w-4 text-green-500" />
+                    </div>
                   </div>
-                </>
-              )}
-            </CardContent>
-          </Card>
+                  <p className="text-2xl font-bold text-green-600">{formatNumber(summary?.totalIncome || 0)}</p>
+                  <p className="text-xs text-muted-foreground mt-1">so'm</p>
+                </CardContent>
+              </Card>
+              <Card className="animate-slide-up">
+                <CardContent className="pt-5">
+                  <div className="flex items-center justify-between mb-3">
+                    <p className="text-sm font-medium text-muted-foreground">Chiqim</p>
+                    <div className="h-9 w-9 rounded-lg bg-red-50 flex items-center justify-center">
+                      <TrendingDown className="h-4 w-4 text-red-500" />
+                    </div>
+                  </div>
+                  <p className="text-2xl font-bold text-red-500">{formatNumber(summary?.totalExpense || 0)}</p>
+                  <p className="text-xs text-muted-foreground mt-1">so'm</p>
+                </CardContent>
+              </Card>
+              <Card className="animate-slide-up">
+                <CardContent className="pt-5">
+                  <div className="flex items-center justify-between mb-3">
+                    <p className="text-sm font-medium text-muted-foreground">Balans</p>
+                    <div className="h-9 w-9 rounded-lg bg-[#dbe7f3] flex items-center justify-center">
+                      <DollarSign className="h-4 w-4 text-[#185fa5]" />
+                    </div>
+                  </div>
+                  <p className="text-2xl font-bold text-[#185fa5]">{formatNumber((summary?.totalIncome || 0) - (summary?.totalExpense || 0))}</p>
+                  <p className="text-xs text-muted-foreground mt-1">so'm</p>
+                </CardContent>
+              </Card>
+            </>
+          )}
+
+          {/* HAYDOVCHI: kutayotgan, yetkazilgan */}
+          {isHaydovchi && (
+            <>
+              <Card className="animate-slide-up">
+                <CardContent className="pt-5">
+                  <div className="flex items-center justify-between mb-3">
+                    <p className="text-sm font-medium text-muted-foreground">Kutayotgan yuklatmalar</p>
+                    <div className="h-9 w-9 rounded-lg bg-amber-50 flex items-center justify-center">
+                      <Clock className="h-4 w-4 text-amber-500" />
+                    </div>
+                  </div>
+                  <p className="text-2xl font-bold">{(pendingDeliveriesRes as { data?: unknown[] })?.data?.length ?? 0}</p>
+                  <p className="text-xs text-muted-foreground mt-1">ta yuklatma</p>
+                </CardContent>
+              </Card>
+              <Card className="animate-slide-up">
+                <CardContent className="pt-5">
+                  <div className="flex items-center justify-between mb-3">
+                    <p className="text-sm font-medium text-muted-foreground">Yetkazilganlar</p>
+                    <div className="h-9 w-9 rounded-lg bg-green-50 flex items-center justify-center">
+                      <CheckCircle className="h-4 w-4 text-green-500" />
+                    </div>
+                  </div>
+                  <p className="text-2xl font-bold text-green-600">{(deliveredRes as { data?: unknown[] })?.data?.length ?? 0}</p>
+                  <p className="text-xs text-muted-foreground mt-1">ta yetkazildi</p>
+                </CardContent>
+              </Card>
+            </>
+          )}
+
         </div>
       )}
 
       {/* Main Content Grid */}
-      {(canViewProjects || canViewRequests) && (
+      {(canViewProjects || canViewRequests) && !isProrab && !isSnab && !isSklad && !isBugalteriya && !isHaydovchi && !isModerator && (
         <div className="grid gap-6 lg:grid-cols-2">
           {/* Projects Section */}
           {canViewProjects && (

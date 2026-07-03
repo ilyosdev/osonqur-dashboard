@@ -52,7 +52,7 @@ export default function ModeratorPage() {
 
   const [searchParams] = useSearchParams();
   const tab: Tab = (searchParams.get("tab") as Tab) || "pending";
-  const [historyFilter, setHistoryFilter] = useState<"bugun" | "hafta" | "oy" | "barchasi">("hafta");
+  const [historyFilter, setHistoryFilter] = useState<"bugun" | "hafta" | "oy" | "barchasi">("barchasi");
 
   // Separate state for each tab's selected batch
   const [pendingBatchDetail, setPendingBatchDetail] = useState<PurchaseRequest[] | null>(null);

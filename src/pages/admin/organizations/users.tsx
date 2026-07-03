@@ -2,7 +2,7 @@ import { useEffect, useState, useCallback } from "react";
 import { useParams, Link } from "react-router-dom";
 import {
   Users, Plus, Search, RefreshCw, Loader2, MoreVertical,
-  Edit, Trash2, AlertCircle, ArrowLeft, Eye, EyeOff, FolderOpen,
+  Edit, Trash2, AlertCircle, ArrowLeft, Eye, EyeOff, FolderOpen, UserPlus,
 } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -53,6 +53,7 @@ export default function OrgUsersPage() {
   const [userProjects, setUserProjects] = useState<UserProjectAssignment[]>([]);
   const [allProjects, setAllProjects] = useState<AdminOrgProject[]>([]);
   const [selectedProjectId, setSelectedProjectId] = useState("");
+  const [selectedProjectOrgRoleId, setSelectedProjectOrgRoleId] = useState("");
 
   const [formData, setFormData] = useState({
     name: "", phone: "", password: "", role: "PRORAB", telegramId: "", allowedRoles: [] as string[], orgRoleId: "",
@@ -202,10 +203,11 @@ export default function OrgUsersPage() {
   const handleAssignProject = async () => {
     if (!orgId || !selectedUser || !selectedProjectId) return;
     try {
-      await adminApi.assignUserToProject(orgId, selectedUser.id, selectedProjectId);
+      await adminApi.assignUserToProject(orgId, selectedUser.id, selectedProjectId, selectedProjectOrgRoleId || undefined);
       const assigned = await adminApi.getUserProjects(orgId, selectedUser.id);
       setUserProjects(assigned);
       setSelectedProjectId("");
+      setSelectedProjectOrgRoleId("");
     } catch (err) {
       setFormError(err instanceof Error ? err.message : "Tayinlashda xatolik");
     }
@@ -466,37 +468,70 @@ export default function OrgUsersPage() {
       <Dialog open={projectsDialogOpen} onOpenChange={setProjectsDialogOpen}>
         <DialogContent className="max-w-md">
           <DialogHeader>
-            <DialogTitle>{selectedUser?.name} — Loyihalar</DialogTitle>
-            <DialogDescription>Foydalanuvchiga loyihalarni tayinlang</DialogDescription>
+            <div className="flex items-center gap-3">
+              <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-blue-50">
+                <UserPlus className="h-5 w-5 text-blue-600" />
+              </div>
+              <div>
+                <DialogTitle>Loyiha biriktirish</DialogTitle>
+                <DialogDescription>{selectedUser?.name} uchun loyiha tayinlang</DialogDescription>
+              </div>
+            </div>
           </DialogHeader>
           <div className="space-y-4">
-            <div className="flex gap-2">
+            <div className="space-y-2">
+              <label className="text-sm font-semibold">Loyiha</label>
               <Select value={selectedProjectId} onValueChange={setSelectedProjectId}>
-                <SelectTrigger className="flex-1"><SelectValue placeholder="Loyiha tanlang" /></SelectTrigger>
+                <SelectTrigger className="h-12">
+                  <div className="flex items-center gap-2">
+                    <FolderOpen className="h-4 w-4 text-muted-foreground" />
+                    <SelectValue placeholder="Loyiha tanlang" />
+                  </div>
+                </SelectTrigger>
                 <SelectContent>
                   {allProjects
                     .filter((p) => !userProjects.some((up) => up.projectId === p.id))
                     .map((p) => <SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>)}
                 </SelectContent>
               </Select>
-              <Button onClick={handleAssignProject} disabled={!selectedProjectId}>Tayinlash</Button>
             </div>
-            {userProjects.length > 0 ? (
+            <div className="space-y-2">
+              <label className="text-sm font-semibold">Bu loyihadagi roli <span className="text-muted-foreground font-normal">(ixtiyoriy)</span></label>
+              <Select value={selectedProjectOrgRoleId} onValueChange={setSelectedProjectOrgRoleId}>
+                <SelectTrigger className="h-12"><SelectValue placeholder="Global rol ishlatiladi" /></SelectTrigger>
+                <SelectContent>
+                  {orgRoles.map((r) => <SelectItem key={r.id} value={r.id}>{r.name}</SelectItem>)}
+                </SelectContent>
+              </Select>
+            </div>
+            {userProjects.length > 0 && (
               <div className="space-y-2">
-                {userProjects.map((up) => (
-                  <div key={up.projectId} className="flex items-center justify-between p-2 rounded-lg bg-muted/50">
-                    <span className="text-sm font-medium">{up.projectName}</span>
-                    <Button variant="ghost" size="sm" className="text-destructive h-7"
-                      onClick={() => handleUnassignProject(up.projectId)}>
-                      Olib tashlash
-                    </Button>
-                  </div>
-                ))}
+                <label className="text-sm font-semibold">Tayinlangan loyihalar</label>
+                <div className="space-y-1.5">
+                  {userProjects.map((up) => (
+                    <div key={up.projectId} className="flex items-center justify-between px-3 py-2 rounded-lg border bg-muted/30">
+                      <div className="flex items-center gap-2">
+                        <span className="text-sm font-medium">{up.projectName}</span>
+                        {up.projectOrgRoleName && (
+                          <span className="text-xs text-muted-foreground bg-muted px-1.5 py-0.5 rounded">
+                            {up.projectOrgRoleName}
+                          </span>
+                        )}
+                      </div>
+                      <Button variant="ghost" size="sm" className="text-destructive h-7 px-2"
+                        onClick={() => handleUnassignProject(up.projectId)}>
+                        <Trash2 className="h-3.5 w-3.5" />
+                      </Button>
+                    </div>
+                  ))}
+                </div>
               </div>
-            ) : (
-              <p className="text-sm text-muted-foreground text-center py-4">Loyihalar tayinlanmagan</p>
             )}
           </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setProjectsDialogOpen(false)}>Bekor qilish</Button>
+            <Button onClick={handleAssignProject} disabled={!selectedProjectId}>Tayinlash</Button>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
 

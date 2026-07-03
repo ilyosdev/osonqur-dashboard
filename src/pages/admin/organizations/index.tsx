@@ -237,154 +237,129 @@ export default function OrganizationsPage() {
     return <Navigate to={`/admin/organizations/${user.orgId}/users`} replace />;
   }
 
+  const C = {
+    blue: "#185fa5", blueDark: "#0c447c", blueLight: "#eff6ff",
+    border: "#dbe7f3", muted: "#64748b", red: "#ef4444", green: "#16a34a",
+  };
+
   return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold tracking-tight flex items-center gap-2">
-            <Building2 className="h-6 w-6" />
-            Kompaniyalar
-          </h1>
-          <p className="text-muted-foreground">Kompaniyalarni boshqaring</p>
+    <div style={{ fontFamily: "-apple-system, BlinkMacSystemFont, 'Inter', sans-serif" }}>
+      {/* Page header */}
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 20 }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+          <div style={{ width: 40, height: 40, borderRadius: 10, background: C.blueLight, display: "flex", alignItems: "center", justifyContent: "center" }}>
+            <Building2 size={20} color={C.blue} />
+          </div>
+          <div>
+            <h1 style={{ fontSize: 20, fontWeight: 700, color: C.blueDark, margin: 0 }}>Kompaniyalar</h1>
+            <p style={{ fontSize: 13, color: C.muted, margin: 0 }}>Kompaniyalarni boshqaring</p>
+          </div>
         </div>
         {canAddOrg && (
-          <Button onClick={openAddDialog}>
-            <Plus className="h-4 w-4 mr-2" />
-            Kompaniya qo'shish
-          </Button>
+          <button onClick={openAddDialog} style={{ display: "flex", alignItems: "center", gap: 8, height: 40, padding: "0 20px", borderRadius: 10, border: "none", background: C.blue, fontSize: 13, fontWeight: 600, color: "#fff", cursor: "pointer" }}>
+            <Plus size={16} /> Kompaniya qo'shish
+          </button>
         )}
       </div>
 
-      <Card className="p-4">
-        <div className="flex flex-col sm:flex-row gap-3">
-          <div className="relative flex-1">
-            <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-            <Input
-              placeholder="Nomi bo'yicha qidirish..."
-              value={searchQuery}
-              onChange={(e) => { setSearchQuery(e.target.value); setPage(1); }}
-              className="pl-9 bg-muted/50 border-0"
-            />
-          </div>
-          <Button variant="outline" size="icon" onClick={fetchOrgs} disabled={isLoading}>
-            <RefreshCw className={`h-4 w-4 ${isLoading ? "animate-spin" : ""}`} />
-          </Button>
-        </div>
-      </Card>
+      {/* Search */}
+      <div style={{ background: "#fff", border: `1px solid ${C.border}`, borderRadius: 12, padding: "12px 16px", marginBottom: 16, display: "flex", alignItems: "center", gap: 10 }}>
+        <Search size={16} color={C.muted} />
+        <input
+          placeholder="Nomi bo'yicha qidirish..."
+          value={searchQuery}
+          onChange={(e) => { setSearchQuery(e.target.value); setPage(1); }}
+          style={{ flex: 1, border: "none", outline: "none", fontSize: 14, color: C.blueDark, background: "transparent" }}
+        />
+        <button onClick={fetchOrgs} disabled={isLoading} style={{ background: "none", border: "none", cursor: "pointer", color: C.muted, display: "flex" }}>
+          <RefreshCw size={16} style={{ animation: isLoading ? "spin 1s linear infinite" : "none" }} />
+        </button>
+      </div>
 
       {error && (
-        <Card className="p-4 border-destructive bg-destructive/10">
-          <div className="flex items-center gap-2 text-destructive">
-            <AlertCircle className="h-5 w-5" />
-            <span>{error}</span>
-          </div>
-        </Card>
+        <div style={{ display: "flex", alignItems: "center", gap: 8, background: "#fef2f2", border: "1px solid #fecaca", borderRadius: 10, padding: "12px 16px", marginBottom: 16, fontSize: 13, color: C.red }}>
+          <AlertCircle size={16} /> {error}
+        </div>
       )}
 
       {isLoading ? (
-        <div className="flex items-center justify-center py-12">
-          <Loader2 className="h-8 w-8 animate-spin text-primary" />
+        <div style={{ display: "flex", justifyContent: "center", padding: 60 }}>
+          <Loader2 size={32} color={C.blue} style={{ animation: "spin 1s linear infinite" }} />
         </div>
       ) : !error && organizations.length === 0 ? (
-        <Card className="p-8 text-center">
-          <Building2 className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
-          <h3 className="text-lg font-semibold mb-2">Kompaniyalar topilmadi</h3>
-          <p className="text-muted-foreground mb-4">Hozircha kompaniyalar yo'q</p>
+        <div style={{ background: "#fff", border: `1px solid ${C.border}`, borderRadius: 16, padding: 48, textAlign: "center" }}>
+          <Building2 size={48} color={C.border} style={{ margin: "0 auto 12px" }} />
+          <p style={{ fontSize: 15, fontWeight: 600, color: C.blueDark, marginBottom: 6 }}>Kompaniyalar topilmadi</p>
+          <p style={{ fontSize: 13, color: C.muted, marginBottom: 16 }}>Hozircha kompaniyalar yo'q</p>
           {canAddOrg && (
-            <Button onClick={openAddDialog}>
-              <Plus className="h-4 w-4 mr-2" />
-              Birinchi kompaniyani qo'shing
-            </Button>
+            <button onClick={openAddDialog} style={{ display: "inline-flex", alignItems: "center", gap: 8, height: 38, padding: "0 20px", borderRadius: 10, border: "none", background: C.blue, fontSize: 13, fontWeight: 600, color: "#fff", cursor: "pointer" }}>
+              <Plus size={14} /> Birinchi kompaniyani qo'shing
+            </button>
           )}
-        </Card>
+        </div>
       ) : (
-        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(320px, 1fr))", gap: 14 }}>
           {organizations.map((org) => (
-            <Card key={org.id} className="overflow-hidden transition-all duration-200 hover:shadow-md group">
-              <CardContent className="p-5">
-                <div className="flex items-start justify-between gap-2 mb-3">
-                  <Link to={`/admin/organizations/${org.id}/users`} className="flex-1">
-                    <h3 className="font-semibold text-lg group-hover:text-primary transition-colors">
-                      {org.name}
-                    </h3>
-                  </Link>
-                  <DropdownMenu>
-                    <DropdownMenuTrigger asChild>
-                      <Button variant="ghost" size="icon" className="h-8 w-8">
-                        <MoreVertical className="h-4 w-4" />
-                      </Button>
-                    </DropdownMenuTrigger>
-                    <DropdownMenuContent align="end">
-                      <DropdownMenuItem onClick={() => openEditDialog(org)}>
-                        <Edit className="h-4 w-4 mr-2" />
-                        Tahrirlash
-                      </DropdownMenuItem>
-                      <DropdownMenuItem onClick={() => handleToggleActive(org)}>
-                        {org.isActive ? "Nofaol qilish" : "Faol qilish"}
-                      </DropdownMenuItem>
-                      {isSuperAdmin && (
-                        <>
-                          <DropdownMenuSeparator />
-                          <DropdownMenuItem className="text-destructive focus:text-destructive" onClick={() => openDeleteDialog(org)}>
-                            <Trash2 className="h-4 w-4 mr-2" />
-                            O'chirish
-                          </DropdownMenuItem>
-                        </>
-                      )}
-                    </DropdownMenuContent>
-                  </DropdownMenu>
+            <Link key={org.id} to={`/admin/organizations/${org.id}/projects`} style={{ textDecoration: "none", display: "block", background: "#fff", border: `1px solid ${C.border}`, borderRadius: 14, overflow: "hidden", cursor: "pointer" }}>
+              {/* Card header */}
+              <div style={{ padding: "16px 20px", background: "#f8fbff", borderBottom: `1px solid ${C.border}`, display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+                <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                  <div style={{ width: 36, height: 36, borderRadius: 9, background: C.blueLight, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+                    <Building2 size={18} color={C.blue} />
+                  </div>
+                  <div>
+                    <p style={{ fontSize: 15, fontWeight: 700, color: C.blueDark, margin: 0 }}>{org.name}</p>
+                    {org.phone && <p style={{ fontSize: 12, color: C.muted, margin: 0 }}>{org.phone}</p>}
+                  </div>
                 </div>
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <button onClick={e => e.preventDefault()} style={{ background: "none", border: "none", cursor: "pointer", color: C.muted, padding: 4, borderRadius: 6 }}>
+                      <MoreVertical size={16} />
+                    </button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end">
+                    <DropdownMenuItem onClick={() => openEditDialog(org)}><Edit className="h-4 w-4 mr-2" />Tahrirlash</DropdownMenuItem>
+                    <DropdownMenuItem onClick={() => handleToggleActive(org)}>{org.isActive ? "Nofaol qilish" : "Faol qilish"}</DropdownMenuItem>
+                    {isSuperAdmin && (<><DropdownMenuSeparator /><DropdownMenuItem className="text-destructive focus:text-destructive" onClick={() => openDeleteDialog(org)}><Trash2 className="h-4 w-4 mr-2" />O'chirish</DropdownMenuItem></>)}
+                  </DropdownMenuContent>
+                </DropdownMenu>
+              </div>
 
-                <div className="space-y-2 text-sm text-muted-foreground">
-                  {org.phone && (
-                    <div className="flex items-center gap-2">
-                      <span>{org.phone}</span>
-                    </div>
-                  )}
-                  <div className="flex items-center gap-4">
-                    <div className="flex items-center gap-1">
-                      <Users className="h-4 w-4" />
-                      <span>{org.userCount} xodim</span>
-                    </div>
-                    <div className="flex items-center gap-1">
-                      <FolderOpen className="h-4 w-4" />
-                      <span>{org.projectCount} loyiha</span>
-                    </div>
-                  </div>
+              {/* Stats */}
+              <div style={{ padding: "12px 20px", display: "flex", alignItems: "center", gap: 20 }}>
+                <div style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 13, color: C.muted }}>
+                  <Users size={14} color={C.blue} />
+                  <span><b style={{ color: C.blueDark }}>{org.userCount}</b> xodim</span>
                 </div>
+                <div style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 13, color: C.muted }}>
+                  <FolderOpen size={14} color={C.blue} />
+                  <span><b style={{ color: C.blueDark }}>{org.projectCount}</b> loyiha</span>
+                </div>
+              </div>
 
-                <div className="mt-4 pt-4 border-t flex items-center justify-between">
-                  <div className="flex gap-2">
-                    <Badge variant="outline" className={TIER_COLORS[org.subscriptionTier || "ODDIY"]}>
-                      {org.subscriptionTier || "ODDIY"}
-                    </Badge>
-                    <Badge variant={org.isActive ? "default" : "secondary"}
-                      className={org.isActive ? "bg-green-500/10 text-green-600" : ""}>
-                      {org.isActive ? "Faol" : "Nofaol"}
-                    </Badge>
-                  </div>
-                  <div className="flex gap-1">
-                    <Button variant="ghost" size="sm" asChild>
-                      <Link to={`/admin/organizations/${org.id}/users`}>Xodimlar</Link>
-                    </Button>
-                    <Button variant="ghost" size="sm" asChild>
-                      <Link to={`/admin/organizations/${org.id}/projects`}>Loyihalar</Link>
-                    </Button>
-                  </div>
+              {/* Footer */}
+              <div style={{ padding: "10px 20px", borderTop: `1px solid ${C.border}`, display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+                <div style={{ display: "flex", gap: 6 }}>
+                  <span style={{ fontSize: 11, fontWeight: 600, padding: "3px 8px", borderRadius: 6, border: `1px solid ${C.border}`, color: C.muted }}>{org.subscriptionTier || "ODDIY"}</span>
+                  <span style={{ fontSize: 11, fontWeight: 600, padding: "3px 8px", borderRadius: 6, background: org.isActive ? "#dcfce7" : "#f1f5f9", color: org.isActive ? C.green : C.muted }}>
+                    {org.isActive ? "Faol" : "Nofaol"}
+                  </span>
                 </div>
-              </CardContent>
-            </Card>
+                <span style={{ fontSize: 13, fontWeight: 600, color: C.blue }}>Batafsil →</span>
+              </div>
+            </Link>
           ))}
         </div>
       )}
 
       {totalPages > 1 && (
-        <div className="flex items-center justify-between pt-4">
-          <p className="text-sm text-muted-foreground">Jami: {total}</p>
-          <div className="flex items-center gap-2">
-            <Button variant="outline" size="sm" disabled={page <= 1} onClick={() => setPage(p => p - 1)}>Oldingi</Button>
-            <span className="text-sm">{page} / {totalPages}</span>
-            <Button variant="outline" size="sm" disabled={page >= totalPages} onClick={() => setPage(p => p + 1)}>Keyingi</Button>
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginTop: 16 }}>
+          <span style={{ fontSize: 13, color: C.muted }}>Jami: {total}</span>
+          <div style={{ display: "flex", gap: 6 }}>
+            <button disabled={page <= 1} onClick={() => setPage(p => p - 1)} style={{ height: 34, padding: "0 14px", borderRadius: 8, border: `1px solid ${C.border}`, background: page <= 1 ? "#f8fafc" : "#fff", fontSize: 13, color: page <= 1 ? "#cbd5e1" : C.blueDark, cursor: page <= 1 ? "not-allowed" : "pointer" }}>← Oldingi</button>
+            <span style={{ height: 34, padding: "0 14px", display: "flex", alignItems: "center", fontSize: 13, color: C.muted }}>{page} / {totalPages}</span>
+            <button disabled={page >= totalPages} onClick={() => setPage(p => p + 1)} style={{ height: 34, padding: "0 14px", borderRadius: 8, border: `1px solid ${C.border}`, background: page >= totalPages ? "#f8fafc" : "#fff", fontSize: 13, color: page >= totalPages ? "#cbd5e1" : C.blueDark, cursor: page >= totalPages ? "not-allowed" : "pointer" }}>Keyingi →</button>
           </div>
         </div>
       )}

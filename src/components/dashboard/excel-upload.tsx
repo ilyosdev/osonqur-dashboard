@@ -64,7 +64,7 @@ export function ExcelUpload<T>({
     setParsedCount(null);
 
     try {
-      const result = await parseFunction(file, supportsAi && useAi);
+      const result = await parseFunction(file, supportsAi);
 
       if (result.errors.length > 0) {
         setError(result.errors.join("; "));
@@ -125,21 +125,6 @@ export function ExcelUpload<T>({
         {description && <CardDescription>{description}</CardDescription>}
       </CardHeader>
       <CardContent className="space-y-4">
-        {supportsAi && (
-          <div className="flex items-center justify-between p-3 rounded-lg bg-muted/50">
-            <div className="flex items-center gap-2">
-              <Sparkles className="h-4 w-4 text-primary" />
-              <Label htmlFor="ai-mode" className="text-sm cursor-pointer">
-                AI yordamida o'qish
-              </Label>
-            </div>
-            <Switch
-              id="ai-mode"
-              checked={useAi}
-              onCheckedChange={setUseAi}
-            />
-          </div>
-        )}
 
         <input
           ref={fileInputRef}
