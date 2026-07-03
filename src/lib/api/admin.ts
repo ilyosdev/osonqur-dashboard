@@ -183,6 +183,8 @@ export interface AdminBotMenuItem {
   sortOrder: number;
   description?: string;
   isEnabled: boolean;
+  customLabel?: string | null;
+  customDescription?: string | null;
   permissions: { key: string; name: string; isActive: boolean }[];
 }
 
@@ -518,7 +520,7 @@ export const adminApi = {
   getOrgRoleBotMenu: (orgId: string, roleId: string) =>
     apiClient<AdminBotMenuItem[]>(`/admin/orgs/${orgId}/roles/${roleId}/bot-menu`, { method: 'GET' }),
 
-  updateOrgRoleBotMenu: (orgId: string, roleId: string, items: { botMenuItemId: string; isEnabled: boolean }[]) =>
+  updateOrgRoleBotMenu: (orgId: string, roleId: string, items: { botMenuItemId: string; isEnabled: boolean; customLabel?: string | null; customDescription?: string | null }[]) =>
     apiClient<{ success: boolean }>(`/admin/orgs/${orgId}/roles/${roleId}/bot-menu`, {
       method: 'PUT',
       body: JSON.stringify({ items }),

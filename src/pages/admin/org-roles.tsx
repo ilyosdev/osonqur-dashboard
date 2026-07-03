@@ -74,7 +74,7 @@ export default function OrgRolesPage() {
   // Bot menu state
   const [botMenuItems, setBotMenuItems] = useState<AdminBotMenuItem[]>([]);
   const [botMenuSaving, setBotMenuSaving] = useState(false);
-  const [activeTab, setActiveTab] = useState("permissions");
+  const [activeTab, setActiveTab] = useState("bot-menu");
 
   // Reassign state
   const [targetRoleId, setTargetRoleId] = useState<string>("");
@@ -158,7 +158,7 @@ export default function OrgRolesPage() {
   const openManageDialog = async (role: AdminOrgRole) => {
     setSelectedRole(role);
     setExpandedGroups(new Set((permissionGroups || []).map((g) => g.id)));
-    setActiveTab("permissions");
+    setActiveTab("bot-menu");
     setManageDialogOpen(true);
     try {
       const [details, menuItems] = await Promise.all([
@@ -307,7 +307,7 @@ export default function OrgRolesPage() {
       await adminApi.updateOrgRoleBotMenu(
         selectedOrgId,
         selectedRole.id,
-        botMenuItems.map((item) => ({ botMenuItemId: item.id, isEnabled: item.isEnabled })),
+        botMenuItems.map((item) => ({ botMenuItemId: item.id, isEnabled: item.isEnabled, customLabel: item.customLabel || null, customDescription: item.customDescription || null })),
       );
       setManageDialogOpen(false);
     } catch (err) {
@@ -732,6 +732,10 @@ export default function OrgRolesPage() {
           </DialogHeader>
           <Tabs value={activeTab} onValueChange={setActiveTab}>
             <TabsList>
+              <TabsTrigger value="bot-menu">
+                <Bot className="h-4 w-4 mr-1" />
+                Bot menyusi ({botMenuItems.filter((i) => i.isEnabled).length}/{botMenuItems.length})
+              </TabsTrigger>
               <TabsTrigger value="permissions">
                 <Shield className="h-4 w-4 mr-1" />
                 Ruxsatlar ({selectedPermIds.size})
@@ -739,10 +743,6 @@ export default function OrgRolesPage() {
               <TabsTrigger value="authority">
                 <Users className="h-4 w-4 mr-1" />
                 Vakolat ({selectedAuthorityIds.size})
-              </TabsTrigger>
-              <TabsTrigger value="bot-menu">
-                <Bot className="h-4 w-4 mr-1" />
-                Bot menyusi ({botMenuItems.filter((i) => i.isEnabled).length}/{botMenuItems.length})
               </TabsTrigger>
             </TabsList>
 
@@ -901,18 +901,25 @@ export default function OrgRolesPage() {
                         item.isEnabled ? "border-primary/30 bg-primary/5" : "border-border"
                       }`}
                     >
-                      <div className="flex items-center gap-3">
+                      <div className="flex items-start gap-3">
                         <Switch
                           checked={item.isEnabled}
                           onCheckedChange={() => toggleBotMenuItem(item.id)}
+                          className="mt-1 shrink-0"
                         />
-                        <div className="flex-1 min-w-0">
-                          <div className="flex items-center gap-2">
-                            <span className="font-medium text-sm">{item.label}</span>
-                          </div>
-                          {item.description && (
-                            <p className="text-xs text-muted-foreground mt-0.5">{item.description}</p>
-                          )}
+                        <div className="flex-1 min-w-0 space-y-1.5">
+                          <input
+                            value={item.customLabel ?? item.label}
+                            onChange={(e) => setBotMenuItems((prev) => prev.map((i) => i.id === item.id ? { ...i, customLabel: e.target.value } : i))}
+                            placeholder={item.label}
+                            className="w-full text-sm font-medium bg-transparent border-b border-transparent hover:border-border focus:border-primary focus:outline-none py-0.5 text-[#0c447c]"
+                          />
+                          <input
+                            value={item.customDescription ?? item.description ?? ""}
+                            onChange={(e) => setBotMenuItems((prev) => prev.map((i) => i.id === item.id ? { ...i, customDescription: e.target.value } : i))}
+                            placeholder={item.description || "Tavsif qo'shing..."}
+                            className="w-full text-xs bg-transparent border-b border-transparent hover:border-border focus:border-primary focus:outline-none py-0.5 text-muted-foreground"
+                          />
                         </div>
                       </div>
                     </div>
