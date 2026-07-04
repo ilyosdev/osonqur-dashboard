@@ -362,13 +362,13 @@ export const adminApi = {
   getProjectSmeta: (orgId: string, projectId: string, smetaId: string) =>
     apiClient<AdminProjectSmeta>(`/admin/organizations/${orgId}/projects/${projectId}/smetas/${smetaId}`, { method: 'GET' }),
 
-  createProjectSmeta: (orgId: string, projectId: string, data: { name: string; type?: AdminSmetaType; description?: string; budget?: number; deadline?: string; overheadPercent?: number; buildingId?: string }) =>
+  createProjectSmeta: (orgId: string, projectId: string, data: { name: string; type?: AdminSmetaType; description?: string; budget?: number; startDate?: string; deadline?: string; overheadPercent?: number; buildingId?: string }) =>
     apiClient<AdminProjectSmeta>(`/admin/organizations/${orgId}/projects/${projectId}/smetas`, {
       method: 'POST',
       body: JSON.stringify(data),
     }),
 
-  updateProjectSmeta: (orgId: string, projectId: string, smetaId: string, data: { name?: string; type?: AdminSmetaType; description?: string; budget?: number; deadline?: string; overheadPercent?: number }) =>
+  updateProjectSmeta: (orgId: string, projectId: string, smetaId: string, data: { name?: string; type?: AdminSmetaType; description?: string; budget?: number; startDate?: string; deadline?: string; overheadPercent?: number }) =>
     apiClient<AdminProjectSmeta>(`/admin/organizations/${orgId}/projects/${projectId}/smetas/${smetaId}`, {
       method: 'PATCH',
       body: JSON.stringify(data),
@@ -381,13 +381,13 @@ export const adminApi = {
   getProjectBuildings: (orgId: string, projectId: string) =>
     apiClient<AdminBuilding[]>(`/admin/organizations/${orgId}/projects/${projectId}/buildings`, { method: 'GET' }),
 
-  createProjectBuilding: (orgId: string, projectId: string, data: { name: string; budget?: number; endDate?: string }) =>
+  createProjectBuilding: (orgId: string, projectId: string, data: { name: string; budget?: number; startDate?: string; endDate?: string }) =>
     apiClient<AdminBuilding>(`/admin/organizations/${orgId}/projects/${projectId}/buildings`, {
       method: 'POST',
       body: JSON.stringify(data),
     }),
 
-  updateProjectBuilding: (orgId: string, projectId: string, buildingId: string, data: { name?: string; budget?: number; endDate?: string }) =>
+  updateProjectBuilding: (orgId: string, projectId: string, buildingId: string, data: { name?: string; budget?: number; startDate?: string; endDate?: string }) =>
     apiClient<AdminBuilding>(`/admin/organizations/${orgId}/projects/${projectId}/buildings/${buildingId}`, {
       method: 'PATCH',
       body: JSON.stringify(data),

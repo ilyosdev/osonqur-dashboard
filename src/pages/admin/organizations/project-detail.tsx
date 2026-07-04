@@ -83,7 +83,7 @@ export default function ProjectDetailPage() {
   const [editBuildingDialogOpen, setEditBuildingDialogOpen] = useState(false);
   const [deleteBuildingDialogOpen, setDeleteBuildingDialogOpen] = useState(false);
   const [selectedBuilding, setSelectedBuilding] = useState<AdminBuilding | null>(null);
-  const [buildingFormData, setBuildingFormData] = useState({ name: "", budget: "", endDate: "" });
+  const [buildingFormData, setBuildingFormData] = useState({ name: "", budget: "", startDate: "", endDate: "" });
   const [buildingFormError, setBuildingFormError] = useState("");
 
   // Excel upload state
@@ -322,6 +322,7 @@ export default function ProjectDetailPage() {
       await adminApi.createProjectBuilding(orgId, projectId, {
         name: buildingFormData.name,
         budget: buildingFormData.budget ? parseFloat(buildingFormData.budget) : undefined,
+        startDate: buildingFormData.startDate || undefined,
         endDate: buildingFormData.endDate || undefined,
       });
       setAddBuildingDialogOpen(false);
@@ -341,6 +342,7 @@ export default function ProjectDetailPage() {
       await adminApi.updateProjectBuilding(orgId, projectId, selectedBuilding.id, {
         name: buildingFormData.name || undefined,
         budget: buildingFormData.budget ? parseFloat(buildingFormData.budget) : undefined,
+        startDate: buildingFormData.startDate || undefined,
         endDate: buildingFormData.endDate || undefined,
       });
       setEditBuildingDialogOpen(false);
@@ -511,7 +513,7 @@ export default function ProjectDetailPage() {
                 <Building2 className="h-4 w-4 text-[#185fa5]" />
                 Binolar ro'yxati
               </CardTitle>
-              <Button onClick={() => { setBuildingFormData({ name: "", budget: "", endDate: "" }); setBuildingFormError(""); setAddBuildingDialogOpen(true); }} className="h-10 rounded-[8px] bg-[#185fa5] px-4 text-[13px] font-medium text-white hover:bg-[#144f8f]">
+              <Button onClick={() => { setBuildingFormData({ name: "", budget: "", startDate: "", endDate: "" }); setBuildingFormError(""); setAddBuildingDialogOpen(true); }} className="h-10 rounded-[8px] bg-[#185fa5] px-4 text-[13px] font-medium text-white hover:bg-[#144f8f]">
                 <Plus className="h-4 w-4 mr-1.5" /> Yangi bino
               </Button>
             </CardHeader>
@@ -523,7 +525,7 @@ export default function ProjectDetailPage() {
                   </div>
                   <p className="text-[14px] font-semibold text-[#0c447c] mb-1">Binolar topilmadi</p>
                   <p className="text-[13px] text-[#94a3b8] mb-4">Agar bino qo'shilmasa, smetalar loyihaga to'g'ridan bog'lanadi</p>
-                  <Button onClick={() => { setBuildingFormData({ name: "", budget: "", endDate: "" }); setBuildingFormError(""); setAddBuildingDialogOpen(true); }} className="h-10 rounded-[8px] bg-[#185fa5] px-5 text-[13px] font-medium text-white hover:bg-[#144f8f]">
+                  <Button onClick={() => { setBuildingFormData({ name: "", budget: "", startDate: "", endDate: "" }); setBuildingFormError(""); setAddBuildingDialogOpen(true); }} className="h-10 rounded-[8px] bg-[#185fa5] px-5 text-[13px] font-medium text-white hover:bg-[#144f8f]">
                     <Plus className="h-4 w-4 mr-1.5" /> Birinchi binoni qo'shing
                   </Button>
                 </div>
@@ -548,7 +550,7 @@ export default function ProjectDetailPage() {
                             <DropdownMenuContent align="end">
                               <DropdownMenuItem onClick={() => {
                                 setSelectedBuilding(building);
-                                setBuildingFormData({ name: building.name, budget: building.budget?.toString() || "", endDate: building.endDate?.split("T")[0] || "" });
+                                setBuildingFormData({ name: building.name, budget: building.budget?.toString() || "", startDate: (building as any).startDate?.split("T")[0] || "", endDate: building.endDate?.split("T")[0] || "" });
                                 setBuildingFormError("");
                                 setEditBuildingDialogOpen(true);
                               }}>
@@ -986,13 +988,21 @@ export default function ProjectDetailPage() {
                 />
               </div>
               <div className="space-y-2">
-                <Label>Tugash sanasi</Label>
+                <Label>Boshlanish sanasi</Label>
                 <Input
                   type="date"
-                  value={buildingFormData.endDate}
-                  onChange={(e) => setBuildingFormData((p) => ({ ...p, endDate: e.target.value }))}
+                  value={buildingFormData.startDate}
+                  onChange={(e) => setBuildingFormData((p) => ({ ...p, startDate: e.target.value }))}
                 />
               </div>
+            </div>
+            <div className="space-y-2">
+              <Label>Tugash sanasi</Label>
+              <Input
+                type="date"
+                value={buildingFormData.endDate}
+                onChange={(e) => setBuildingFormData((p) => ({ ...p, endDate: e.target.value }))}
+              />
             </div>
           </div>
           <DialogFooter>
@@ -1030,13 +1040,21 @@ export default function ProjectDetailPage() {
                 />
               </div>
               <div className="space-y-2">
-                <Label>Tugash sanasi</Label>
+                <Label>Boshlanish sanasi</Label>
                 <Input
                   type="date"
-                  value={buildingFormData.endDate}
-                  onChange={(e) => setBuildingFormData((p) => ({ ...p, endDate: e.target.value }))}
+                  value={buildingFormData.startDate}
+                  onChange={(e) => setBuildingFormData((p) => ({ ...p, startDate: e.target.value }))}
                 />
               </div>
+            </div>
+            <div className="space-y-2">
+              <Label>Tugash sanasi</Label>
+              <Input
+                type="date"
+                value={buildingFormData.endDate}
+                onChange={(e) => setBuildingFormData((p) => ({ ...p, endDate: e.target.value }))}
+              />
             </div>
           </div>
           <DialogFooter>

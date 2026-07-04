@@ -68,6 +68,7 @@ export default function BuildingDetailPage() {
     type: "CONSTRUCTION" as AdminSmetaType,
     description: "",
     budget: "",
+    startDate: "",
     deadline: "",
     overheadPercent: "17.27",
   });
@@ -105,7 +106,7 @@ export default function BuildingDetailPage() {
   useEffect(() => { fetchSmetas(); }, [fetchSmetas]);
 
   const resetSmetaForm = () => {
-    setSmetaFormData({ name: "", type: "CONSTRUCTION", description: "", budget: "", deadline: "", overheadPercent: "17.27" });
+    setSmetaFormData({ name: "", type: "CONSTRUCTION", description: "", budget: "", startDate: "", deadline: "", overheadPercent: "17.27" });
     setFormError("");
   };
 
@@ -118,6 +119,7 @@ export default function BuildingDetailPage() {
       type: smeta.type,
       description: smeta.description || "",
       budget: smeta.budget?.toString() || "",
+      startDate: (smeta as any).startDate ? (smeta as any).startDate.split("T")[0] : "",
       deadline: smeta.deadline ? smeta.deadline.split("T")[0] : "",
       overheadPercent: smeta.overheadPercent?.toString() || "17.27",
     });
@@ -138,6 +140,7 @@ export default function BuildingDetailPage() {
         type: smetaFormData.type,
         description: smetaFormData.description || undefined,
         budget: smetaFormData.budget ? parseFloat(smetaFormData.budget) : undefined,
+        startDate: smetaFormData.startDate || undefined,
         deadline: smetaFormData.deadline || undefined,
         overheadPercent: smetaFormData.overheadPercent ? parseFloat(smetaFormData.overheadPercent) : undefined,
         buildingId,
@@ -162,6 +165,7 @@ export default function BuildingDetailPage() {
         type: smetaFormData.type,
         description: smetaFormData.description || undefined,
         budget: smetaFormData.budget ? parseFloat(smetaFormData.budget) : undefined,
+        startDate: smetaFormData.startDate || undefined,
         deadline: smetaFormData.deadline || undefined,
         overheadPercent: smetaFormData.overheadPercent ? parseFloat(smetaFormData.overheadPercent) : undefined,
       });
@@ -431,9 +435,13 @@ export default function BuildingDetailPage() {
                 <Input type="number" placeholder="0" value={smetaFormData.budget} onChange={(e) => setSmetaFormData((p) => ({ ...p, budget: e.target.value }))} />
               </div>
               <div className="space-y-2">
-                <Label>Muddat</Label>
-                <Input type="date" value={smetaFormData.deadline} onChange={(e) => setSmetaFormData((p) => ({ ...p, deadline: e.target.value }))} />
+                <Label>Boshlanish sanasi</Label>
+                <Input type="date" value={smetaFormData.startDate} onChange={(e) => setSmetaFormData((p) => ({ ...p, startDate: e.target.value }))} />
               </div>
+            </div>
+            <div className="space-y-2">
+              <Label>Tugash sanasi (muddat)</Label>
+              <Input type="date" value={smetaFormData.deadline} onChange={(e) => setSmetaFormData((p) => ({ ...p, deadline: e.target.value }))} />
             </div>
           </div>
           <DialogFooter>
@@ -477,9 +485,13 @@ export default function BuildingDetailPage() {
                 <Input type="number" value={smetaFormData.budget} onChange={(e) => setSmetaFormData((p) => ({ ...p, budget: e.target.value }))} />
               </div>
               <div className="space-y-2">
-                <Label>Muddat</Label>
-                <Input type="date" value={smetaFormData.deadline} onChange={(e) => setSmetaFormData((p) => ({ ...p, deadline: e.target.value }))} />
+                <Label>Boshlanish sanasi</Label>
+                <Input type="date" value={smetaFormData.startDate} onChange={(e) => setSmetaFormData((p) => ({ ...p, startDate: e.target.value }))} />
               </div>
+            </div>
+            <div className="space-y-2">
+              <Label>Tugash sanasi (muddat)</Label>
+              <Input type="date" value={smetaFormData.deadline} onChange={(e) => setSmetaFormData((p) => ({ ...p, deadline: e.target.value }))} />
             </div>
           </div>
           <DialogFooter>
