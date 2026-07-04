@@ -128,7 +128,7 @@ export default function ForemanPage() {
       )}
 
       <Dialog open={createOpen} onOpenChange={setCreateOpen}>
-        <DialogContent style={{ maxWidth: "90vw", width: "90vw", maxHeight: "90vh", overflowY: "auto" }}>
+        <DialogContent className="max-w-xl max-h-[85vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>Yangi zayavka yaratish</DialogTitle>
             <DialogDescription>Materiallarni kiriting</DialogDescription>
