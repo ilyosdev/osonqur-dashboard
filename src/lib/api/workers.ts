@@ -34,6 +34,8 @@ export interface WorkLog {
   date: string;
   isValidated: boolean;
   isRejected?: boolean;
+  isPaid?: boolean;
+  paidAmount?: number;
   rejectionReason?: string | null;
   validatedAt?: string | null;
   worker?: { id: string; name: string };
@@ -56,14 +58,13 @@ export interface CreateWorkLogRequest {
 
 export interface WorkerPayment {
   id: string;
-  workerId: string;
   amount: number;
-  paymentDate: string;
-  paymentType: string;
-  description?: string;
-  vendorId: string;
+  note?: string | null;
+  worker: { id: string; name: string };
+  paidBy: { id: string; name: string };
+  workLogId?: string;
+  workLog?: { id: string; workType: string; quantity: number; unit: string };
   createdAt: string;
-  updatedAt: string;
 }
 
 export interface CreateWorkerPaymentRequest {

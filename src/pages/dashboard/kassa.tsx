@@ -52,6 +52,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { useApi, useMutation } from "@/hooks/use-api";
+import { translateError } from "@/lib/error-messages";
 import { useAuth } from "@/lib/auth";
 import { usePermission } from "@/hooks";
 import { useProject } from "@/lib/project-context";
@@ -889,11 +890,18 @@ function RequestMoneyModalInner({ onClose }: { onClose: () => void }) {
   const { selectedProjectId, selectedProject } = useProject();
   const [amount, setAmount] = useState("");
   const [reason, setReason] = useState("");
+  const [error, setError] = useState("");
   const { mutate, loading } = useMutation((data: { projectId: string; amount: number; reason?: string }) => cashRequestsApi.create(data));
 
   const handleSubmit = async () => {
     if (!amount || !selectedProjectId) return;
-    try { await mutate({ projectId: selectedProjectId, amount: Number(amount), reason: reason || undefined }); setAmount(""); setReason(""); onClose(); } catch {}
+    setError("");
+    try {
+      await mutate({ projectId: selectedProjectId, amount: Number(amount), reason: reason || undefined });
+      setAmount(""); setReason(""); onClose();
+    } catch (err) {
+      setError(translateError(err));
+    }
   };
 
   return (
@@ -909,6 +917,11 @@ function RequestMoneyModalInner({ onClose }: { onClose: () => void }) {
       <Field label="Sabab">
         <textarea style={inp2Style} placeholder="Sabab (ixtiyoriy)" value={reason} onChange={(e) => setReason(e.target.value)} />
       </Field>
+      {error && (
+        <div style={{ marginTop: 8, padding: "8px 12px", borderRadius: 8, background: "#fef2f2", border: "1px solid #fecaca", color: "#dc2626", fontSize: 13 }}>
+          {error}
+        </div>
+      )}
       <div style={{ display: "flex", gap: 8, justifyContent: "flex-end", marginTop: 4 }}>
         <button style={{ padding: "9px 18px", border: "1px solid #daeaf8", borderRadius: 9, background: "#fff", color: "#85b7eb", fontSize: 13, cursor: "pointer" }} onClick={onClose}>Bekor qilish</button>
         <button style={{ padding: "9px 22px", border: "none", borderRadius: 9, background: "#185fa5", color: "#fff", fontSize: 13, fontWeight: 500, cursor: "pointer" }} onClick={handleSubmit} disabled={loading || !selectedProjectId || !amount}>{loading ? "Yuborilmoqda..." : "Yuborish"}</button>
@@ -920,11 +933,19 @@ function RequestMoneyModalInner({ onClose }: { onClose: () => void }) {
 function AddExpenseModalInner({ koshelokId, onClose }: { koshelokId?: string; onClose: () => void }) {
   const [amount, setAmount] = useState("");
   const [note, setNote] = useState("");
+  const [error, setError] = useState("");
   const { mutate, loading } = useMutation((data: { type: "OUT"; amount: number; note?: string }) => cashRegistersApi.createMyTransaction(data));
 
   const handleSubmit = async () => {
     if (!amount) return;
-    try { await mutate({ type: "OUT", amount: Number(amount), note: note || undefined }); setAmount(""); setNote(""); onClose(); } catch {}
+    setError("");
+    try {
+      await mutate({ type: "OUT", amount: Number(amount), note: note || undefined });
+      setAmount(""); setNote(""); onClose();
+    } catch (err) {
+      // Keep dialog open, show translated Uzbek error (e.g. balans yetmasa)
+      setError(translateError(err));
+    }
   };
 
   return (
@@ -935,6 +956,11 @@ function AddExpenseModalInner({ koshelokId, onClose }: { koshelokId?: string; on
       <Field label="Izoh">
         <textarea style={inp2Style} placeholder="Izoh (ixtiyoriy)" value={note} onChange={(e) => setNote(e.target.value)} />
       </Field>
+      {error && (
+        <div style={{ marginTop: 8, padding: "8px 12px", borderRadius: 8, background: "#fef2f2", border: "1px solid #fecaca", color: "#dc2626", fontSize: 13 }}>
+          {error}
+        </div>
+      )}
       <div style={{ display: "flex", gap: 8, justifyContent: "flex-end", marginTop: 4 }}>
         <button style={{ padding: "9px 18px", border: "1px solid #daeaf8", borderRadius: 9, background: "#fff", color: "#85b7eb", fontSize: 13, cursor: "pointer" }} onClick={onClose}>Bekor qilish</button>
         <button style={{ padding: "9px 22px", border: "none", borderRadius: 9, background: "#185fa5", color: "#fff", fontSize: 13, fontWeight: 500, cursor: "pointer" }} onClick={handleSubmit} disabled={loading || !amount}>{loading ? "Saqlanmoqda..." : "Saqlash"}</button>
@@ -948,13 +974,20 @@ function AddIncomeModalInner({ onClose }: { onClose: () => void }) {
   const [category, setCategory] = useState("");
   const [description, setDescription] = useState("");
   const [accountId, setAccountId] = useState("");
+  const [error, setError] = useState("");
 
   const { data: accountsData } = useApi(() => accountsApi.getAll({ limit: 100 }), [], { enabled: true });
   const { mutate, loading } = useMutation((data: any) => incomesApi.create(data));
 
   const handleSubmit = async () => {
     if (!amount || !accountId || !category) return;
-    try { await mutate({ accountId, amount: Number(amount), date: new Date().toISOString().split("T")[0], category, description: description || undefined }); onClose(); } catch {}
+    setError("");
+    try {
+      await mutate({ accountId, amount: Number(amount), date: new Date().toISOString().split("T")[0], category, description: description || undefined });
+      onClose();
+    } catch (err) {
+      setError(translateError(err));
+    }
   };
 
   return (
@@ -977,6 +1010,11 @@ function AddIncomeModalInner({ onClose }: { onClose: () => void }) {
       <Field label="Izoh">
         <textarea style={inp2Style} placeholder="Izoh (ixtiyoriy)" value={description} onChange={(e) => setDescription(e.target.value)} />
       </Field>
+      {error && (
+        <div style={{ marginTop: 8, padding: "8px 12px", borderRadius: 8, background: "#fef2f2", border: "1px solid #fecaca", color: "#dc2626", fontSize: 13 }}>
+          {error}
+        </div>
+      )}
       <div style={{ display: "flex", gap: 8, justifyContent: "flex-end", marginTop: 4 }}>
         <button style={{ padding: "9px 18px", border: "1px solid #daeaf8", borderRadius: 9, background: "#fff", color: "#85b7eb", fontSize: 13, cursor: "pointer" }} onClick={onClose}>Bekor qilish</button>
         <button style={{ padding: "9px 22px", border: "none", borderRadius: 9, background: "#3B6D11", color: "#fff", fontSize: 13, fontWeight: 500, cursor: "pointer" }} onClick={handleSubmit} disabled={loading || !amount || !accountId || !category}>{loading ? "Saqlanmoqda..." : "Saqlash"}</button>
@@ -988,11 +1026,18 @@ function AddIncomeModalInner({ onClose }: { onClose: () => void }) {
 function FillBalanceModalInner({ koshelokId, employeeName, onClose }: { koshelokId?: string; employeeName?: string; onClose: () => void }) {
   const [amount, setAmount] = useState("");
   const [note, setNote] = useState("");
+  const [error, setError] = useState("");
   const { mutate, loading } = useMutation((data: { cashRegisterId: string; type: "IN"; amount: number; note?: string }) => cashRegistersApi.createTransaction(data));
 
   const handleSubmit = async () => {
     if (!koshelokId || !amount) return;
-    try { await mutate({ cashRegisterId: koshelokId, type: "IN", amount: Number(amount), note: note || "Balans to'ldirish" }); onClose(); } catch {}
+    setError("");
+    try {
+      await mutate({ cashRegisterId: koshelokId, type: "IN", amount: Number(amount), note: note || "Balans to'ldirish" });
+      onClose();
+    } catch (err) {
+      setError(translateError(err));
+    }
   };
 
   return (
@@ -1003,6 +1048,11 @@ function FillBalanceModalInner({ koshelokId, employeeName, onClose }: { koshelok
       <Field label="Izoh">
         <textarea style={inp2Style} placeholder="Izoh (ixtiyoriy)" value={note} onChange={(e) => setNote(e.target.value)} />
       </Field>
+      {error && (
+        <div style={{ marginTop: 8, padding: "8px 12px", borderRadius: 8, background: "#fef2f2", border: "1px solid #fecaca", color: "#dc2626", fontSize: 13 }}>
+          {error}
+        </div>
+      )}
       <div style={{ display: "flex", gap: 8, justifyContent: "flex-end", marginTop: 4 }}>
         <button style={{ padding: "9px 18px", border: "1px solid #daeaf8", borderRadius: 9, background: "#fff", color: "#85b7eb", fontSize: 13, cursor: "pointer" }} onClick={onClose}>Bekor qilish</button>
         <button style={{ padding: "9px 22px", border: "none", borderRadius: 9, background: "#185fa5", color: "#fff", fontSize: 13, fontWeight: 500, cursor: "pointer" }} onClick={handleSubmit} disabled={loading || !amount || !koshelokId}>{loading ? "To'ldirilmoqda..." : "To'ldirish"}</button>

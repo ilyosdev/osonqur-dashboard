@@ -39,6 +39,7 @@ import { projectsApi } from "@/lib/api/projects";
 import { analyticsApi } from "@/lib/api/analytics";
 import { StatsSkeleton } from "@/components/ui/table-skeleton";
 import { ErrorMessage } from "@/components/ui/error-message";
+import { translateError } from "@/lib/error-messages";
 
 function fmt(num: number): string {
   return num.toLocaleString("uz-UZ");
@@ -92,6 +93,7 @@ export default function WorkersPage() {
   const [showPayDialog, setShowPayDialog] = useState(false);
   const [payWorkerId, setPayWorkerId] = useState("");
   const [payAmount, setPayAmount] = useState("");
+  const [payWorkLogId, setPayWorkLogId] = useState<string>(""); // "" = umumiy to'lov
   const [payLoading, setPayLoading] = useState(false);
   const [payError, setPayError] = useState<string | null>(null);
 
@@ -163,6 +165,17 @@ export default function WorkersPage() {
     [showArchiveDialog]
   );
 
+  // To'lov dialogi ochilganda ustaning to'lanmagan (validatsiyalangan) ishlari
+  const { data: unpaidLogsResp } = useApi(
+    () => showPayDialog && payWorkerId
+      ? workersApi.getWorkLogs({ workerId: payWorkerId, isPaid: false, limit: 100 })
+      : Promise.resolve(null),
+    [showPayDialog, payWorkerId]
+  );
+  const unpaidWorkLogs = (unpaidLogsResp?.data || []).filter(
+    (wl) => wl.isValidated && !wl.isRejected && (wl.totalAmount ?? 0) > 0
+  );
+
   const workers = workersResponse?.data || [];
   const recentWorkLogs = workLogsResponse?.data || [];
   const projects = projectsResponse?.data || [];
@@ -221,10 +234,14 @@ export default function WorkersPage() {
     if (!payAmount || isNaN(amount) || amount <= 0) { setPayError("Summani kiriting"); return; }
     setPayLoading(true); setPayError(null);
     try {
-      await workersApi.createPayment({ workerId: payWorkerId, amount });
-      setShowPayDialog(false); setPayWorkerId(""); setPayAmount("");
+      await workersApi.createPayment({
+        workerId: payWorkerId,
+        amount,
+        workLogId: payWorkLogId || undefined, // "" => umumiy to'lov
+      });
+      setShowPayDialog(false); setPayWorkerId(""); setPayAmount(""); setPayWorkLogId("");
     } catch (err) {
-      setPayError(err instanceof Error ? err.message : "Xatolik yuz berdi");
+      setPayError(translateError(err));
     } finally { setPayLoading(false); }
   };
 
@@ -313,8 +330,9 @@ export default function WorkersPage() {
         setDetailPayAmount("");
         refetchWorkerPayments();
         refetchWorkers();
+        refetchUnpaid();
       } catch (err) {
-        setDetailPayError(err instanceof Error ? err.message : "Xatolik yuz berdi");
+        setDetailPayError(translateError(err));
       } finally { setDetailPayLoading(false); }
     };
 
@@ -504,7 +522,7 @@ export default function WorkersPage() {
                   <div className="flex items-center gap-3">
                     <span className="text-[12px] font-medium text-[#3B6D11]">{fmt(totalPaid)} so'm</span>
                     <button
-                      onClick={() => { setShowPayDialog(true); setPayWorkerId(ihWorker!.id); setPayAmount(""); setPayError(null); }}
+                      onClick={() => { setShowPayDialog(true); setPayWorkerId(ihWorker!.id); setPayAmount(""); setPayWorkLogId(""); setPayError(null); }}
                       className="flex items-center gap-1.5 px-3 py-1.5 rounded-[8px] bg-[#185fa5] text-white text-[12px] font-medium hover:bg-[#0c447c] transition-colors"
                     >
                       <Plus className="h-3.5 w-3.5" /> To'lov qo'shish
@@ -523,8 +541,15 @@ export default function WorkersPage() {
                           <Banknote className="h-4 w-4 text-[#3B6D11]" />
                         </div>
                         <div>
-                          <p className="text-[13px] font-medium text-[#0c447c]">Naqd to'lov</p>
-                          {payment.description && <p className="text-[11px] text-[#85b7eb] mt-0.5">{payment.description}</p>}
+                          <p className="text-[13px] font-medium text-[#0c447c]">
+                            {payment.workLog ? payment.workLog.workType : "Umumiy to'lov"}
+                          </p>
+                          {payment.workLog && (
+                            <p className="text-[11px] text-[#378add] mt-0.5">
+                              {payment.workLog.quantity} {payment.workLog.unit}
+                            </p>
+                          )}
+                          {payment.note && <p className="text-[11px] text-[#85b7eb] mt-0.5">{payment.note}</p>}
                         </div>
                       </div>
                       <div className="text-right">
@@ -578,6 +603,40 @@ export default function WorkersPage() {
                 <div className="rounded-[10px] border border-emerald-200 bg-emerald-50 p-3">
                   <span className="text-xs text-emerald-700">Qarz yo'q</span>
                 </div>
+              )}
+            </div>
+            <div className="space-y-2">
+              <Label className="text-[14px] font-medium text-[#0c447c]">Qaysi ish uchun</Label>
+              <select
+                value={payWorkLogId}
+                onChange={(e) => {
+                  const id = e.target.value;
+                  setPayWorkLogId(id);
+                  // Ish tanlansa — summani o'sha ishning to'lanmagan qismiga to'ldiramiz
+                  if (id) {
+                    const wl = unpaidWorkLogs.find((w) => w.id === id);
+                    if (wl) {
+                      const unpaid = Math.max(0, (wl.totalAmount ?? 0) - (wl.paidAmount ?? 0));
+                      setPayAmount(String(unpaid));
+                    }
+                  }
+                }}
+                className="h-11 w-full rounded-[10px] border border-[#dbe7f3] bg-white px-3 text-[14px] text-[#0c447c] shadow-none"
+              >
+                <option value="">Umumiy to'lov (ishga bog'lanmagan)</option>
+                {unpaidWorkLogs.map((wl) => {
+                  const unpaid = Math.max(0, (wl.totalAmount ?? 0) - (wl.paidAmount ?? 0));
+                  return (
+                    <option key={wl.id} value={wl.id}>
+                      {wl.workType} — {wl.quantity} {wl.unit} ({fmt(unpaid)} so'm)
+                    </option>
+                  );
+                })}
+              </select>
+              {payWorkLogId === "" && unpaidWorkLogs.length > 0 && (
+                <p className="text-[11px] text-[#85b7eb]">
+                  Aniq ishni tanlasangiz, to'lov o'sha ishga bog'lanadi va tarixda ko'rinadi.
+                </p>
               )}
             </div>
             <div className="space-y-2">
@@ -789,7 +848,7 @@ export default function WorkersPage() {
                     className="h-10 rounded-[8px] border border-[#dbe7f3] bg-white pl-9 text-[13px] text-[#0c447c] shadow-none placeholder:text-[#94a3b8]"
                   />
                 </div>
-                <Button variant="outline" size="sm" className="h-10 rounded-[8px]" onClick={() => { setShowPayDialog(true); setPayWorkerId(""); setPayAmount(""); setPayError(null); }}>
+                <Button variant="outline" size="sm" className="h-10 rounded-[8px]" onClick={() => { setShowPayDialog(true); setPayWorkerId(""); setPayAmount(""); setPayWorkLogId(""); setPayError(null); }}>
                   <DollarSign className="mr-2 h-4 w-4" /> To'lov qo'shish
                 </Button>
                 <Button variant="outline" size="sm" className="h-10 rounded-[8px]" onClick={() => setShowArchiveDialog(true)}>
@@ -926,6 +985,36 @@ export default function WorkersPage() {
                 );
               })()}
             </div>
+            {payWorkerId && (
+              <div className="space-y-2">
+                <Label className="text-[14px] font-medium text-[#0c447c]">Qaysi ish uchun</Label>
+                <select
+                  value={payWorkLogId}
+                  onChange={(e) => {
+                    const id = e.target.value;
+                    setPayWorkLogId(id);
+                    if (id) {
+                      const wl = unpaidWorkLogs.find((w) => w.id === id);
+                      if (wl) {
+                        const unpaid = Math.max(0, (wl.totalAmount ?? 0) - (wl.paidAmount ?? 0));
+                        setPayAmount(String(unpaid));
+                      }
+                    }
+                  }}
+                  className="h-11 w-full rounded-[10px] border border-[#dbe7f3] bg-white px-3 text-[14px] text-[#0c447c] shadow-none"
+                >
+                  <option value="">Umumiy to'lov (ishga bog'lanmagan)</option>
+                  {unpaidWorkLogs.map((wl) => {
+                    const unpaid = Math.max(0, (wl.totalAmount ?? 0) - (wl.paidAmount ?? 0));
+                    return (
+                      <option key={wl.id} value={wl.id}>
+                        {wl.workType} — {wl.quantity} {wl.unit} ({fmt(unpaid)} so'm)
+                      </option>
+                    );
+                  })}
+                </select>
+              </div>
+            )}
             <div className="space-y-2">
               <Label className="text-[14px] font-medium text-[#0c447c]">Summa (so'm) *</Label>
               <Input
@@ -966,7 +1055,11 @@ export default function WorkersPage() {
                 <div key={p.id} className="flex items-center justify-between rounded-[10px] border border-[#dbe7f3] p-3 text-sm">
                   <div>
                     <p className="font-medium">{fmt(p.amount)} so'm</p>
-                    <p className="text-xs text-muted-foreground">{new Date(p.paymentDate).toLocaleDateString("uz-UZ")} — {p.paymentType}</p>
+                    <p className="text-xs text-[#378add]">{p.workLog ? p.workLog.workType : "Umumiy to'lov"}</p>
+                    <p className="text-xs text-muted-foreground">
+                      {new Date(p.createdAt).toLocaleDateString("uz-UZ")}
+                      {p.worker ? ` — ${p.worker.name}` : ""}
+                    </p>
                   </div>
                   <Badge variant="secondary">To'langan</Badge>
                 </div>

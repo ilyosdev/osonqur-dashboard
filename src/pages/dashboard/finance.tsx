@@ -13,6 +13,7 @@ import { useApi, useMutation } from "@/hooks/use-api";
 import { incomesApi, expensesApi, cashRegistersApi, cashRequestsApi } from "@/lib/api/finance";
 import { StatsSkeleton } from "@/components/ui/table-skeleton";
 import { ErrorMessage } from "@/components/ui/error-message";
+import { translateError } from "@/lib/error-messages";
 import { useAuth } from "@/lib/auth";
 import { useProject } from "@/lib/project-context";
 
@@ -69,6 +70,7 @@ export default function FinancePage() {
   const [expenseCategory, setExpenseCategory] = useState("OTHER");
   const [expensePaymentType, setExpensePaymentType] = useState<'CASH' | 'CARD' | 'TRANSFER'>("CASH");
   const [expenseNote, setExpenseNote] = useState("");
+  const [expenseError, setExpenseError] = useState("");
 
   const { mutate: createIncome, loading: creatingIncome } = useMutation(
     (data: { projectId: string; amount: number; source: string; paymentType: 'CASH' | 'CARD' | 'TRANSFER'; note?: string }) =>
@@ -134,17 +136,23 @@ export default function FinancePage() {
 
   const handleCreateExpense = async () => {
     if (!expenseAmount || !expenseRecipient || !selectedProjectId) return;
-    await createExpense({
-      projectId: selectedProjectId,
-      amount: Number(expenseAmount),
-      recipient: expenseRecipient,
-      paymentType: expensePaymentType,
-      category: expenseCategory,
-      note: expenseNote || undefined,
-    });
-    setShowExpenseDialog(false);
-    setExpenseAmount(""); setExpenseRecipient(""); setExpenseNote("");
-    refetchExpenses();
+    setExpenseError("");
+    try {
+      await createExpense({
+        projectId: selectedProjectId,
+        amount: Number(expenseAmount),
+        recipient: expenseRecipient,
+        paymentType: expensePaymentType,
+        category: expenseCategory,
+        note: expenseNote || undefined,
+      });
+      setShowExpenseDialog(false);
+      setExpenseAmount(""); setExpenseRecipient(""); setExpenseNote("");
+      refetchExpenses();
+    } catch (err) {
+      // Keep the dialog open and show a translated Uzbek error
+      setExpenseError(translateError(err));
+    }
   };
 
   return (
@@ -160,7 +168,7 @@ export default function FinancePage() {
           </Button>
         )}
         {activeTab === "expenses" && canCreateExpense && (
-          <Button size="sm" onClick={() => setShowExpenseDialog(true)}>
+          <Button size="sm" onClick={() => { setExpenseError(""); setShowExpenseDialog(true); }}>
             <Plus className="h-4 w-4 mr-1" /> Chiqim qo'shish
           </Button>
         )}
@@ -379,6 +387,11 @@ export default function FinancePage() {
               <Label>Izoh (ixtiyoriy)</Label>
               <Input value={expenseNote} onChange={e => setExpenseNote(e.target.value)} placeholder="..." />
             </div>
+            {expenseError && (
+              <p className="text-sm text-destructive bg-destructive/5 border border-destructive/30 rounded-md px-3 py-2">
+                {expenseError}
+              </p>
+            )}
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setShowExpenseDialog(false)}>Bekor</Button>

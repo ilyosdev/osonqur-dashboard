@@ -460,7 +460,7 @@ function InlineCreateRequest({ projectId, onClose: _onClose, onSuccess, onParsed
   const selectedSmetaIdRef = useRef<string>("__none__");
   const [smetaItems, setSmetaItems] = useState<SmetaItem[]>([]);
   const [smetaItemSearch, setSmetaItemSearch] = useState<Record<number, string>>({});
-  const [smetaItemResults, setSmetaItemResults] = useState<Record<number, SmetaItem[]>>({});
+  const [smetaItemResults, setSmetaItemResults] = useState<Record<number, { id: string; name: string; unit: string }[]>>({});
 
   const { selectedBuildingId, buildings } = useBuilding();
   const [smetas, setSmetas] = useState<{ id: string; name: string; buildingId?: string }[]>([]);
@@ -1111,7 +1111,7 @@ function SmetaItemPicker({
           {/* Clear option */}
           <button
             type="button"
-            onClick={() => { onChange(undefined); setOpen(false); onSearch(""); }}
+            onClick={() => { onChange(undefined); setOpen(false); onSearch("", []); }}
             className="w-full px-3 py-2 text-left text-[12px] text-[#94a3b8] hover:bg-[#f8fafc] border-b border-[#f1f5f9]"
           >
             — Elementisiz
@@ -1126,7 +1126,7 @@ function SmetaItemPicker({
                 <button
                   key={si.id}
                   type="button"
-                  onClick={() => { onChange(si.id); setOpen(false); onSearch(""); }}
+                  onClick={() => { onChange(si.id); setOpen(false); onSearch("", []); }}
                   className={`w-full px-3 py-2 text-left hover:bg-[#eff6ff] transition-colors flex items-center justify-between gap-2 ${si.id === value ? "bg-[#eff6ff]" : ""}`}
                 >
                   <span className="text-[12px] text-[#1e293b] leading-snug">{si.name}</span>

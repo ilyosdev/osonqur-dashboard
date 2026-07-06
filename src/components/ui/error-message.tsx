@@ -2,6 +2,7 @@
 import { AlertTriangle, RefreshCcw } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
+import { translateError } from "@/lib/error-messages";
 
 interface ErrorMessageProps {
   error: Error | string;
@@ -14,7 +15,7 @@ export function ErrorMessage({
   onRetry,
   title = "Xatolik yuz berdi",
 }: ErrorMessageProps) {
-  const message = typeof error === "string" ? error : error.message;
+  const message = translateError(error);
 
   return (
     <Card className="border-destructive/50 bg-destructive/5">

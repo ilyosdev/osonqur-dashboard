@@ -341,14 +341,16 @@ function PaymentCard({ payment }: { payment: WorkerPayment }) {
     <div className="flex items-center justify-between p-3 rounded-lg border bg-success/5 border-success/10">
       <div className="flex-1 min-w-0">
         <p className="font-medium text-sm">
-          {payment.description || "To'lov"}
+          {payment.workLog ? payment.workLog.workType : payment.note || "Umumiy to'lov"}
         </p>
         <div className="flex items-center gap-2 mt-1 text-xs text-muted-foreground">
           <Calendar className="h-3 w-3" />
-          <span>{formatDate(payment.paymentDate)}</span>
-          <Badge variant="outline" className="text-xs">
-            {payment.paymentType}
-          </Badge>
+          <span>{formatDate(payment.createdAt)}</span>
+          {payment.workLog && (
+            <Badge variant="outline" className="text-xs">
+              {payment.workLog.quantity} {payment.workLog.unit}
+            </Badge>
+          )}
         </div>
       </div>
       <p className="font-semibold text-success">
