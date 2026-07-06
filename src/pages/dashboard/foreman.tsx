@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import { ClipboardList, Plus, ChevronLeft, ChevronRight, Clock, CheckCircle, Search } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -94,6 +94,7 @@ export default function ForemanPage() {
   const [selectedBatch, setSelectedBatch] = useState<PurchaseRequest[] | null>(null);
   const [detailBackView, setDetailBackView] = useState<"menu" | "history">("menu");
   const [createOpen, setCreateOpen] = useState(false);
+  const [createParsed, setCreateParsed] = useState(false);
 
   return (
     <div className="space-y-6 animate-fade-in">
@@ -127,8 +128,8 @@ export default function ForemanPage() {
         />
       )}
 
-      <Dialog open={createOpen} onOpenChange={setCreateOpen}>
-        <DialogContent className="max-w-xl max-h-[85vh] overflow-y-auto">
+      <Dialog open={createOpen} onOpenChange={(o) => { setCreateOpen(o); if (!o) setCreateParsed(false); }}>
+        <DialogContent style={{ maxWidth: createParsed ? 1100 : 560, width: "95vw", maxHeight: "90vh", overflowY: "auto" }}>
           <DialogHeader>
             <DialogTitle>Yangi zayavka yaratish</DialogTitle>
             <DialogDescription>Materiallarni kiriting</DialogDescription>
@@ -136,8 +137,10 @@ export default function ForemanPage() {
           {createOpen && (
             <InlineCreateRequest
               projectId={selectedProjectId}
-              onClose={() => setCreateOpen(false)}
-              onSuccess={() => setCreateOpen(false)}
+              onClose={() => { setCreateOpen(false); setCreateParsed(false); }}
+              onSuccess={() => { setCreateOpen(false); setCreateParsed(false); }}
+              onParsed={() => setCreateParsed(true)}
+              onBack={() => setCreateParsed(false)}
             />
           )}
         </DialogContent>
@@ -448,36 +451,52 @@ function BatchDetailView({ batch, onBack }: { batch: PurchaseRequest[]; onBack: 
   );
 }
 
-function InlineCreateRequest({ projectId, onClose: _onClose, onSuccess }: { projectId: string | null; onClose: () => void; onSuccess: () => void }) {
+function InlineCreateRequest({ projectId, onClose: _onClose, onSuccess, onParsed, onBack: _onBack }: { projectId: string | null; onClose: () => void; onSuccess: () => void; onParsed?: () => void; onBack?: () => void }) {
   const [text, setText] = useState("");
   const [parsed, setParsed] = useState<ParsedItem[] | null>(null);
   const [error, setError] = useState("");
   const [parsing, setParsing] = useState(false);
   const [selectedSmetaId, setSelectedSmetaId] = useState<string>("__none__");
+  const selectedSmetaIdRef = useRef<string>("__none__");
   const [smetaItems, setSmetaItems] = useState<SmetaItem[]>([]);
   const [smetaItemSearch, setSmetaItemSearch] = useState<Record<number, string>>({});
+  const [smetaItemResults, setSmetaItemResults] = useState<Record<number, SmetaItem[]>>({});
 
   const { selectedBuildingId, buildings } = useBuilding();
   const [smetas, setSmetas] = useState<{ id: string; name: string; buildingId?: string }[]>([]);
-  useEffect(() => {
-    if (!projectId) return;
-    smetasApi.getAll({ projectId, limit: 100 }).then(res => setSmetas(res.data ?? [])).catch(() => {});
-  }, [projectId]);
 
-  // Filter smetas by selected building
-  const visibleSmetas = selectedBuildingId
-    ? smetas.filter(s => s.buildingId === selectedBuildingId)
-    : smetas;
+  // Show all smetas (building filter only groups them visually, doesn't hide)
+  const visibleSmetas = smetas;
 
   const handleSmetaChange = async (smetaId: string) => {
     setSelectedSmetaId(smetaId);
+    selectedSmetaIdRef.current = smetaId;
     setSmetaItems([]);
+    setSmetaItemResults({});
+    setSmetaItemSearch({});
     if (!smetaId || smetaId === "__none__") return;
     try {
-      const res = await smetaItemsApi.getAll({ smetaId, limit: 500 });
+      const res = await smetaItemsApi.getAll({ smetaId, limit: 200 });
       setSmetaItems(res.data);
     } catch { /* ignore */ }
   };
+
+  useEffect(() => {
+    if (!projectId) return;
+    smetasApi.getAll({ projectId, limit: 100 }).then(async res => {
+      const data = res.data ?? [];
+      setSmetas(data);
+      if (data.length >= 1) {
+        const firstId = data[0].id;
+        setSelectedSmetaId(firstId);
+        selectedSmetaIdRef.current = firstId;
+        try {
+          const r = await smetaItemsApi.getAll({ smetaId: firstId, limit: 200 });
+          setSmetaItems(r.data);
+        } catch { /* ignore */ }
+      }
+    }).catch(() => {});
+  }, [projectId]);
 
   const { mutate: submit, loading, error: submitError } = useMutation(async () => {
     if (!projectId) throw new Error("Loyiha tanlanmagan");
@@ -488,16 +507,36 @@ function InlineCreateRequest({ projectId, onClose: _onClose, onSuccess }: { proj
 
   const handleParse = async () => {
     setError("");
+    // Use current state value (always fresh at call time), fallback to first smeta
+    const activeSmetaId = (selectedSmetaId && selectedSmetaId !== "__none__")
+      ? selectedSmetaId
+      : (smetas.length > 0 ? smetas[0].id : null);
+    // If project has smetas, smeta selection is required
+    if (smetas.length > 0 && !activeSmetaId) {
+      setError("Loyihada smeta mavjud — iltimos smeta tanlang");
+      return;
+    }
     setParsing(true);
+    console.log('[PARSE] activeSmetaId:', activeSmetaId, 'selectedSmetaId:', selectedSmetaId, 'smetas.length:', smetas.length);
     try {
       let items: ParsedItem[] = [];
       try {
-        const result = await requestsApi.parseText(text);
+        // Pass smetaId to backend — it will parse AND auto-match in one request
+        const result = await requestsApi.parseText(text, activeSmetaId ?? undefined);
+        console.log('[PARSE] response matched:', result.items?.filter(i => i.smetaItemId).length, '/', result.items?.length);
         if (!result.items || result.items.length === 0) {
           setError("Material topilmadi. Masalan: \"Sement 100 qop, armatura 500 kg\"");
           return;
         }
         items = result.items;
+        // Pre-populate smetaItemResults so SmetaItemPicker can display matched names
+        const preloaded: Record<number, { id: string; name: string; unit: string }[]> = {};
+        result.items.forEach((item, idx) => {
+          if (item.smetaItemId && item.smetaItemName) {
+            preloaded[idx] = [{ id: item.smetaItemId, name: item.smetaItemName, unit: item.smetaItemUnit ?? '' }];
+          }
+        });
+        if (Object.keys(preloaded).length > 0) setSmetaItemResults(preloaded);
       } catch {
         items = parseText(text);
         if (items.length === 0) {
@@ -506,19 +545,8 @@ function InlineCreateRequest({ projectId, onClose: _onClose, onSuccess }: { proj
         }
       }
 
-      // Auto-match against selected smeta items
-      if (selectedSmetaId && selectedSmetaId !== "__none__" && smetaItems.length > 0) {
-        items = items.map(item => {
-          const q = item.name.toLowerCase().trim();
-          const match = smetaItems.find(si => {
-            const n = si.name.toLowerCase().trim();
-            return n === q || n.includes(q) || q.includes(n);
-          });
-          return match ? { ...item, smetaItemId: match.id } : item;
-        });
-      }
-
       setParsed(items);
+      onParsed?.();
     } finally {
       setParsing(false);
     }
@@ -534,13 +562,13 @@ function InlineCreateRequest({ projectId, onClose: _onClose, onSuccess }: { proj
         <div className="space-y-4">
           {visibleSmetas.length > 0 && (
             <div className="space-y-2">
-              <Label>Smeta (ixtiyoriy)</Label>
+              <Label>Smeta {visibleSmetas.length > 0 ? <span className="text-destructive">*</span> : <span className="text-muted-foreground text-xs">(ixtiyoriy)</span>}</Label>
               <Select value={selectedSmetaId} onValueChange={handleSmetaChange}>
-                <SelectTrigger className="h-9 text-[13px]">
+                <SelectTrigger className="h-10 text-[14px] w-full">
                   <SelectValue placeholder="Smeta tanlang — elementlar avtomatik aniqlanadi" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="__none__" className="text-[12px] text-muted-foreground">— Smetasiz</SelectItem>
+                  <SelectItem value="__none__" className="text-[12px] text-muted-foreground">— Smeta tanlang</SelectItem>
                   {/* If no building selected — group by buildings */}
                   {!selectedBuildingId && buildings.length > 0 ? (
                     <>
@@ -572,8 +600,8 @@ function InlineCreateRequest({ projectId, onClose: _onClose, onSuccess }: { proj
                   )}
                 </SelectContent>
               </Select>
-              {selectedSmetaId && smetaItems.length > 0 && (
-                <p className="text-[11px] text-[#378add]">✓ {smetaItems.length} ta element yuklandi</p>
+              {selectedSmetaId && selectedSmetaId !== "__none__" && smetaItems.length > 0 && (
+                <p className="text-[11px] text-emerald-600">✓ Smeta tanlandi</p>
               )}
             </div>
           )}
@@ -606,8 +634,8 @@ function InlineCreateRequest({ projectId, onClose: _onClose, onSuccess }: { proj
             <Table className="table-fixed w-full">
               <TableHeader>
                 <TableRow className="bg-white hover:bg-white">
-                  <TableHead className="w-[35%] text-[11px] font-semibold uppercase tracking-[0.04em] text-[#378add]">Material</TableHead>
-                  <TableHead className="w-[25%] text-[11px] font-semibold uppercase tracking-[0.04em] text-[#378add]">Miqdor</TableHead>
+                  <TableHead className="w-[28%] text-[11px] font-semibold uppercase tracking-[0.04em] text-[#378add]">Material</TableHead>
+                  <TableHead className="w-[18%] text-[11px] font-semibold uppercase tracking-[0.04em] text-[#378add]">Miqdor</TableHead>
                   {smetaItems.length > 0 && (
                     <TableHead className="text-[11px] font-semibold uppercase tracking-[0.04em] text-[#378add]">Smeta elementi</TableHead>
                   )}
@@ -641,37 +669,17 @@ function InlineCreateRequest({ projectId, onClose: _onClose, onSuccess }: { proj
                     </TableCell>
                     {smetaItems.length > 0 && (
                       <TableCell>
-                        <Select
-                          value={item.smetaItemId ?? "__none__"}
-                          onValueChange={(val) => setParsed(parsed.map((p, idx) => idx === i ? { ...p, smetaItemId: val === "__none__" ? undefined : val } : p))}
-                        >
-                          <SelectTrigger className="h-8 text-[12px]">
-                            <SelectValue placeholder="Element (ixtiyoriy)" />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <div className="px-2 py-1 border-b border-[#dbe7f3]">
-                              <input
-                                placeholder="Qidirish..."
-                                value={smetaItemSearch[i] ?? ""}
-                                onChange={e => setSmetaItemSearch(s => ({ ...s, [i]: e.target.value }))}
-                                onKeyDown={e => e.stopPropagation()}
-                                style={{ width: "100%", border: "1px solid #dbe7f3", borderRadius: 6, padding: "3px 8px", fontSize: 12, outline: "none" }}
-                              />
-                            </div>
-                            <SelectItem value="__none__" className="text-[12px] text-muted-foreground">— Elementisiz</SelectItem>
-                            {smetaItems
-                              .filter(si => {
-                                const q = (smetaItemSearch[i] ?? "").toLowerCase();
-                                return !q || si.name.toLowerCase().includes(q);
-                              })
-                              .map(si => (
-                                <SelectItem key={si.id} value={si.id} className="text-[12px]">
-                                  {si.name} ({si.unit})
-                                  {item.smetaItemId === si.id && " ✓"}
-                                </SelectItem>
-                              ))}
-                          </SelectContent>
-                        </Select>
+                        <SmetaItemPicker
+                          smetaId={selectedSmetaId}
+                          smetaItems={smetaItemResults[i] ?? smetaItems}
+                          value={item.smetaItemId}
+                          search={smetaItemSearch[i] ?? ""}
+                          onSearch={async (q, results) => {
+                            setSmetaItemSearch(s => ({ ...s, [i]: q }));
+                            setSmetaItemResults(r => ({ ...r, [i]: results }));
+                          }}
+                          onChange={val => setParsed(parsed.map((p, idx) => idx === i ? { ...p, smetaItemId: val } : p))}
+                        />
                       </TableCell>
                     )}
                     <TableCell className="text-right">
@@ -692,7 +700,7 @@ function InlineCreateRequest({ projectId, onClose: _onClose, onSuccess }: { proj
           {submitError && <p className="text-sm text-destructive">{String(submitError)}</p>}
 
           <div className="flex gap-3 justify-end">
-            <Button variant="outline" onClick={() => setParsed(null)}>Tahrirlash</Button>
+            <Button variant="outline" onClick={() => { setParsed(null); _onBack?.(); }}>Tahrirlash</Button>
             <Button onClick={() => submit(undefined)} disabled={loading}>
               {loading ? "Yuborilmoqda..." : "Tasdiqlash"}
             </Button>
@@ -981,6 +989,159 @@ function HistoryView({
           summary={`Sahifa ${page + 1} / ${totalPages}`}
         />
       </Card>
+    </div>
+  );
+}
+
+// Lotin → Kirill va Kirill → Lotin transliteration (O'zbek)
+const LT: Record<string, string> = {
+  a:"а",b:"б",d:"д",e:"е",f:"ф",g:"г",h:"х",i:"и",j:"ж",k:"к",l:"л",m:"м",
+  n:"н",o:"о",p:"п",q:"қ",r:"р",s:"с",t:"т",u:"у",v:"в",x:"х",y:"й",z:"з",
+  ch:"ч",sh:"ш",ng:"нг",yo:"ё",yu:"ю",ya:"я",gh:"ғ",
+};
+const CT: Record<string, string> = Object.fromEntries(Object.entries(LT).map(([l,c])=>[c,l]));
+
+function translitBoth(s: string): string[] {
+  const lo = s.toLowerCase();
+  // try latin→cyrillic
+  let cy = ""; let i = 0;
+  while (i < lo.length) {
+    if (LT[lo[i]+lo[i+1]]) { cy += LT[lo[i]+lo[i+1]]; i+=2; }
+    else if (LT[lo[i]]) { cy += LT[lo[i]]; i++; }
+    else { cy += lo[i]; i++; }
+  }
+  // try cyrillic→latin
+  let lat = ""; i = 0;
+  while (i < lo.length) {
+    if (CT[lo[i]+lo[i+1]]) { lat += CT[lo[i]+lo[i+1]]; i+=2; }
+    else if (CT[lo[i]]) { lat += CT[lo[i]]; i++; }
+    else { lat += lo[i]; i++; }
+  }
+  return [lo, cy, lat].filter((v,idx,arr) => arr.indexOf(v)===idx);
+}
+
+function SmetaItemPicker({
+  smetaId, smetaItems, value, search, onSearch, onChange,
+}: {
+  smetaId: string;
+  smetaItems: { id: string; name: string; unit: string }[];
+  value?: string;
+  search: string;
+  onSearch: (q: string, results: { id: string; name: string; unit: string }[]) => void;
+  onChange: (id: string | undefined) => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const [serverResults, setServerResults] = useState<{ id: string; name: string; unit: string }[]>([]);
+  const [searching, setSearching] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
+  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(() => {
+    const handler = (e: MouseEvent) => {
+      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
+    };
+    document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
+  }, []);
+
+  const handleSearch = (q: string) => {
+    if (debounceRef.current) clearTimeout(debounceRef.current);
+    if (!q.trim()) {
+      setServerResults([]);
+      onSearch("", []);
+      return;
+    }
+    onSearch(q, serverResults);
+    debounceRef.current = setTimeout(async () => {
+      setSearching(true);
+      try {
+        const variants = translitBoth(q);
+        // Search all variants, merge results
+        const all: { id: string; name: string; unit: string }[] = [];
+        for (const v of variants) {
+          const res = await smetaItemsApi.getAll({ smetaId, search: v, limit: 50 });
+          for (const item of res.data) {
+            if (!all.find(a => a.id === item.id)) all.push(item);
+          }
+        }
+        setServerResults(all);
+        onSearch(q, all);
+      } catch { /* ignore */ } finally {
+        setSearching(false);
+      }
+    }, 300);
+  };
+
+  const selected = smetaItems.find(si => si.id === value) ?? serverResults.find(si => si.id === value);
+  const displayItems = search ? serverResults : smetaItems.slice(0, 80);
+
+  return (
+    <div ref={ref} className="relative w-full max-w-[320px]">
+      <button
+        type="button"
+        onClick={() => { setOpen(o => !o); setTimeout(() => inputRef.current?.focus(), 50); }}
+        className="flex h-9 w-full items-center justify-between rounded-md border border-[#dbe7f3] bg-white px-3 text-[13px] text-left hover:border-[#185fa5] transition-colors"
+      >
+        <span className={`truncate ${selected ? "text-[#0c447c]" : "text-[#94a3b8]"}`}>
+          {selected ? selected.name : "Element tanlang..."}
+        </span>
+        <span className="ml-2 text-[#94a3b8] shrink-0">▾</span>
+      </button>
+
+      {open && (
+        <div className="absolute z-50 mt-1 w-[420px] rounded-[10px] border border-[#dbe7f3] bg-white shadow-lg overflow-hidden">
+          {/* Search */}
+          <div className="flex items-center gap-2 border-b border-[#dbe7f3] px-3 py-2">
+            {searching
+              ? <span className="h-3.5 w-3.5 shrink-0 animate-spin rounded-full border-2 border-[#185fa5] border-t-transparent" />
+              : <Search className="h-3.5 w-3.5 text-[#94a3b8] shrink-0" />}
+            <input
+              ref={inputRef}
+              placeholder="Qidirish (lotin yoki kirill)..."
+              value={search}
+              onChange={e => handleSearch(e.target.value)}
+              className="flex-1 text-[13px] outline-none placeholder:text-[#94a3b8]"
+            />
+            {search && (
+              <button onClick={() => { handleSearch(""); setServerResults([]); }} className="text-[#94a3b8] hover:text-[#64748b]">✕</button>
+            )}
+          </div>
+
+          {/* Clear option */}
+          <button
+            type="button"
+            onClick={() => { onChange(undefined); setOpen(false); onSearch(""); }}
+            className="w-full px-3 py-2 text-left text-[12px] text-[#94a3b8] hover:bg-[#f8fafc] border-b border-[#f1f5f9]"
+          >
+            — Elementisiz
+          </button>
+
+          {/* List */}
+          <div className="max-h-[260px] overflow-y-auto">
+            {displayItems.length === 0 ? (
+              <div className="px-3 py-4 text-center text-[12px] text-[#94a3b8]">{searching ? "Qidirilmoqda..." : "Topilmadi"}</div>
+            ) : (
+              displayItems.map(si => (
+                <button
+                  key={si.id}
+                  type="button"
+                  onClick={() => { onChange(si.id); setOpen(false); onSearch(""); }}
+                  className={`w-full px-3 py-2 text-left hover:bg-[#eff6ff] transition-colors flex items-center justify-between gap-2 ${si.id === value ? "bg-[#eff6ff]" : ""}`}
+                >
+                  <span className="text-[12px] text-[#1e293b] leading-snug">{si.name}</span>
+                  <span className="text-[11px] text-[#94a3b8] shrink-0 rounded bg-[#f1f5f9] px-1.5 py-0.5">{si.unit}</span>
+                </button>
+              ))
+            )}
+          </div>
+          {!search && smetaItems.length > 80 && (
+            <div className="px-3 py-1.5 text-center text-[11px] text-[#94a3b8] border-t border-[#f1f5f9]">
+              Qidiruv orqali aniqlang ({smetaItems.length} ta element)
+            </div>
+          )}
+        </div>
+      )}
     </div>
   );
 }

@@ -22,7 +22,7 @@ export interface PurchaseRequest {
   requestedQty: number;
   requestedAmount: number;
   note?: string;
-  status: 'PENDING' | 'APPROVED' | 'REJECTED' | 'IN_TRANSIT' | 'DELIVERED' | 'RECEIVED' | 'FINALIZED';
+  status: 'PENDING_DIRECTOR' | 'PENDING' | 'APPROVED' | 'REJECTED' | 'IN_TRANSIT' | 'DELIVERED' | 'RECEIVED' | 'FINALIZED';
   requestedById: string;
   approvedById?: string;
   approvedAt?: string;
@@ -127,13 +127,13 @@ export const requestsApi = {
       method: 'GET',
     }),
 
-  parseText: (text: string) =>
-    apiClient<{ items: { name: string; qty: number; unit: string }[] }>('/vendor/requests/parse-text', {
+  parseText: (text: string, smetaId?: string) =>
+    apiClient<{ items: { name: string; qty: number; unit: string; smetaItemId?: string; smetaItemName?: string; smetaItemUnit?: string }[] }>('/vendor/requests/parse-text', {
       method: 'POST',
-      body: JSON.stringify({ text }),
+      body: JSON.stringify({ text, smetaId }),
     }),
 
-  submitText: (projectId: string, items: { name: string; qty: number; unit: string }[]) =>
+  submitText: (projectId: string, items: { name: string; qty: number; unit: string; smetaItemId?: string }[]) =>
     apiClient<{ count: number }>('/vendor/requests/submit-text', {
       method: 'POST',
       body: JSON.stringify({ projectId, items }),
@@ -154,6 +154,18 @@ export const requestsApi = {
   delete: (id: string) =>
     apiClient<void>(`/vendor/requests/${id}`, {
       method: 'DELETE',
+    }),
+
+  directorApprove: (id: string, smetaId?: string) =>
+    apiClient<PurchaseRequest>(`/vendor/requests/${id}/director-approve`, {
+      method: 'POST',
+      body: JSON.stringify({ smetaId }),
+    }),
+
+  directorReject: (id: string, reason: string) =>
+    apiClient<PurchaseRequest>(`/vendor/requests/${id}/director-reject`, {
+      method: 'POST',
+      body: JSON.stringify({ rejectionReason: reason }),
     }),
 
   approve: (id: string) =>

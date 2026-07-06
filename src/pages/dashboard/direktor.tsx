@@ -64,6 +64,7 @@ import { suppliersApi, Supplier, SupplierDebt } from "@/lib/api/suppliers";
 import { workersApi, WorkLog } from "@/lib/api/workers";
 import { analyticsApi } from "@/lib/api/analytics";
 import { projectsApi, Project } from "@/lib/api/projects";
+import { smetasApi, Smeta } from "@/lib/api/smetas";
 import { StatsSkeleton } from "@/components/ui/table-skeleton";
 import { ErrorMessage } from "@/components/ui/error-message";
 import { useProject } from "@/lib/project-context";
@@ -173,6 +174,10 @@ export default function DirektorPage() {
   const [unitPrice, setUnitPrice] = useState("");
   const [totalAmount, setTotalAmount] = useState("");
   const [rejectReason, setRejectReason] = useState("");
+  const [directorRejectId, setDirectorRejectId] = useState<string | null>(null);
+  const [directorRejectReason, setDirectorRejectReason] = useState("");
+  const [directorApproveReq, setDirectorApproveReq] = useState<{ id: string; projectId?: string } | null>(null);
+  const [directorApproveSmetaId, setDirectorApproveSmetaId] = useState<string>("");
 
   useEffect(() => {
     setPage(1);
@@ -188,6 +193,15 @@ export default function DirektorPage() {
   } = useApi(() => projectsApi.getAll({ limit: 100 }), []);
 
   const projects = projectsData?.data || [];
+
+  const canDirectorApprove = hasPermission("request:director_approve");
+
+  // Fetch requests awaiting director approval
+  const {
+    data: directorPendingData,
+    loading: directorPendingLoading,
+    refetch: refetchDirectorPending,
+  } = useApi(() => requestsApi.getAll({ status: "PENDING_DIRECTOR", limit: 50, projectId: projectIdParam }), [selectedProjectId], { enabled: canDirectorApprove });
 
   // Fetch pending requests
   const {
@@ -260,6 +274,26 @@ export default function DirektorPage() {
       requestsApi.reject(id, reason)
   );
 
+  const { mutate: directorApprove, loading: directorApproving } = useMutation(
+    async ({ id, smetaId }: { id: string; smetaId?: string }) => {
+      await requestsApi.directorApprove(id, smetaId);
+      refetchDirectorPending();
+      refetchPendingRequests();
+    }
+  );
+
+  const { data: approveSmetas } = useApi(
+    () => directorApproveReq?.projectId
+      ? smetasApi.getAll({ projectId: directorApproveReq.projectId, limit: 50 })
+      : Promise.resolve({ data: [] as Smeta[], total: 0, page: 1, limit: 50 }),
+    [directorApproveReq?.projectId],
+    { enabled: !!directorApproveReq }
+  );
+
+  const { mutate: directorReject, loading: directorRejecting } = useMutation(
+    async ({ id, reason }: { id: string; reason: string }) => { await requestsApi.directorReject(id, reason); refetchDirectorPending(); }
+  );
+
   const { mutate: createDebt, loading: creatingDebt } = useMutation(
     (data: { supplierId: string; amount: number; description?: string }) =>
       suppliersApi.createDebt(data)
@@ -279,6 +313,7 @@ export default function DirektorPage() {
       workersApi.rejectWorkLog(id, { reason })
   );
 
+  const directorPendingRequests = directorPendingData?.data || [];
   const pendingRequests = pendingRequestsData?.data || [];
   const finalizedRequests = finalizedRequestsData?.data || [];
   const suppliers = suppliersData?.data || [];
@@ -440,6 +475,60 @@ export default function DirektorPage() {
           Tasdiqlash
         </h1>
       </div>
+
+      {/* Director Approval Section */}
+      {canDirectorApprove && (directorPendingLoading || directorPendingRequests.length > 0) && (
+        <div className="rounded-[12px] border border-[#f8e6bd] bg-[#fffbf0] p-5 space-y-3">
+          <div className="flex items-center gap-2">
+            <Package className="h-4 w-4 text-[#c88716]" />
+            <h3 className="text-[14px] font-semibold text-[#0c447c]">
+              Direktor tasdiqlashi kerak
+            </h3>
+            {directorPendingRequests.length > 0 && (
+              <span className="ml-auto rounded-full bg-[#f8e6bd] px-2 py-0.5 text-[11px] font-semibold text-[#c88716]">
+                {directorPendingRequests.length} ta
+              </span>
+            )}
+          </div>
+          {directorPendingLoading ? (
+            <div className="space-y-2">{[1,2].map(i => <div key={i} className="h-14 bg-[#f8e6bd]/40 rounded-lg animate-pulse" />)}</div>
+          ) : (
+            <div className="space-y-2">
+              {directorPendingRequests.map(req => (
+                <div key={req.id} className="flex items-center justify-between gap-3 rounded-lg border border-[#f8e6bd] bg-white p-3">
+                  <div className="flex-1 min-w-0">
+                    <p className="text-[13px] font-medium text-[#0c447c] truncate">{req.note || "Material"}</p>
+                    <p className="text-[11px] text-[#64748b] mt-0.5">
+                      {req.requestedQty} {req.smetaItem?.unit || "dona"} •{" "}
+                      {req.requestedBy?.name || "Prorab"} • {new Date(req.createdAt).toLocaleDateString("uz-UZ")}
+                    </p>
+                  </div>
+                  <div className="flex items-center gap-2 shrink-0">
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      className="h-8 text-destructive hover:text-destructive border-destructive/30"
+                      disabled={directorRejecting}
+                      onClick={() => { setDirectorRejectId(req.id); setDirectorRejectReason(""); }}
+                    >
+                      <XCircle className="h-3.5 w-3.5" />
+                    </Button>
+                    <Button
+                      size="sm"
+                      className="h-8 bg-[#185fa5] hover:bg-[#0c447c]"
+                      disabled={directorApproving}
+                      onClick={() => { setDirectorApproveReq({ id: req.id, projectId: selectedProjectId !== "all" ? selectedProjectId : undefined }); setDirectorApproveSmetaId(""); }}
+                    >
+                      <CheckCircle className="h-3.5 w-3.5 mr-1" />
+                      Tasdiqlash
+                    </Button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
 
       {unvalidatedWorkLogsLoading ? (
         <StatsSkeleton />
@@ -991,6 +1080,78 @@ export default function DirektorPage() {
       </Dialog>
 
       {/* Request Detail Dialog */}
+      {/* Director Approve Dialog */}
+      <Dialog open={!!directorApproveReq} onOpenChange={(o) => { if (!o) setDirectorApproveReq(null); }}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader>
+            <DialogTitle>Zayavkani tasdiqlash</DialogTitle>
+            <DialogDescription>Mahsulot qaysi smetaga qo'shilsin?</DialogDescription>
+          </DialogHeader>
+          <div className="space-y-3 py-2">
+            <select
+              className="w-full rounded-lg border border-[#dbe7f3] p-2.5 text-sm outline-none focus:border-[#185fa5] bg-white"
+              value={directorApproveSmetaId}
+              onChange={e => setDirectorApproveSmetaId(e.target.value)}
+            >
+              <option value="">— Smetaga qo'shmasdan tasdiqlash</option>
+              {(approveSmetas?.data || []).map(s => (
+                <option key={s.id} value={s.id}>{s.name}</option>
+              ))}
+            </select>
+            <div className="flex justify-end gap-2">
+              <Button variant="outline" size="sm" onClick={() => setDirectorApproveReq(null)}>Bekor</Button>
+              <Button
+                size="sm"
+                className="bg-[#185fa5] hover:bg-[#0c447c]"
+                disabled={directorApproving}
+                onClick={async () => {
+                  if (directorApproveReq) {
+                    await directorApprove({ id: directorApproveReq.id, smetaId: directorApproveSmetaId || undefined });
+                    setDirectorApproveReq(null);
+                  }
+                }}
+              >
+                <CheckCircle className="h-3.5 w-3.5 mr-1" />
+                Tasdiqlash
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Director Reject Dialog */}
+      <Dialog open={!!directorRejectId} onOpenChange={(o) => { if (!o) setDirectorRejectId(null); }}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader>
+            <DialogTitle>Rad etish sababi</DialogTitle>
+            <DialogDescription>Prorabga izoh qoldiring</DialogDescription>
+          </DialogHeader>
+          <div className="space-y-3 py-2">
+            <textarea
+              className="w-full rounded-lg border border-[#dbe7f3] p-3 text-sm outline-none focus:border-[#185fa5] resize-none"
+              rows={3}
+              placeholder="Sabab yozing..."
+              value={directorRejectReason}
+              onChange={e => setDirectorRejectReason(e.target.value)}
+            />
+            <div className="flex justify-end gap-2">
+              <Button variant="outline" size="sm" onClick={() => setDirectorRejectId(null)}>Bekor</Button>
+              <Button
+                size="sm"
+                variant="destructive"
+                disabled={directorRejecting}
+                onClick={async () => {
+                  if (directorRejectId) {
+                    await directorReject({ id: directorRejectId, reason: directorRejectReason });
+                    setDirectorRejectId(null);
+                  }
+                }}
+              >Rad etish</Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
       <Dialog open={!!requestDetailDialog} onOpenChange={() => setRequestDetailDialog(null)}>
         <DialogContent>
           <DialogHeader>
