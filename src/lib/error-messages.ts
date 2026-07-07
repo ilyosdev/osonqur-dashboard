@@ -9,6 +9,13 @@ const ERROR_MESSAGES: Record<string, string> = {
   INSUFFICIENT_STOCK: "Omborda yetarli mahsulot yo'q",
   PAYMENT_EXCEEDS_REMAINING: "To'lov summasi qolgan qarzdan oshib ketdi",
   DEPOSIT_FAILED: "Pul kiritishda xatolik yuz berdi",
+  DEBT_ALREADY_PAID: "Bu qarz allaqachon to'langan",
+  INVALID_PAYMENT_AMOUNT: "To'lov summasi noto'g'ri",
+  WORKER_OVERPAY_NOT_ALLOWED: "To'lov summasi ustaning qarzidan oshib ketdi",
+  WORK_LOG_OVERPAY_NOT_ALLOWED: "To'lov summasi ish uchun qolgan qarzdan oshib ketdi",
+  WORK_LOG_WORKER_MISMATCH: "Bu ish boshqa ustaga tegishli",
+  WORK_LOG_NOT_VALIDATED: "Ish hali tasdiqlanmagan",
+  WORK_LOG_ALREADY_PAID: "Bu ish allaqachon to'langan",
 
   // Topilmadi
   PROJECT_NOT_FOUND: "Loyiha topilmadi",
