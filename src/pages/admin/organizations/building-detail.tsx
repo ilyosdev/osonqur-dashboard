@@ -26,6 +26,7 @@ import {
 } from "@/components/ui/select";
 import { adminApi, AdminBuilding, AdminProjectSmeta, AdminSmetaType } from "@/lib/api/admin";
 import { smetaItemsApi, CreateSmetaItemRequest } from "@/lib/api/smeta-items";
+import { uploadApi } from "@/lib/api/upload";
 
 interface ExcelRow { name: string; unit: string; quantity: number; unitPrice: number }
 
@@ -60,6 +61,7 @@ export default function BuildingDetailPage() {
   const [excelRows, setExcelRows] = useState<ExcelRow[]>([]);
   const [excelError, setExcelError] = useState("");
   const [excelUploading, setExcelUploading] = useState(false);
+  const [excelParsing, setExcelParsing] = useState(false);
   const [excelFileName, setExcelFileName] = useState("");
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -205,16 +207,36 @@ export default function BuildingDetailPage() {
     setExcelDialogOpen(true);
   };
 
-  const handleExcelFile = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleExcelFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
     setExcelFileName(file.name);
     setExcelError("");
-    const reader = new FileReader();
-    reader.onload = (ev) => {
+    setExcelRows([]);
+    setExcelParsing(true);
+    try {
+      // Backend AI parser (OpenRouter): istalgan ustun tartibidagi Excelni
+      // tushunadi — sarlavhalar/kategoriyalarni AI aniqlaydi. AI ishlamasa
+      // backend o'zi oddiy parserga tushadi.
+      const result = await uploadApi.parseSmetaItems(file, true);
+      const parsed: ExcelRow[] = (result.data || [])
+        .filter((r) => r.name && r.name.trim())
+        .map((r) => ({
+          name: String(r.name).trim().slice(0, 500),
+          unit: String(r.unit || "dona").trim().slice(0, 50),
+          quantity: Number(r.quantity) || 0,
+          unitPrice: Number(r.unitPrice) || 0,
+        }));
+      if (parsed.length === 0) {
+        setExcelError("Excel faylda ma'lumot topilmadi.");
+        return;
+      }
+      setExcelRows(parsed);
+    } catch (err) {
+      // Backend xato bersa — brauzerda oddiy o'qishga tushamiz (zaxira).
       try {
-        const data = new Uint8Array(ev.target!.result as ArrayBuffer);
-        const workbook = XLSX.read(data, { type: "array" });
+        const buf = await file.arrayBuffer();
+        const workbook = XLSX.read(new Uint8Array(buf), { type: "array" });
         const sheet = workbook.Sheets[workbook.SheetNames[0]];
         const rows = XLSX.utils.sheet_to_json<string[]>(sheet, { header: 1 });
         const parsed: ExcelRow[] = [];
@@ -229,18 +251,38 @@ export default function BuildingDetailPage() {
         }
         if (parsed.length === 0) { setExcelError("Excel faylda ma'lumot topilmadi. Format: Nomi | Birligi | Miqdori | Narxi"); return; }
         setExcelRows(parsed);
-      } catch { setExcelError("Excel faylni o'qishda xatolik"); }
-    };
-    reader.readAsArrayBuffer(file);
+      } catch {
+        setExcelError(err instanceof Error ? err.message : "Excel faylni o'qishda xatolik");
+      }
+    } finally {
+      setExcelParsing(false);
+    }
   };
 
   const handleExcelUpload = async () => {
-    if (!excelSmetaId || excelRows.length === 0) return;
+    if (excelRows.length === 0) return;
     setExcelUploading(true);
     setExcelError("");
     try {
+      // Smeta tanlanmagan bo'lsa (bina bo'sh) — avval AVTOMATIK yangi smeta
+      // yaratamiz, elementlarni o'sha smetaga solamiz. Nomi Excel fayl nomidan.
+      let targetSmetaId = excelSmetaId;
+      if (!targetSmetaId) {
+        if (!orgId || !projectId || !buildingId) {
+          setExcelError("Bino aniqlanmadi");
+          return;
+        }
+        const smetaName = (excelFileName || "Yangi smeta").replace(/\.(xlsx|xls)$/i, "").slice(0, 200);
+        const created = await adminApi.createProjectSmeta(orgId, projectId, {
+          name: smetaName,
+          type: "CONSTRUCTION",
+          buildingId,
+        });
+        targetSmetaId = created.id;
+      }
+
       const items: CreateSmetaItemRequest[] = excelRows.map((row) => ({
-        smetaId: excelSmetaId,
+        smetaId: targetSmetaId,
         name: row.name,
         unit: row.unit,
         quantity: row.quantity,
@@ -250,6 +292,7 @@ export default function BuildingDetailPage() {
       await smetaItemsApi.bulkCreate(items);
       setExcelDialogOpen(false);
       fetchSmetas();
+      fetchBuilding();
     } catch (err) {
       setExcelError(err instanceof Error ? err.message : "Yuklashda xatolik");
     } finally {
@@ -306,23 +349,26 @@ export default function BuildingDetailPage() {
         <button onClick={openAddSmetaDialog} style={{ display: "flex", alignItems: "center", gap: 6, height: 36, padding: "0 16px", borderRadius: 8, border: "none", background: C.blue, fontSize: 13, fontWeight: 600, color: "#fff", cursor: "pointer" }}>
           <Plus size={14} /> Yangi smeta
         </button>
-        {smetas.length > 0 && (
-          smetas.length === 1 ? (
-            <button onClick={() => openExcelDialog(smetas[0].id)} style={{ display: "flex", alignItems: "center", gap: 6, height: 36, padding: "0 16px", borderRadius: 8, border: `1px solid ${C.border}`, background: "#fff", fontSize: 13, color: C.blue, cursor: "pointer" }}>
-              <Upload size={14} /> Excel yuklash
-            </button>
-          ) : (
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <button style={{ display: "flex", alignItems: "center", gap: 6, height: 36, padding: "0 16px", borderRadius: 8, border: `1px solid ${C.border}`, background: "#fff", fontSize: 13, color: C.blue, cursor: "pointer" }}>
-                  <Upload size={14} /> Excel yuklash
-                </button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end">
-                {smetas.map((s) => <DropdownMenuItem key={s.id} onClick={() => openExcelDialog(s.id)}>{s.name}</DropdownMenuItem>)}
-              </DropdownMenuContent>
-            </DropdownMenu>
-          )
+        {smetas.length === 0 ? (
+          // Smeta yo'q — Excel yuklaganda AI o'qib, AVTOMATIK yangi smeta yaratadi.
+          <button onClick={() => openExcelDialog("")} style={{ display: "flex", alignItems: "center", gap: 6, height: 36, padding: "0 16px", borderRadius: 8, border: `1px solid ${C.border}`, background: "#fff", fontSize: 13, color: C.blue, cursor: "pointer" }}>
+            <Upload size={14} /> Excel yuklash
+          </button>
+        ) : smetas.length === 1 ? (
+          <button onClick={() => openExcelDialog(smetas[0].id)} style={{ display: "flex", alignItems: "center", gap: 6, height: 36, padding: "0 16px", borderRadius: 8, border: `1px solid ${C.border}`, background: "#fff", fontSize: 13, color: C.blue, cursor: "pointer" }}>
+            <Upload size={14} /> Excel yuklash
+          </button>
+        ) : (
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <button style={{ display: "flex", alignItems: "center", gap: 6, height: 36, padding: "0 16px", borderRadius: 8, border: `1px solid ${C.border}`, background: "#fff", fontSize: 13, color: C.blue, cursor: "pointer" }}>
+                <Upload size={14} /> Excel yuklash
+              </button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              {smetas.map((s) => <DropdownMenuItem key={s.id} onClick={() => openExcelDialog(s.id)}>{s.name}</DropdownMenuItem>)}
+            </DropdownMenuContent>
+          </DropdownMenu>
         )}
       </div>
 
@@ -531,9 +577,13 @@ export default function BuildingDetailPage() {
           <div className="px-7 pt-6 pb-0 shrink-0">
             <div className="flex items-start justify-between mb-1">
               <div>
-                <h2 className="text-lg font-medium">Smeta elementlarini Excel orqali yuklash</h2>
+                <h2 className="text-lg font-medium">
+                  {excelSmetaId ? "Smeta elementlarini Excel orqali yuklash" : "Excel orqali yangi smeta yaratish"}
+                </h2>
                 <p className="text-sm text-muted-foreground mt-1">
-                  Excel fayl formati: <strong className="text-foreground font-medium">Nomi</strong> | <strong className="text-foreground font-medium">Birligi</strong> | <strong className="text-foreground font-medium">Miqdori</strong> | <strong className="text-foreground font-medium">Narxi</strong> <span className="text-muted-foreground/60">(1-qator sarlavha)</span>
+                  {excelSmetaId
+                    ? "AI Excel faylini o'qib, elementlarni tanlangan smetaga qo'shadi."
+                    : "AI Excel faylini o'qib, avtomatik yangi smeta yaratadi va elementlarni ichiga soladi."}
                 </p>
               </div>
             </div>
@@ -547,9 +597,11 @@ export default function BuildingDetailPage() {
               </div>
               <div className="flex-1 min-w-0">
                 <p className="text-sm font-medium truncate">{excelFileName || "Excel faylni tanlang (.xlsx, .xls)"}</p>
-                <p className="text-xs text-muted-foreground mt-0.5">Bosing yoki faylni bu yerga tashlang</p>
+                <p className="text-xs text-muted-foreground mt-0.5">
+                  {excelParsing ? "⏳ AI faylni o'qiyapti..." : "AI istalgan formatni tushunadi — bosing yoki tashlang"}
+                </p>
               </div>
-              <input ref={fileInputRef} type="file" accept=".xlsx,.xls" className="hidden" onChange={handleExcelFile} />
+              <input ref={fileInputRef} type="file" accept=".xlsx,.xls" className="hidden" onChange={handleExcelFile} disabled={excelParsing} />
             </div>
             {excelRows.length > 0 && (
               <div className="flex items-center gap-2 mt-4 mb-3">
